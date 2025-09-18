@@ -270,7 +270,7 @@ export function OrderCreationForm() {
                 You need to be logged in to create an order. Please sign in with your phone number.
               </p>
               <p className="text-sm text-yellow-600 mt-1">
-                For testing: Use register number + phone "99135213"
+                For testing: Use register number + phone &ldquo;99135213&rdquo;
               </p>
             </div>
             <div className="flex space-x-3">
@@ -290,7 +290,7 @@ export function OrderCreationForm() {
               <Button 
                 onClick={() => {
                   // Temporary test mode - simulate user for testing
-                  setUser({ id: '2f04b895-e3f2-4b10-af5e-444a1ef9c366' } as any)
+                  setUser({ id: '2f04b895-e3f2-4b10-af5e-444a1ef9c366' } as { id: string })
                   toast.info('Test mode activated - Using test user')
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
