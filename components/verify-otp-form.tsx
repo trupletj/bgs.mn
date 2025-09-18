@@ -1,6 +1,7 @@
 'use client'
-import { redirect, useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -28,11 +29,9 @@ const FormSchema = z.object({
     }),
 })
 
-export function VerifyOtpForm() {
+function VerifyOtpFormInner() {
     const supabase = createClient()
-    const router = useRouter()
     const searchParams = useSearchParams()
-    const register = searchParams.get('register') || ''
     const phone = searchParams.get('phone') || ''
 
     const form = useForm<z.infer<typeof FormSchema>>({
@@ -88,5 +87,13 @@ export function VerifyOtpForm() {
             </Form>
 
         </>
+    )
+}
+
+export function VerifyOtpForm() {
+    return (
+        <Suspense>
+            <VerifyOtpFormInner />
+        </Suspense>
     )
 }
