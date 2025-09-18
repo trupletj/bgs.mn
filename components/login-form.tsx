@@ -26,7 +26,7 @@ const supabase = createClient()
   const onRequest = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(undefined)
-    const { data, error } = await supabase.auth.signInWithOtp({
+    const {  error } = await supabase.auth.signInWithOtp({
           phone , options : {
             shouldCreateUser : true , data : { register_number : register}
           }

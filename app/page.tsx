@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { createClient } from '@/utils/supabase/server'
 import { RequestOtpForm } from "@/components/login-form"
 import { redirect } from "next/navigation";
