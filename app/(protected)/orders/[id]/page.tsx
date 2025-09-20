@@ -24,7 +24,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     }
     
     if (!orderDetails) {
-      console.error('No order details found for ID:', orderId)
+      console.error('No order details found for ID:', orderId)  
       notFound()
     }
 
