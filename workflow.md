@@ -37,15 +37,16 @@ Create the following tables in Supabase:
 
 ### 3. Order Status Workflow
 Implement this exact workflow sequence:
-1. `draft` → User creates order
+1. `draft` → User creates order /  Эхний ээлжинд захиалга хийх хүн 
 2. `pending_review` → Submitted for technical review
-3. `in_review` → Technical reviewers make changes
+3. `in_review` → Technical reviewers make changes 
 4. `pending_approval` → Ready for department approval
 5. `approved` → Department approved, needs final approval
-6. `final_approved` → Final approval completed
-7. `in_procurement` → Procurement officer handling purchase
-8. `completed` → All purchases completed
-9. `rejected`/`cancelled` - Terminal states
+6. `pending_final_approval`
+7. `final_approved` → Final approval completed
+8. `in_procurement` → Procurement officer handling purchase
+9. `completed` → All purchases completed
+10. `rejected`/`cancelled` - Terminal states
 
 ### 4. Key Features to Implement
 
