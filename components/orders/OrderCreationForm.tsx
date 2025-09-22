@@ -273,31 +273,7 @@ export function OrderCreationForm() {
                 For testing: Use register number + phone &ldquo;99135213&rdquo;
               </p>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                onClick={() => router.push('/')}
-                variant="outline"
-                className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-              >
-                Go to Login
-              </Button>
-              <Button 
-                onClick={() => router.refresh()}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white"
-              >
-                Refresh Page
-              </Button>
-              <Button 
-                onClick={() => {
-                  // Temporary test mode - simulate user for testing
-                  setUser({ id: '2f04b895-e3f2-4b10-af5e-444a1ef9c366' } as { id: string })
-                  toast.info('Test mode activated - Using test user')
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Test Mode (Dev Only)
-              </Button>
-            </div>
+           
           </div>
         </div>
       </div>
