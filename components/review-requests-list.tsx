@@ -19,8 +19,8 @@ interface ReviewRequest {
     status: string;
     urgency_level: string;
     created_at: string;
-    users: {
-      nice_name: string;
+    profile: {
+      name: string;
       department_name: string;
     };
   };
@@ -87,7 +87,6 @@ export function ReviewRequestsList() {
         .eq("profile_id", id?.id)
         .eq("status", "pending")
         .order("assigned_at", { ascending: false });
-      console.log("Fetched review requests:", data);
 
       if (error) {
         throw new Error(error.message);
@@ -180,8 +179,8 @@ export function ReviewRequestsList() {
                 <p className="text-gray-700 mb-1">{request.orders.title}</p>
 
                 <div className="text-sm text-gray-500 space-y-1">
-                  <p>Хүсэлт гаргасан: {request.orders.users.nice_name}</p>
-                  <p>Хэлтэс: {request.orders.users.department_name}</p>
+                  <p>Хүсэлт гаргасан: {request.orders.profile.name}</p>
+                  <p>Хэлтэс: {request.orders.profile.name}</p>
                   <p>
                     Илгээгдсэн:{" "}
                     {new Date(request.assigned_at).toLocaleDateString()}
