@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/utils/supabase/client";
+import { getStepRoleId, StepType } from "@/utils/workflow";
 
 interface Reviewer {
-  user_id: string;
-  users: {
+  profile_id: string;
+  profile: {
     id: string;
-    nice_name: string;
+    name: string;
     phone: string;
     department_name: string;
   };
@@ -20,6 +21,7 @@ interface TechnicalReviewerSelectorProps {
   selectedReviewers: string[];
   onReviewersChange: (userIds: string[]) => void;
   minimumSelection?: number;
+  currentStep: StepType; // Шинэ prop
   maxSelection?: number;
 }
 
@@ -28,10 +30,12 @@ export function TechnicalReviewerSelector({
   onReviewersChange,
   minimumSelection = 2,
   maxSelection,
+  currentStep,
 }: TechnicalReviewerSelectorProps) {
   const [reviewers, setReviewers] = useState<Reviewer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const role_id = getStepRoleId(currentStep);
 
   useEffect(() => {
     const fetchReviewers = async () => {
@@ -39,19 +43,19 @@ export function TechnicalReviewerSelector({
         const supabase = createClient();
 
         const { data: reviewers, error } = await supabase
-          .from("user_roles")
+          .from("roles_profiles")
           .select(
             `
-            user_id,
-            users:user_id (
+            profile_id,
+            profile:profile_id (
               id,
-              nice_name,
+              name,
               phone,
               department_name
             )
           `
           )
-          .eq("role_id", "9")
+          .eq("role_id", role_id)
           .eq("is_active", true);
 
         if (error) {
@@ -59,11 +63,10 @@ export function TechnicalReviewerSelector({
           throw new Error(error.message);
         }
 
-        console.log("Fetched reviewers:", reviewers);
         setReviewers(
           (reviewers || []).map((r: any) => ({
-            user_id: r.user_id,
-            users: Array.isArray(r.users) ? r.users[0] : r.users,
+            profile_id: r.profile_id,
+            profile: Array.isArray(r.profile) ? r.profile[0] : r.profile,
           }))
         );
       } catch (err) {
@@ -80,9 +83,8 @@ export function TechnicalReviewerSelector({
   const handleReviewerToggle = (userId: string) => {
     if (selectedReviewers.includes(userId)) {
       // Хэрэглэгчийг хасах (хасахгүй бол minimumSelection-аас бага болохгүй)
-      if (selectedReviewers.length > minimumSelection) {
-        onReviewersChange(selectedReviewers.filter((id) => id !== userId));
-      }
+
+      onReviewersChange(selectedReviewers.filter((id) => id !== userId));
     } else {
       // Хэрэглэгчийг нэмэх
       onReviewersChange([...selectedReviewers, userId]);
@@ -148,27 +150,30 @@ export function TechnicalReviewerSelector({
           ) : (
             reviewers.map((reviewer) => (
               <div
-                key={reviewer.user_id}
+                key={reviewer.profile.id}
                 className="flex items-center space-x-3"
               >
                 <Checkbox
-                  id={`reviewer-${reviewer.user_id}`}
-                  checked={selectedReviewers.includes(reviewer.user_id)}
-                  onCheckedChange={() => handleReviewerToggle(reviewer.user_id)}
+                  id={`reviewer-${reviewer.profile_id}`}
+                  checked={selectedReviewers.includes(reviewer.profile_id)}
+                  onCheckedChange={() =>
+                    handleReviewerToggle(reviewer.profile_id)
+                  }
                   disabled={
                     // Хэрэглэгч сонгоогүй, мөн дээд хязгаар тогтоосон бол ирэх үед л disable хийх
-                    !selectedReviewers.includes(reviewer.user_id) &&
+                    !selectedReviewers.includes(reviewer.profile_id) &&
                     maxSelection !== undefined &&
                     selectedReviewers.length >= maxSelection
                   }
                 />
                 <Label
-                  htmlFor={`reviewer-${reviewer.user_id}`}
+                  htmlFor={`reviewer-${reviewer.profile_id}`}
                   className="flex-1 cursor-pointer"
                 >
-                  <div className="font-medium">{reviewer.users.nice_name}</div>
+                  <div className="font-medium">{reviewer.profile.name}</div>
                   <div className="text-sm text-gray-600">
-                    {reviewer.users.department_name} • {reviewer.users.phone}
+                    {reviewer.profile.department_name} •{" "}
+                    {reviewer.profile.phone}
                   </div>
                 </Label>
               </div>
@@ -183,11 +188,11 @@ export function TechnicalReviewerSelector({
             </h4>
             <ul className="text-sm text-blue-700">
               {reviewers
-                .filter((r) => selectedReviewers.includes(r.user_id))
+                .filter((r) => selectedReviewers.includes(r.profile_id))
                 .map((reviewer) => (
-                  <li key={reviewer.user_id}>
-                    • {reviewer.users.nice_name} (
-                    {reviewer.users.department_name})
+                  <li key={reviewer.profile_id}>
+                    • {reviewer.profile.name} (
+                    {reviewer.profile.department_name})
                   </li>
                 ))}
             </ul>
