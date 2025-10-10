@@ -3,11 +3,8 @@ import { Suspense } from "react";
 import { ReviewRequestsList } from "@/components/review-requests-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getProfileIdFromAuthUserId } from "@/actions/review";
 
-export default async function ReviewRequestsPage() {
-  const profile_id = await getProfileIdFromAuthUserId();
-
+export default function ReviewRequestsPage() {
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6">
@@ -23,7 +20,7 @@ export default async function ReviewRequestsPage() {
         </CardHeader>
         <CardContent>
           <Suspense fallback={<ReviewRequestsSkeleton />}>
-            <ReviewRequestsList profile_id={profile_id} />
+            <ReviewRequestsList />
           </Suspense>
         </CardContent>
       </Card>
