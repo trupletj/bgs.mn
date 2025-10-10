@@ -41,28 +41,28 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { StatusUpdateDialog } from "./StatusUpdateDialog";
 import type { Order, OrderItem, WorkflowEntry } from "@/actions/orders";
-import { UNIT_OPTIONS } from "@/types";
 
 interface OrderDetailViewProps {
   orderDetails: {
     order: Order;
     items: OrderItem[];
     workflow: WorkflowEntry[];
-    profile: {
+    creator: {
       id: string;
-      name?: string;
-      department_name?: string;
+      nice_name?: string;
+      first_name?: string;
+      last_name?: string;
       phone?: string;
     };
   };
 }
 
 export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
-  const { order, items, workflow, profile } = orderDetails;
+  const { order, items, workflow, creator } = orderDetails;
   const router = useRouter();
 
   // For now, we'll use a test user ID. In a real app, this would come from authentication
-  const currentUserId = profile.id; // Temporary - should come from auth context
+  const currentUserId = creator.id; // Temporary - should come from auth context
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {
@@ -135,6 +135,7 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
     // Refresh the page to show updated data
     router.refresh();
   };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -260,7 +261,7 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                     <TableRow>
                       <TableHead>Сэлбэг, эд анги</TableHead>
                       <TableHead>Тоо</TableHead>
-                      {/* <TableHead>Төлөв</TableHead> */}
+                      <TableHead>Төлөв</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -281,16 +282,12 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell>{item.quantity}</TableCell>
                         <TableCell>
-                          {item.quantity}{" "}
-                          {UNIT_OPTIONS.find((u) => u.value === item.unit)
-                            ?.label || item.unit}
-                        </TableCell>
-                        {/* <TableCell>
                           <Badge variant={getStatusBadgeVariant(item.status)}>
                             {item.status}
                           </Badge>
-                        </TableCell> */}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -387,7 +384,12 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
               <div>
                 <h4 className="font-medium mb-1">Created by</h4>
                 <p className="text-sm text-muted-foreground">
-                  {profile.name} {profile.department_name} {profile.phone}
+                  {creator.nice_name ||
+                    (creator.first_name && creator.last_name
+                      ? `${creator.first_name} ${creator.last_name}`
+                      : "") ||
+                    creator.phone ||
+                    "Unknown"}
                 </p>
               </div>
 
