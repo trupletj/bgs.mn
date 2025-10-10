@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,17 +31,37 @@ import {
   addOrderItem,
   type PartsCatalog,
   addTechnicalReviewers,
-  deleteImagesFromStorage,
 } from "@/actions/orders";
+import { createClient } from "@/utils/supabase/client";
 import { TechnicalReviewerSelector } from "../reviewer-selector";
-import ImageUploader from "../image-uploader";
-import ImageViewer from "../image-viewer";
-import { OrderFormData, OrderItemForm, UNIT_OPTIONS, UnitType } from "@/types";
+
+interface OrderFormData {
+  title: string;
+  description: string;
+  equipment_name: string;
+  equipment_model: string;
+  equipment_serial: string;
+  equipment_location: string;
+  urgency_level: "low" | "medium" | "high" | "critical";
+  requested_delivery_date: string;
+  notes: string;
+}
+
+interface OrderItemForm {
+  part_id?: number;
+  part_number?: string;
+  part_name: string;
+  part_description?: string;
+  manufacturer?: string;
+  quantity: number;
+  notes?: string;
+}
 
 export function OrderCreationForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [user, setUser] = useState<{ id: string } | null>(null);
   // const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PartsCatalog[]>([]);
   // const [categories, setCategories] = useState<string[]>([]);
@@ -50,21 +70,13 @@ export function OrderCreationForm() {
     string[]
   >([]);
 
-  const [pendingImageDeletions, setPendingImageDeletions] = useState<string[]>(
-    []
-  );
-  const [uploadedImages, setUploadedImages] = useState<Record<number, string>>(
-    {}
-  );
-
   const [formData, setFormData] = useState<OrderFormData>({
     title: "",
     description: "",
-    order_type: "",
-    // equipment_name: "",
-    // equipment_model: "",
-    // equipment_serial: "",
-    // equipment_location: "",
+    equipment_name: "",
+    equipment_model: "",
+    equipment_serial: "",
+    equipment_location: "",
     urgency_level: "medium",
     requested_delivery_date: "",
     notes: "",
@@ -74,23 +86,35 @@ export function OrderCreationForm() {
     {
       part_name: "",
       quantity: 1,
-      unit: "piece",
     },
   ]);
 
-  const handleImageUpload = (itemIndex: number, url: string) => {
-    setUploadedImages((prev) => ({
-      ...prev,
-      [itemIndex]: url,
-    }));
-  };
-
-  const handleMarkImageForDeletion = (url: string) => {
-    setPendingImageDeletions((prev) => [...prev, url]);
-  };
-
   useEffect(() => {
     // Get current user
+    const getUser = async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
+        if (error) {
+          console.error("Auth error:", error);
+          // If there's an auth error, user is not authenticated
+          setUser(null);
+          return;
+        }
+
+        console.log("User data:", user);
+        setUser(user);
+      } catch (err) {
+        console.error("Error getting user:", err);
+        setUser(null);
+      }
+    };
+    getUser();
+
     // Load categories
     // const loadCategories = async () => {
     //   try {
@@ -120,18 +144,7 @@ export function OrderCreationForm() {
     value: string | number | undefined
   ) => {
     setOrderItems((prev) =>
-      prev.map((item, i) => {
-        if (i === index) {
-          // Quantity-г бутархай тоо болгон хувиргах
-          if (field === "quantity" && typeof value === "string") {
-            // Бутархай тоог зөвшөөрөх (0.5, 1.25, 2.75 гэх мэт)
-            const numericValue = parseFloat(value);
-            return { ...item, [field]: isNaN(numericValue) ? 0 : numericValue };
-          }
-          return { ...item, [field]: value };
-        }
-        return item;
-      })
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
   };
 
@@ -178,6 +191,11 @@ export function OrderCreationForm() {
   // };
 
   const handleSubmit = async (isDraft: boolean = false) => {
+    if (!user) {
+      toast.error("Та нэвтрэх хэрэгтэй.");
+      return;
+    }
+
     if (!formData.title.trim()) {
       toast.error("Захиалгын гарчиг оруулах шаардлагатай.");
       return;
@@ -197,19 +215,22 @@ export function OrderCreationForm() {
 
     try {
       // Create order
-      const { data: order, error: orderError } = await createOrder({
-        title: formData.title,
-        description: formData.description,
-        order_type: formData.order_type,
-        // equipment_name: formData.equipment_name,
-        // equipment_model: formData.equipment_model,
-        // equipment_serial: formData.equipment_serial,
-        // equipment_location: formData.equipment_location,
-        urgency_level: formData.urgency_level,
-        requested_delivery_date: formData.requested_delivery_date || undefined,
-        notes: formData.notes,
-        status: isDraft ? "draft" : "pending_technical_review",
-      });
+      const { data: order, error: orderError } = await createOrder(
+        {
+          title: formData.title,
+          description: formData.description,
+          equipment_name: formData.equipment_name,
+          equipment_model: formData.equipment_model,
+          equipment_serial: formData.equipment_serial,
+          equipment_location: formData.equipment_location,
+          urgency_level: formData.urgency_level,
+          requested_delivery_date:
+            formData.requested_delivery_date || undefined,
+          notes: formData.notes,
+          status: isDraft ? "draft" : "pending_technical_review",
+        },
+        user.id
+      );
 
       if (orderError || !order) {
         throw new Error(
@@ -217,30 +238,22 @@ export function OrderCreationForm() {
         );
       }
 
-      // 2. Сэлбэгүүд нэмэх (зургийн URL-г оруулах)
-      for (const [index, item] of orderItems.entries()) {
-        const imageUrl = uploadedImages[index];
-
-        const { data: itemData, error: itemError } = await addOrderItem({
+      // Add order items
+      for (const item of orderItems) {
+        const { error: itemError } = await addOrderItem({
           order_id: order.id,
+          part_id: item.part_id,
           part_number: item.part_number,
           part_name: item.part_name,
           part_description: item.part_description,
           manufacturer: item.manufacturer,
           quantity: item.quantity,
-          unit: item.unit,
           notes: item.notes,
-          image_url: imageUrl || "", // Зургийн URL-г оруулах
         });
 
         if (itemError) {
           throw new Error(`Сэлбэг нэмэхэд алдаа гарлаа: ${itemError.message}`);
         }
-      }
-
-      // 3. Устгахаар тэмдэглэгдсэн зургийг устгах
-      if (pendingImageDeletions.length > 0) {
-        await deleteImagesFromStorage(pendingImageDeletions);
       }
 
       if (!isDraft) {
@@ -379,23 +392,6 @@ export function OrderCreationForm() {
             </div>
             <div className="space-y-2">
               <Label
-                htmlFor="title"
-                className="text-sm font-medium text-gray-700"
-              >
-                Захиалгын төрөл <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="order_type"
-                value={formData.order_type}
-                onChange={(e) =>
-                  handleInputChange("order_type", e.target.value)
-                }
-                placeholder="Хангамжийн бараа материал"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label
                 htmlFor="urgency"
                 className="text-sm font-medium text-gray-700"
               >
@@ -418,6 +414,7 @@ export function OrderCreationForm() {
                     >
                       Бага
                     </Badge>
+                    Standard timeline
                   </SelectItem>
                   <SelectItem value="medium" className="flex items-center">
                     <Badge
@@ -426,6 +423,7 @@ export function OrderCreationForm() {
                     >
                       Дунд
                     </Badge>
+                    Moderate priority
                   </SelectItem>
                   <SelectItem value="high" className="flex items-center">
                     <Badge
@@ -434,6 +432,7 @@ export function OrderCreationForm() {
                     >
                       Яаралтай
                     </Badge>
+                    Expedited processing
                   </SelectItem>
                   <SelectItem value="critical" className="flex items-center">
                     <Badge
@@ -442,6 +441,7 @@ export function OrderCreationForm() {
                     >
                       Нэн яаралтай
                     </Badge>
+                    Emergency priority
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -489,9 +489,8 @@ export function OrderCreationForm() {
       </Card>
 
       {/* Equipment Information */}
-      {/* Div-г card-р солих */}
-      <div className="shadow-sm border-0 ring-1 ring-gray-200">
-        {/* <CardHeader className="bg-gray-50/50 border-b border-gray-200">
+      {/* <Card className="shadow-sm border-0 ring-1 ring-gray-200">
+        <CardHeader className="bg-gray-50/50 border-b border-gray-200">
           <CardTitle className="flex items-center space-x-2">
             <SettingsIcon className="h-5 w-5 text-indigo-600" />
             <span>Equipment Information</span>
@@ -571,8 +570,8 @@ export function OrderCreationForm() {
               />
             </div>
           </div>
-        </CardContent> */}
-      </div>
+        </CardContent>
+      </Card> */}
 
       {/* Parts Selection */}
       <Card>
@@ -581,7 +580,7 @@ export function OrderCreationForm() {
             Шаардлагатай сэлбэг, эд ангиуд
             <Button type="button" onClick={addNewItem} size="sm">
               <PlusIcon className="h-4 w-4 mr-2" />
-              Сэлбэг нэмэх
+              Сэлбэг нэмэг
             </Button>
           </CardTitle>
         </CardHeader>
@@ -654,14 +653,11 @@ export function OrderCreationForm() {
           )}
 
           {/* Order Items */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {orderItems.map((item, index) => (
-              <div
-                key={index}
-                className="border rounded-xl p-6 bg-gray-50 shadow-sm"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold">Сэлбэг {index + 1}</h4>
+              <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">Сэлбэг {index + 1}.</h4>
                   {orderItems.length > 1 && (
                     <Button
                       type="button"
@@ -674,10 +670,9 @@ export function OrderCreationForm() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Сэлбэгийн нэр */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
-                    <Label className="mb-1 block">Сэлбэгийн нэр *</Label>
+                    <Label className="mb-1">Сэлбэгийн нэр *</Label>
                     <Input
                       value={item.part_name}
                       onChange={(e) =>
@@ -686,10 +681,8 @@ export function OrderCreationForm() {
                       placeholder="Сэлбэгийн нэр эсвэл тайлбар"
                     />
                   </div>
-
-                  {/* Эдийн дугаар */}
                   <div>
-                    <Label className="mb-1 block">Эдийн дугаар</Label>
+                    <Label className="mb-1">Эдийн дугаар</Label>
                     <Input
                       value={item.part_number || ""}
                       onChange={(e) =>
@@ -698,10 +691,8 @@ export function OrderCreationForm() {
                       placeholder="Үйлдвэрийн эдийн дугаар"
                     />
                   </div>
-
-                  {/* Үйлдвэрлэгч */}
                   <div>
-                    <Label className="mb-1 block">Үйлдвэрлэгч</Label>
+                    <Label className="mb-1">Үйлдвэрлэгч</Label>
                     <Input
                       value={item.manufacturer || ""}
                       onChange={(e) =>
@@ -710,46 +701,23 @@ export function OrderCreationForm() {
                       placeholder="Бренд эсвэл үйлдвэрлэгч"
                     />
                   </div>
-
-                  {/* Тоо ширхэг */}
                   <div>
-                    <Label className="mb-1">Тоо хэмжээ *</Label>
+                    <Label className="mb-1">Тоо ширхэг</Label>
                     <Input
                       type="number"
-                      min="0"
-                      step="0.01" // Бутархай тоо оруулах боломжтой
+                      min="1"
                       value={item.quantity}
                       onChange={(e) =>
-                        handleItemChange(index, "quantity", e.target.value)
+                        handleItemChange(
+                          index,
+                          "quantity",
+                          parseInt(e.target.value) || 1
+                        )
                       }
-                      placeholder="0.00"
                     />
                   </div>
-
-                  <div>
-                    <Label className="mb-1">Нэгж *</Label>
-                    <Select
-                      value={item.unit || "piece"}
-                      onValueChange={(value: UnitType) =>
-                        handleItemChange(index, "unit", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Нэгж сонгох" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UNIT_OPTIONS.map((unit) => (
-                          <SelectItem key={unit.value} value={unit.value}>
-                            {unit.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Нэмэлт тайлбар */}
-                  <div className="md:col-span-1 lg:col-span-1">
-                    <Label className="mb-1 block">Нэмэлт тайлбар</Label>
+                  <div className="w-full lg:col-span-2">
+                    <Label className="mb-1 ">Нэмэлт тайлбар</Label>
                     <Textarea
                       value={item.part_description || ""}
                       onChange={(e) =>
@@ -760,32 +728,7 @@ export function OrderCreationForm() {
                         )
                       }
                       placeholder="Техникийн үзүүлэлт гэх мэт"
-                      rows={3}
                     />
-                  </div>
-
-                  {/* Зураг оруулах хэсэг */}
-                  <div className="md:col-span-2 lg:col-span-3 border-2 border-dashed border-border rounded-lg p-4 bg-white">
-                    <ImageUploader
-                      multiple={false}
-                      onUpload={(url) =>
-                        handleImageUpload(
-                          index,
-                          Array.isArray(url) ? url[0] : url
-                        )
-                      }
-                    />
-
-                    {uploadedImages[index] && (
-                      <div className="mt-4">
-                        <ImageViewer
-                          images={[uploadedImages[index]]}
-                          editable
-                          onDelete={handleMarkImageForDeletion}
-                          pendingDeletion={pendingImageDeletions}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -832,8 +775,6 @@ export function OrderCreationForm() {
           <TechnicalReviewerSelector
             selectedReviewers={selectedTechnicalReviewers}
             onReviewersChange={setSelectedTechnicalReviewers}
-            minimumSelection={2}
-            currentStep="first_step"
           />
 
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
@@ -882,7 +823,7 @@ export function OrderCreationForm() {
           <Button
             type="button"
             onClick={() => handleSubmit(false)}
-            disabled={loading || selectedTechnicalReviewers.length <= 1}
+            disabled={loading}
             className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium"
           >
             {loading ? (
