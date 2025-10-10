@@ -1,3 +1,4 @@
+// components/review-requests-list.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -27,9 +28,14 @@ interface ReviewRequest {
   reviewer_type: string;
   assigned_at: string;
   status: string;
+  is_reviewed: boolean;
 }
 
-export function ReviewRequestsList() {
+interface ReviewRequestProp {
+  profile_id: string;
+}
+
+export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
   const [reviewRequests, setReviewRequests] = useState<ReviewRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -42,24 +48,6 @@ export function ReviewRequestsList() {
     try {
       const supabase = createClient();
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("Хэрэглэгч олдсонгүй");
-      }
-      const { data: id } = await supabase
-        .from("profile")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .single();
-
-      const { data: reviewer } = await supabase
-        .from("order_reviewers")
-        .select("*")
-        .eq("profile_id", id?.id);
-
-      // Шалгуулахаар илгээгдсэн хүсэлтүүдийг авах
       const { data, error } = await supabase
         .from("order_reviewers")
         .select(
@@ -69,6 +57,7 @@ export function ReviewRequestsList() {
           reviewer_type,
           assigned_at,
           status,
+          is_reviewed,
           orders:order_id (
             id,
             order_number,
@@ -84,25 +73,24 @@ export function ReviewRequestsList() {
           )
         `
         )
-        .eq("profile_id", id?.id)
-        .eq("status", "pending")
+        .eq("profile_id", profile_id)
         .order("assigned_at", { ascending: false });
 
       if (error) {
         throw new Error(error.message);
       }
 
-      setReviewRequests(
-        (data || []).map((item: any) => ({
-          ...item,
-          order: {
-            ...(Array.isArray(item.order) ? item.order[0] : item.order),
-            requester: Array.isArray(item.order?.requester)
-              ? item.order.requester[0]
-              : item.order?.requester,
-          },
-        }))
-      );
+      const processedData = (data || []).map((item: any) => ({
+        ...item,
+        orders: {
+          ...(Array.isArray(item.orders) ? item.orders[0] : item.orders),
+          profile: Array.isArray(item.orders?.profile)
+            ? item.orders.profile[0]
+            : item.orders?.profile,
+        },
+      }));
+
+      setReviewRequests(processedData);
     } catch (error) {
       toast.error("Хүсэлтүүдийг авахад алдаа гарлаа");
       console.error(error);
@@ -111,8 +99,26 @@ export function ReviewRequestsList() {
     }
   };
 
-  const handleReview = (orderId: number) => {
-    router.push(`/orders/${orderId}/review`);
+  // Нэг захиалгыг нэг л удаа харуулах
+  const uniqueOrders = reviewRequests.reduce((acc, request) => {
+    const existingOrder = acc.find(
+      (order) =>
+        order.order_id === request.order_id &&
+        order.reviewer_type === request.reviewer_type
+    );
+    if (!existingOrder) {
+      acc.push(request);
+    }
+    return acc;
+  }, [] as ReviewRequest[]);
+
+  const handleReview = (orderId: number, reviewerType: string) => {
+    // Шууд хандах - хуудас дээр эрх шалгана
+    router.push(`/orders/${orderId}/review?step=${reviewerType}`);
+  };
+
+  const handleViewDetails = (orderId: number, reviewerType: string) => {
+    router.push(`/orders/${orderId}/review-details?step=${reviewerType}`);
   };
 
   const getUrgencyBadge = (urgency: string) => {
@@ -126,30 +132,44 @@ export function ReviewRequestsList() {
     const config =
       urgencyConfig[urgency as keyof typeof urgencyConfig] ||
       urgencyConfig.medium;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
 
+  const getStepBadge = (reviewerType: string) => {
+    const stepConfig = {
+      first_step: { label: "1-р шат", variant: "default" as const },
+      second_step: { label: "2-р шат", variant: "secondary" as const },
+      third_step: { label: "3-р шат", variant: "outline" as const },
+      fourth_step: { label: "4-р шат", variant: "destructive" as const },
+    };
+
+    const config =
+      stepConfig[reviewerType as keyof typeof stepConfig] ||
+      stepConfig.first_step;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { label: "Хүлээгдэж байна", variant: "outline" as const },
+      approved: { label: "Зөвшөөрсөн", variant: "default" as const },
+      changes_requested: {
+        label: "Өөрчлөлттэй",
+        variant: "secondary" as const,
+      },
+      rejected: { label: "Татгалзсан", variant: "destructive" as const },
+    };
+
+    const config =
+      statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between p-4 border rounded-lg"
-          >
-            <div className="space-y-2">
-              <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
-            </div>
-            <div className="h-10 bg-gray-200 rounded w-24 animate-pulse"></div>
-          </div>
-        ))}
-      </div>
-    );
+    return <div>Ачааллаж байна...</div>;
   }
 
-  if (reviewRequests.length === 0) {
+  if (uniqueOrders.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         <p>Одоогоор хянагдахаар илгээгдсэн хүсэлт байхгүй байна</p>
@@ -159,45 +179,121 @@ export function ReviewRequestsList() {
 
   return (
     <div className="space-y-4">
-      {reviewRequests.map((request) => (
-        <Card key={request.id} className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="font-semibold text-lg">
-                    {request.orders.order_number}
-                  </h3>
-                  {getUrgencyBadge(request.orders.urgency_level)}
-                  <Badge variant="outline">
-                    {request.reviewer_type === "in_reviewer"
-                      ? "Техник шалгуулалт"
-                      : "Бусад"}
-                  </Badge>
+      {uniqueOrders.map((request) => {
+        // Тухайн захиалгын ижил шатны шалгуулагчийн тоог тоолох
+        const sameStepReviewers = reviewRequests.filter(
+          (r) =>
+            r.order_id === request.order_id &&
+            r.reviewer_type === request.reviewer_type
+        );
+
+        const totalReviewers = sameStepReviewers.length;
+        const reviewedCount = sameStepReviewers.filter(
+          (r) => r.is_reviewed
+        ).length;
+
+        return (
+          <Card
+            key={`${request.order_id}-${request.reviewer_type}`}
+            className="hover:shadow-md transition-shadow"
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h3 className="font-semibold text-lg">
+                      {request.orders.order_number}
+                    </h3>
+                    {getUrgencyBadge(request.orders.urgency_level)}
+                    {getStepBadge(request.reviewer_type)}
+
+                    {/* Шалгуулагчийн тоо ба статус */}
+                    <Badge
+                      variant="outline"
+                      className="bg-blue-50 text-blue-700"
+                    >
+                      {reviewedCount}/{totalReviewers} шалгуулагч
+                    </Badge>
+
+                    {request.is_reviewed ? (
+                      <Badge variant="outline">Та үнэлсэн</Badge>
+                    ) : (
+                      <Badge variant="default">Хянах шаардлагатай</Badge>
+                    )}
+                  </div>
+
+                  <p className="text-gray-700 mb-1 font-medium">
+                    {request.orders.title}
+                  </p>
+                  <p className="text-gray-600 text-sm mb-2">
+                    {request.orders.description}
+                  </p>
+
+                  <div className="text-sm text-gray-500 space-y-1">
+                    <p>Хүсэлт гаргасан: {request.orders.profile.name}</p>
+                    <p>Хэлтэс: {request.orders.profile.department_name}</p>
+                    <p>
+                      Илгээгдсэн:{" "}
+                      {new Date(request.assigned_at).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
 
-                <p className="text-gray-700 mb-1">{request.orders.title}</p>
+                <div className="ml-4 text-right space-y-2">
+                  {!request.is_reviewed ? (
+                    <Button
+                      onClick={() =>
+                        handleReview(request.orders.id, request.reviewer_type)
+                      }
+                      className="w-full"
+                    >
+                      Хянах
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-center">
+                        <Badge
+                          variant={
+                            request.status === "approved"
+                              ? "default"
+                              : request.status === "changes_requested"
+                              ? "secondary"
+                              : request.status === "rejected"
+                              ? "destructive"
+                              : "outline"
+                          }
+                          className="w-full justify-center"
+                        >
+                          {request.status === "approved"
+                            ? "Та зөвшөөрсөн"
+                            : request.status === "changes_requested"
+                            ? "Та өөрчлөлт санал болгосон"
+                            : request.status === "rejected"
+                            ? "Та татгалзсан"
+                            : "Хүлээгдэж байна"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="text-sm text-gray-500 space-y-1">
-                  <p>Хүсэлт гаргасан: {request.orders.profile.name}</p>
-                  <p>Хэлтэс: {request.orders.profile.name}</p>
-                  <p>
-                    Илгээгдсэн:{" "}
-                    {new Date(request.assigned_at).toLocaleDateString()}
-                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      handleViewDetails(
+                        request.orders.id,
+                        request.reviewer_type
+                      )
+                    }
+                    className="w-full"
+                  >
+                    Дэлгэрэнгүй харах
+                  </Button>
                 </div>
               </div>
-
-              <Button
-                onClick={() => handleReview(request.orders.id)}
-                className="ml-4"
-              >
-                Хянах
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

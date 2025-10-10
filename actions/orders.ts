@@ -2,16 +2,19 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
+import { getProfileIdFromAuthUserId } from "./review";
+import { createClient } from "@/utils/supabase/server";
 
 export type Order = {
   id: number;
   order_number: string;
   title: string;
   description?: string;
-  equipment_name?: string;
-  equipment_model?: string;
-  equipment_serial?: string;
-  equipment_location?: string;
+  order_type: string;
+  // equipment_name?: string;
+  // equipment_model?: string;
+  // equipment_serial?: string;
+  // equipment_location?: string;
   urgency_level: "low" | "medium" | "high" | "critical";
   requested_delivery_date?: string;
   // total_estimated_cost: number;
@@ -34,6 +37,8 @@ export type OrderItem = {
   // unit_price?: number;
   status: string;
   notes?: string;
+  unit: string;
+  image_url?: string;
 };
 
 export type PartsCatalog = {
@@ -67,40 +72,30 @@ export type WorkflowEntry = {
   };
 };
 
-export async function createOrder(
-  orderData: Partial<Order>,
-  authUserId: string
-): Promise<{
+export async function createOrder(orderData: Partial<Order>): Promise<{
   data: Order | null;
   error: PostgrestError | null;
 }> {
-  const supabase = getSupabaseAdmin();
+  const supabase = await createClient();
 
-  const { data: user, error: userError } = await supabase
-    .from("users")
-    .select("id")
-    .eq("auth_user_id", authUserId)
-    .single();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  if (userError || !user) {
-    return {
-      data: null,
-      error: {
-        message:
-          "User not found in users table. Please ensure your account is properly linked.",
-        details: userError?.message || "No matching user found",
-        hint: "Contact administrator to link your account",
-        code: "USER_NOT_LINKED",
-      } as any,
-    };
+  if (authError || !user) {
+    throw new Error("Хэрэглэгчийн мэдээлэл авах үед алдаа гарлаа.");
   }
+  const auth_user_id = user?.id;
+  const profile_id = await getProfileIdFromAuthUserId();
 
   const { data, error } = await supabase
     .from("orders")
     .insert({
       ...orderData,
-      created_by: user.id, // Use the public.users.id instead of auth user ID
+      created_profile: profile_id, // Use the public.users.id instead of auth user ID
       status: "draft",
+      auth_user_id: auth_user_id,
     })
     .select()
     .single();
@@ -158,16 +153,15 @@ export async function getOrderById(orderId: number): Promise<{
   return { data, error };
 }
 
-export async function getOrderWithDetails(orderId: number): Promise<{
+export async function getOrderWithDetails(orderId: string): Promise<{
   data: {
     order: Order;
     items: OrderItem[];
     workflow: WorkflowEntry[];
-    creator: {
+    profile: {
       id: string;
-      nice_name?: string;
-      first_name?: string;
-      last_name?: string;
+      name?: string;
+      department_name?: string;
       phone?: string;
     };
   } | null;
@@ -227,22 +221,22 @@ export async function getOrderWithDetails(orderId: number): Promise<{
       // Continue with empty workflow
     }
 
-    // Get creator details
-    const { data: creator, error: creatorError } = await supabase
-      .from("users")
-      .select("id, nice_name, first_name, last_name, phone")
-      .eq("id", order.created_by)
+    // Get profile details
+    const { data: profile, error: profileError } = await supabase
+      .from("profile")
+      .select("id, name, department_name, phone")
+      .eq("id", order.created_profile)
       .single();
 
-    if (creatorError) {
-      console.error("Creator fetch error:", creatorError);
-      return { data: null, error: creatorError };
+    if (profileError) {
+      console.error("profile fetch error:", profileError);
+      return { data: null, error: profileError };
     }
 
-    if (!creator) {
+    if (!profile) {
       return {
         data: null,
-        error: { message: "Creator not found" } as PostgrestError,
+        error: { message: "profile not found" } as PostgrestError,
       };
     }
 
@@ -251,7 +245,7 @@ export async function getOrderWithDetails(orderId: number): Promise<{
         order,
         items: items || [],
         workflow,
-        creator,
+        profile,
       },
       error: null,
     };
@@ -397,6 +391,27 @@ export async function submitOrderForReview(
   }
 }
 
+export const deleteImagesFromStorage = async (urls: string[]) => {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    for (const url of urls) {
+      const fileName = url.split("/").pop();
+      if (fileName) {
+        const { error } = await supabase.storage
+          .from("order-item-bucket")
+          .remove([fileName]);
+
+        if (error) {
+          console.error(`Зураг устгахад алдаа: ${fileName}`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Зураг устгахад алдаа гарлаа:", error);
+  }
+};
+
 export async function updateOrderStatus(
   orderId: number,
   newStatus: string,
@@ -492,7 +507,7 @@ export async function addOrderNote(
       order_id: orderId,
       old_status: null,
       new_status: null,
-      user_id: userId,
+      // user_id: userId,
       comments: note,
       change_reason: "note_added",
     });
@@ -510,12 +525,14 @@ export async function addTechnicalReviewers(
   reviewerIds: string[]
 ) {
   const supabase = getSupabaseAdmin();
+  const profile_id = await getProfileIdFromAuthUserId();
 
-  const reviewersToAdd = reviewerIds.map((userId, index) => ({
+  const reviewersToAdd = reviewerIds.map((userId) => ({
     order_id: orderId,
-    user_id: userId,
-    reviewer_type: "in_reviewer",
+    reviewer_type: "first_step",
     status: "pending",
+    sender_id: profile_id,
+    profile_id: userId,
   }));
 
   const { error } = await supabase
@@ -544,7 +561,7 @@ export async function sendReviewNotifications(
   if (orderError) return;
 
   const notifications = reviewerIds.map((userId) => ({
-    user_id: userId,
+    // user_id: userId,
     type: "review_request",
     title: "Шинэ захиалга шалгуулалтад ирлээ",
     message: `Захиалга #${order.order_number}: ${order.title}`,
