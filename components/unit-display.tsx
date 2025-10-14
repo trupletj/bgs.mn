@@ -1,4 +1,4 @@
-import { UNIT_OPTIONS, type UnitType } from "@/types";
+import { UNIT_OPTIONS, type UnitType } from "@/types/types";
 
 interface UnitDisplayProps {
   unit: UnitType;
