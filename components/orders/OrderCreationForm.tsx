@@ -36,7 +36,12 @@ import {
 import { TechnicalReviewerSelector } from "../reviewer-selector";
 import ImageUploader from "../image-uploader";
 import ImageViewer from "../image-viewer";
-import { OrderFormData, OrderItemForm, UNIT_OPTIONS, UnitType } from "@/types";
+import {
+  OrderFormData,
+  OrderItemForm,
+  UNIT_OPTIONS,
+  UnitType,
+} from "@/types/types";
 
 export function OrderCreationForm() {
   const router = useRouter();
@@ -365,8 +370,7 @@ export function OrderCreationForm() {
             <div className="space-y-2">
               <Label
                 htmlFor="title"
-                className="text-sm font-medium text-gray-700"
-              >
+                className="text-sm font-medium text-gray-700">
                 Захиалгын гарчиг <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -380,8 +384,7 @@ export function OrderCreationForm() {
             <div className="space-y-2">
               <Label
                 htmlFor="title"
-                className="text-sm font-medium text-gray-700"
-              >
+                className="text-sm font-medium text-gray-700">
                 Захиалгын төрөл <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -397,16 +400,14 @@ export function OrderCreationForm() {
             <div className="space-y-2">
               <Label
                 htmlFor="urgency"
-                className="text-sm font-medium text-gray-700"
-              >
+                className="text-sm font-medium text-gray-700">
                 Яаралтай байдлын түвшин
               </Label>
               <Select
                 value={formData.urgency_level}
                 onValueChange={(
                   value: "low" | "medium" | "high" | "critical"
-                ) => handleInputChange("urgency_level", value)}
-              >
+                ) => handleInputChange("urgency_level", value)}>
                 <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                   <SelectValue />
                 </SelectTrigger>
@@ -414,32 +415,28 @@ export function OrderCreationForm() {
                   <SelectItem value="low" className="flex items-center">
                     <Badge
                       variant="secondary"
-                      className="bg-green-100 text-green-800 mr-2"
-                    >
+                      className="bg-green-100 text-green-800 mr-2">
                       Бага
                     </Badge>
                   </SelectItem>
                   <SelectItem value="medium" className="flex items-center">
                     <Badge
                       variant="secondary"
-                      className="bg-yellow-100 text-yellow-800 mr-2"
-                    >
+                      className="bg-yellow-100 text-yellow-800 mr-2">
                       Дунд
                     </Badge>
                   </SelectItem>
                   <SelectItem value="high" className="flex items-center">
                     <Badge
                       variant="secondary"
-                      className="bg-orange-100 text-orange-800 mr-2"
-                    >
+                      className="bg-orange-100 text-orange-800 mr-2">
                       Яаралтай
                     </Badge>
                   </SelectItem>
                   <SelectItem value="critical" className="flex items-center">
                     <Badge
                       variant="secondary"
-                      className="bg-red-100 text-red-800 mr-2"
-                    >
+                      className="bg-red-100 text-red-800 mr-2">
                       Нэн яаралтай
                     </Badge>
                   </SelectItem>
@@ -451,8 +448,7 @@ export function OrderCreationForm() {
           <div className="space-y-2">
             <Label
               htmlFor="description"
-              className="text-sm font-medium text-gray-700"
-            >
+              className="text-sm font-medium text-gray-700">
               Тайлбар
             </Label>
             <Textarea
@@ -470,8 +466,7 @@ export function OrderCreationForm() {
           <div className="space-y-2">
             <Label
               htmlFor="delivery_date"
-              className="text-sm font-medium text-gray-700 flex items-center space-x-2"
-            >
+              className="text-sm font-medium text-gray-700 flex items-center space-x-2">
               <CalendarIcon className="h-4 w-4" />
               <span>Бараа бүтээгдэхүүний хэрэгцээт хязгаар огноо</span>
             </Label>
@@ -658,8 +653,7 @@ export function OrderCreationForm() {
             {orderItems.map((item, index) => (
               <div
                 key={index}
-                className="border rounded-xl p-6 bg-gray-50 shadow-sm"
-              >
+                className="border rounded-xl p-6 bg-gray-50 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-lg font-semibold">Сэлбэг {index + 1}</h4>
                   {orderItems.length > 1 && (
@@ -667,8 +661,7 @@ export function OrderCreationForm() {
                       type="button"
                       variant="destructive"
                       size="sm"
-                      onClick={() => removeItem(index)}
-                    >
+                      onClick={() => removeItem(index)}>
                       <TrashIcon className="h-4 w-4" />
                     </Button>
                   )}
@@ -732,8 +725,7 @@ export function OrderCreationForm() {
                       value={item.unit || "piece"}
                       onValueChange={(value: UnitType) =>
                         handleItemChange(index, "unit", value)
-                      }
-                    >
+                      }>
                       <SelectTrigger>
                         <SelectValue placeholder="Нэгж сонгох" />
                       </SelectTrigger>
@@ -806,8 +798,7 @@ export function OrderCreationForm() {
           <div className="space-y-2">
             <Label
               htmlFor="notes"
-              className="text-sm font-medium text-gray-700"
-            >
+              className="text-sm font-medium text-gray-700">
               Тусгай заавар, хүргэх шаардлага, эсвэл нэмэлт мэдээлэл
             </Label>
             <Textarea
@@ -833,7 +824,7 @@ export function OrderCreationForm() {
             selectedReviewers={selectedTechnicalReviewers}
             onReviewersChange={setSelectedTechnicalReviewers}
             minimumSelection={2}
-            currentStep="first_step"
+            currentStep="created_step"
           />
 
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
@@ -859,8 +850,7 @@ export function OrderCreationForm() {
             variant="outline"
             onClick={() => router.back()}
             disabled={loading}
-            className="h-11 px-6 border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
+            className="h-11 px-6 border-gray-300 text-gray-700 hover:bg-gray-50">
             Цуцлах
           </Button>
           <Button
@@ -868,8 +858,7 @@ export function OrderCreationForm() {
             variant="secondary"
             onClick={() => handleSubmit(true)}
             disabled={loading}
-            className="h-11 px-6 bg-gray-100 text-gray-800 hover:bg-gray-200"
-          >
+            className="h-11 px-6 bg-gray-100 text-gray-800 hover:bg-gray-200">
             {loading ? (
               <>
                 <ClockIcon className="h-4 w-4 mr-2 animate-spin" />
@@ -883,8 +872,7 @@ export function OrderCreationForm() {
             type="button"
             onClick={() => handleSubmit(false)}
             disabled={loading || selectedTechnicalReviewers.length <= 1}
-            className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium"
-          >
+            className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium">
             {loading ? (
               <>
                 <ClockIcon className="h-4 w-4 mr-2 animate-spin" />

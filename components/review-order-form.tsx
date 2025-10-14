@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { submitReview, assignNextReviewers } from "@/actions/review";
 import { TechnicalReviewerSelector } from "@/components/reviewer-selector";
 import { UnitDisplay } from "@/components/unit-display";
-import { UnitType } from "@/types";
+import { UnitType } from "@/types/types";
 import { StepType } from "@/utils/workflow";
 
 interface OrderDetails {
@@ -274,8 +274,7 @@ export function ReviewOrderForm({
                       {showChanged && (
                         <Badge
                           variant="outline"
-                          className="mt-1 bg-yellow-100 text-yellow-800"
-                        >
+                          className="mt-1 bg-yellow-100 text-yellow-800">
                           Өөрчлөгдсөн
                         </Badge>
                       )}
@@ -346,8 +345,7 @@ export function ReviewOrderForm({
               onClick={handleReject}
               disabled={isSubmitting}
               variant="destructive"
-              className="flex-1"
-            >
+              className="flex-1">
               {isSubmitting ? "Түр хүлээнэ үү..." : "Татгалзах"}
             </Button>
             {hasChanges ? (
@@ -355,16 +353,14 @@ export function ReviewOrderForm({
                 onClick={handleRequestChanges}
                 disabled={isSubmitting || nextReviewers.length === 0}
                 variant="outline"
-                className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 flex-1"
-              >
+                className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 flex-1">
                 {isSubmitting ? "Түр хүлээнэ үү..." : "Өөрчлөлт шаардах"}
               </Button>
             ) : (
               <Button
                 onClick={handleApprove}
                 disabled={isSubmitting || nextReviewers.length === 0}
-                className="bg-green-600 hover:bg-green-700 flex-1"
-              >
+                className="bg-green-600 hover:bg-green-700 flex-1">
                 {isSubmitting ? "Түр хүлээнэ үү..." : "Зөвшөөрөх"}
               </Button>
             )}
