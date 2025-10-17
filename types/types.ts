@@ -10,6 +10,31 @@ export interface OrderItemForm {
   unit?: string;
 }
 
+export interface JobDescription {
+  title: string;
+  job_position_id: string;
+  code: string;
+  supervisor_pos_id: string;
+  subordinate_pos_id: string;
+  communication_scope: string;
+  purpose: string;
+  schedule: string;
+  daily_hours: string;
+  break_time: string;
+  duties: string[];
+  education_level: string;
+  work_experience: string;
+  general_skills: string[];
+  professional_skills: string[];
+  additional_courses: string[];
+  resources: string;
+  authority: string[];
+  responsibilities: string[];
+  property_liability: string[];
+  relevant_laws: string[];
+  note: string;
+}
+
 export interface OrderFormData {
   title: string;
   description: string;

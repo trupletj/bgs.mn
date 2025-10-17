@@ -2,14 +2,13 @@
 
 ## Өгөгдлийн сангийн бүтэц
 
-## Learn More
+Policy - Журам
+Section - Бүлэг
+Policy - Журам
+Policy - Журам
+Policy - Журам
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## WorkFlow
 
 ## Deploy on Vercel
 
@@ -17,9 +16,16 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
-//@version=6
-гарсан байна
-Could not find function or function reference 'ta.pinbar'
-rsi_bullish_div = ta.divergence(m15_rsi, close, 5, 1) > 0
-
 # Журам бүртгэл болон хэрэгжилтийн үнэлгээний систем
+
+Журам бүртгэл болон хэрэгжилтийн үнэлгээний систем нь журам түүн агуулагдах бүлэг, заалтыг бүртгэдэг байхад оршино. Тухайн журмын заалтуудтай ажлын байр холбож, ажлын байрны
+
+## Өгөгдлийн сангийн бүтэц
+
+- policy - Журам
+- section - Бүлэг
+- clause - Заалт
+- job_position - Ажлын байр
+- clause_job_position - Relation of clause
+
+## WorkFlow
