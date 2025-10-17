@@ -111,10 +111,8 @@ export const PolicyHeader = ({
                 mode="single"
                 selected={date}
                 onSelect={handleDateSelect}
-                initialFocus
                 disabled={isProcessing}
-                fromYear={1900}
-                toYear={new Date().getFullYear()}
+                captionLayout="dropdown"
               />
             </PopoverContent>
           </Popover>

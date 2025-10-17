@@ -41,21 +41,21 @@ const data = {
     avatar: "/avatars/shadcn.jpg",
   },
   navMain: [
-    {
-      title: "Илгээсэн захиалгууд",
-      url: "/orders",
-      icon: IconDashboard,
-    },
-    {
-      title: "Ирсэн захиалгууд",
-      url: "/review-request",
-      icon: IconListDetails,
-    },
-    {
-      title: "Захиалга хийх",
-      url: "/orders/create",
-      icon: IconPlus,
-    },
+    // {
+    //   title: "Илгээсэн захиалгууд",
+    //   url: "#",
+    //   icon: IconDashboard,
+    // },
+    // {
+    //   title: "Ирсэн захиалгууд",
+    //   url: "#",
+    //   icon: IconListDetails,
+    // },
+    // {
+    //   title: "Захиалга хийх",
+    //   url: "#",
+    //   icon: IconPlus,
+    // },
     {
       title: "Projects",
       url: "#",
@@ -159,11 +159,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <a href="#">
+              className="data-[slot=sidebar-menu-button]:!p-1.5">
+              <a href="/dashboard">
                 <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <span className="text-base font-semibold">BGS</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
