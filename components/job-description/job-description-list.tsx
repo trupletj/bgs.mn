@@ -15,6 +15,8 @@ import { useDebounce } from "use-debounce";
 import JobDescSeeButton from "./job-desc-see-button";
 // import JobDescDeleteButton from "./job-desc-delete-button";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
+import { PlusIcon } from "lucide-react";
 
 interface JobDescription {
   id: string;
@@ -66,6 +68,14 @@ export default function JobDescriptionList() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+      <Link
+        href="/job-descriptions/new"
+        className="flex cursor-pointer justify-end mb-2">
+        <Button className="items-center flex">
+          <PlusIcon className="h-4 w-4 " />
+          Нэмэх
+        </Button>
+      </Link>
       <div className="flex justify-between mb-6">
         <h2 className="text-2xl font-bold">Ажлын байрны тодорхойлолтууд</h2>
         <div className="relative flex items-center">

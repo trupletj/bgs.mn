@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { OrdersList } from "@/components/orders/OrdersList";
 
-
 export const dynamic = "force-dynamic";
 
 export default function OrdersPage() {
@@ -12,7 +11,9 @@ export default function OrdersPage() {
     <main className="container mx-auto py-6 px-4">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Equipment Parts Orders</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Equipment Parts Orders
+          </h1>
           <p className="text-gray-600 mt-2">
             Manage and track equipment parts orders and requests.
           </p>
@@ -25,9 +26,14 @@ export default function OrdersPage() {
         </Link>
       </div>
 
-      <Suspense fallback={<div className="animate-pulse bg-gray-200 h-64 rounded-lg" />}>
+      <Suspense
+        fallback={
+          <div className="animate-pulse bg-gray-200 h-64 rounded-lg" />
+        }>
         <OrdersList />
       </Suspense>
+      {/* OrderList харуулна, хүн хамаагүй бүх order-г энэ давуу эрхтэй хүн хамааралтай байна. */}
+      {/* order_revision дээр өөрийнх нь profile-р шүүж харуулна. Ингэхдээ reviewer type-р group хийнэ. */}
     </main>
   );
 }
