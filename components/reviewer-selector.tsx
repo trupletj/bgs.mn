@@ -69,6 +69,8 @@ export function TechnicalReviewerSelector({
             profile: Array.isArray(r.profile) ? r.profile[0] : r.profile,
           }))
         );
+        // console.log("Fetched reviewers:", reviewers);
+        // console.log("role_id:", role_id)
       } catch (err) {
         console.error("Error in fetchReviewers:", err);
         setError(err instanceof Error ? err.message : "An error occurred");

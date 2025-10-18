@@ -41,7 +41,9 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { StatusUpdateDialog } from "./StatusUpdateDialog";
 import type { Order, OrderItem, WorkflowEntry } from "@/actions/orders";
-import { UNIT_OPTIONS } from "@/types";
+import { UNIT_OPTIONS } from "@/types/types";
+import Image from "next/image";
+import ImageViewer from "../image-viewer";
 
 interface OrderDetailViewProps {
   orderDetails: {
@@ -170,8 +172,7 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                 orderId={order.id}
                 currentStatus={order.status}
                 userId={currentUserId}
-                onStatusUpdated={handleStatusUpdated}
-              >
+                onStatusUpdated={handleStatusUpdated}>
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                   Update Status
                 </DropdownMenuItem>
@@ -200,42 +201,6 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                   <p className="text-muted-foreground">{order.description}</p>
                 </div>
               )}
-
-              {/* {order.equipment_name && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium mb-1">Equipment</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {order.equipment_name}
-                    </p>
-                  </div>
-                  {order.equipment_model && (
-                    <div>
-                      <h4 className="font-medium mb-1">Model</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {order.equipment_model}
-                      </p>
-                    </div>
-                  )}
-                  {order.equipment_serial && (
-                    <div>
-                      <h4 className="font-medium mb-1">Serial Number</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {order.equipment_serial}
-                      </p>
-                    </div>
-                  )}
-                  {order.equipment_location && (
-                    <div>
-                      <h4 className="font-medium mb-1">Location</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {order.equipment_location}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )} */}
-
               {order.notes && (
                 <div>
                   <h4 className="font-medium mb-2">Notes</h4>
@@ -260,6 +225,7 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                     <TableRow>
                       <TableHead>Сэлбэг, эд анги</TableHead>
                       <TableHead>Тоо</TableHead>
+                      <TableHead>Зураг</TableHead>
                       {/* <TableHead>Төлөв</TableHead> */}
                     </TableRow>
                   </TableHeader>
@@ -286,6 +252,18 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                           {UNIT_OPTIONS.find((u) => u.value === item.unit)
                             ?.label || item.unit}
                         </TableCell>
+                        <TableCell>
+                          <div>
+                            {item.image_url ? (
+                              <div className="">
+                                <ImageViewer images={[item.image_url]} />
+                              </div>
+                            ) : (
+                              <span>Зураггүй.</span>
+                            )}
+                          </div>
+                        </TableCell>
+
                         {/* <TableCell>
                           <Badge variant={getStatusBadgeVariant(item.status)}>
                             {item.status}
@@ -332,8 +310,7 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                           <p className="text-sm font-medium">
                             Status changed to{" "}
                             <Badge
-                              variant={getStatusBadgeVariant(entry.to_status)}
-                            >
+                              variant={getStatusBadgeVariant(entry.to_status)}>
                               {entry.to_status.replace("_", " ").toUpperCase()}
                             </Badge>
                           </p>
@@ -395,8 +372,7 @@ export function OrderDetailView({ orderDetails }: OrderDetailViewProps) {
                 <h4 className="font-medium mb-1">Priority</h4>
                 <Badge
                   variant={getUrgencyBadgeVariant(order.urgency_level)}
-                  className="flex items-center space-x-1 w-fit"
-                >
+                  className="flex items-center space-x-1 w-fit">
                   {getUrgencyIcon(order.urgency_level)}
                   <span>{order.urgency_level.toUpperCase()}</span>
                 </Badge>

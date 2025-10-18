@@ -11,7 +11,7 @@ interface ImageViewerProps {
   images: string[] | string;
   editable?: boolean;
   onDelete?: (url: string) => void;
-  pendingDeletion?: string[]; // Устгахаар тэмдэглэгдсэн зурагнууд
+  pendingDeletion?: string[];
 }
 
 export default function ImageViewer({
@@ -25,7 +25,6 @@ export default function ImageViewer({
 
   const imageArray = Array.isArray(images) ? images : images ? [images] : [];
 
-  // Устгахаар тэмдэглэгдсэн зурагнуудыг хасах
   const visibleImages = imageArray.filter(
     (url) => !pendingDeletion.includes(url)
   );
@@ -42,8 +41,7 @@ export default function ImageViewer({
             key={idx}
             className={`relative group rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 ${
               isPendingDeletion ? "opacity-50 grayscale" : ""
-            }`}
-          >
+            }`}>
             <Image
               src={url}
               alt={`Image ${idx + 1}`}
@@ -74,8 +72,7 @@ export default function ImageViewer({
                   e.stopPropagation();
                   onDelete(url);
                 }}
-                title="Зураг устгах"
-              >
+                title="Зураг устгах">
                 <Trash2 className="w-4 h-4" />
               </Button>
             )}

@@ -90,8 +90,7 @@ export function OrdersList() {
     const matchesSearch =
       !searchQuery ||
       order.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.equipment_name?.toLowerCase().includes(searchQuery.toLowerCase());
+      order.order_number.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" || order.status === statusFilter;
@@ -152,8 +151,7 @@ export function OrdersList() {
                 <Link href="/">
                   <Button
                     variant="outline"
-                    className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                  >
+                    className="border-yellow-300 text-yellow-700 hover:bg-yellow-50">
                     Go to Login
                   </Button>
                 </Link>
@@ -166,8 +164,7 @@ export function OrdersList() {
                     // Reload data with test user
                     window.location.reload();
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
+                  className="bg-blue-600 hover:bg-blue-700 text-white">
                   Test Mode (Dev Only)
                 </Button>
               </div>
@@ -261,8 +258,7 @@ export function OrdersList() {
                     <div className="flex items-center gap-3 mb-2">
                       <Link
                         href={`/orders/${order.id}`}
-                        className="text-lg font-semibold text-blue-600 hover:text-blue-800"
-                      >
+                        className="text-lg font-semibold text-blue-600 hover:text-blue-800">
                         {order.title}
                       </Link>
                       <Badge
@@ -270,8 +266,7 @@ export function OrdersList() {
                           statusColors[
                             order.status as keyof typeof statusColors
                           ] || statusColors.draft
-                        }
-                      >
+                        }>
                         {formatStatus(order.status)}
                       </Badge>
                       <Badge
@@ -279,21 +274,10 @@ export function OrdersList() {
                           urgencyColors[
                             order.urgency_level as keyof typeof urgencyColors
                           ] || urgencyColors.medium
-                        }
-                      >
+                        }>
                         {order.urgency_level.charAt(0).toUpperCase() +
                           order.urgency_level.slice(1)}
                       </Badge>
-                    </div>
-
-                    <div className="text-sm text-gray-600 mb-3">
-                      Order #{order.order_number}
-                      {order.equipment_name && (
-                        <span> • Equipment: {order.equipment_name}</span>
-                      )}
-                      {order.equipment_model && (
-                        <span> ({order.equipment_model})</span>
-                      )}
                     </div>
 
                     {order.description && (
