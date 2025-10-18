@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { ReviewOrderForm } from "@/components/review-order-form";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { UnitType } from "@/types";
+import { UnitType } from "@/types/types";
 import { StepType, isValidStep } from "@/utils/workflow";
 import { Badge } from "./ui/badge";
 
@@ -160,8 +160,7 @@ export default function OrderReviewerDetail({
         <div className="text-center mt-4">
           <button
             onClick={fetchOrderDetails}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
             Дахин оролдох
           </button>
         </div>
