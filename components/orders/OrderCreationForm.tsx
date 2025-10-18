@@ -779,6 +779,30 @@ export function OrderCreationForm() {
                       </div>
                     )}
                   </div>
+
+                  {/* Зураг оруулах хэсэг */}
+                  <div className="md:col-span-2 lg:col-span-3 border-2 border-dashed border-border rounded-lg p-4 bg-white">
+                    <ImageUploader
+                      multiple={false}
+                      onUpload={(url) =>
+                        handleImageUpload(
+                          index,
+                          Array.isArray(url) ? url[0] : url
+                        )
+                      }
+                    />
+
+                    {uploadedImages[index] && (
+                      <div className="mt-4">
+                        <ImageViewer
+                          images={[uploadedImages[index]]}
+                          editable
+                          onDelete={handleMarkImageForDeletion}
+                          pendingDeletion={pendingImageDeletions}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
