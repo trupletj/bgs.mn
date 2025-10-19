@@ -7,10 +7,10 @@ export default function Home() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Ажлын байрны тодорхойлолт
+              Албан тушаалын тодорхойлолт
             </h1>
             <p className="text-muted-foreground">
-              Ажлын байрны дэлгэрэнгүй мэдээллийг оруулна уу
+              Албан тушаалын дэлгэрэнгүй мэдээллийг оруулна уу
             </p>
           </div>
           <JobDescriptionForm />

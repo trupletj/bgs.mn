@@ -47,11 +47,12 @@ export const createJobDescription = async (data: JobDescription) => {
     const { data: jobDescription, error } = await supabase
       .from("job_description")
       .insert({
-        title: data.title,
         job_position_id: data.job_position_id,
-        code: data.code,
+        a_code: data.a_code,
+        at_code: data.at_code,
         supervisor_pos_id: data.supervisor_pos_id || null,
         subordinate_pos_id: data.subordinate_pos_id || null,
+        job_condition: data.job_condition,
         communication_scope: data.communication_scope,
         purpose: data.purpose,
         schedule: data.schedule,
