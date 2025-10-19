@@ -11,12 +11,13 @@ export interface OrderItemForm {
 }
 
 export interface JobDescription {
-  title: string;
   job_position_id: string;
-  code: string;
-  supervisor_pos_id: string;
-  subordinate_pos_id: string;
+  a_code: string;
+  at_code: string;
+  supervisor_pos_id: string | string[];
+  subordinate_pos_id: string | string[];
   communication_scope: string;
+  job_condition: string;
   purpose: string;
   schedule: string;
   daily_hours: string;
@@ -166,7 +167,7 @@ export interface Section {
 export interface Policy {
   id?: string;
   name: string;
-  reference_code: string;
+  reference_a_code: string;
   approved_date: Date | null;
   section: Section[];
 }
