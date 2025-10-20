@@ -28,12 +28,6 @@ const eslintConfig = [
       "jsx-a11y/anchor-is-valid": "off",
       "import/no-anonymous-default-export": "off",
       "import/prefer-default-export": "off",
-      "unused-imports/no-unused-imports": "warn",
-      "unused-imports/no-unused-vars": [
-        "warn",
-        { vars: "all", varsIgnorePattern: "^_", args: "after-used", argsIgnorePattern: "^_" },
-      ],
-     
     },
   },
 ];
