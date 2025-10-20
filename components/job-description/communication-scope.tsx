@@ -58,24 +58,6 @@ export function CommunicationScopeSelector({
     onChange(JSON.stringify(newScope));
   };
 
-  const getDisplayText = () => {
-    const internal = [];
-    const external = [];
-
-    if (scope.company_internal.department_heads)
-      internal.push("Хэлтэс/албаны дарга");
-    if (scope.company_internal.employees) internal.push("Ажилтнууд");
-    if (scope.external.clients) external.push("Харилцагчид");
-    if (scope.external.contractors) external.push("Туслан гүйцэтгэгч компани");
-
-    const parts = [];
-    if (internal.length > 0)
-      parts.push(`Компани дотор: ${internal.join(", ")}`);
-    if (external.length > 0) parts.push(`Гадна: ${external.join(", ")}`);
-
-    return parts.join(" | ") || "Сонгоогүй";
-  };
-
   return (
     <div className="space-y-6">
       {/* <div className="rounded-lg border bg-muted/50 p-4">

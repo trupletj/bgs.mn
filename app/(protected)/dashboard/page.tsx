@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, ClipboardList, Briefcase } from "lucide-react";
+import { FileText, Briefcase } from "lucide-react";
 
 export default function Page() {
   const systems = [

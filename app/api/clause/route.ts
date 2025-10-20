@@ -5,7 +5,6 @@ import {
   getAllClauses,
   updateClause,
   deleteClause,
-  restoreClause,
 } from "@/actions/clause";
 
 export async function GET(request: Request) {

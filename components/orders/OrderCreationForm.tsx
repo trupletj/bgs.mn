@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,6 @@ export function OrderCreationForm() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   // const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<PartsCatalog[]>([]);
   // const [categories, setCategories] = useState<string[]>([]);
   // const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedTechnicalReviewers, setSelectedTechnicalReviewers] = useState<
@@ -226,7 +225,7 @@ export function OrderCreationForm() {
       for (const [index, item] of orderItems.entries()) {
         const imageUrl = uploadedImages[index];
 
-        const { data: itemData, error: itemError } = await addOrderItem({
+        const { error: itemError } = await addOrderItem({
           order_id: order.id,
           part_number: item.part_number,
           part_name: item.part_name,
@@ -611,42 +610,6 @@ export function OrderCreationForm() {
               <SearchIcon className="h-4 w-4" />
             </Button>
           </div> */}
-
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <div className="border rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
-              {/* <h4 className="font-medium mb-2">Search Results:</h4> */}
-              {/* <div className="space-y-2">
-                {searchResults.map((part) => (
-                  <div
-                    key={part.id}
-                    className="flex items-center justify-between p-2 bg-white rounded border"
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium">{part.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {part.part_number} • {part.manufacturer} • ₮
-                        {part.unit_price?.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {orderItems.map((_, index) => (
-                        <Button
-                          key={index}
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => selectPart(part, index)}
-                        >
-                          Add to Item {index + 1}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div> */}
-            </div>
-          )}
 
           {/* Order Items */}
           <div className="space-y-6">

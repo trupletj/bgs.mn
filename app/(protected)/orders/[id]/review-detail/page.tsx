@@ -1,7 +1,7 @@
 // app/orders/[id]/review-details/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,42 @@ interface OrderItemChange {
   };
 }
 
+interface Profile {
+  name: string;
+  position_name: string;
+  department_name: string;
+}
+
+interface SimpleProfile {
+  name: string;
+}
+
+interface OrderItem {
+  part_name: string;
+  part_number?: string;
+}
+
+interface ReviewData {
+  id: number;
+  reviewer_type: string;
+  status: string;
+  comments: string;
+  assigned_at: string;
+  completed_at: string;
+  profile: Profile | Profile[];
+}
+
+interface ChangesData {
+  id: number;
+  order_item_id: number;
+  reviewer_id: number;
+  old_quantity: number;
+  new_quantity: number;
+  changed_at: string;
+  profile: SimpleProfile | SimpleProfile[];
+  order_item: OrderItem | OrderItem[];
+}
+
 export default function ReviewDetailsPage() {
   const params = useParams();
   const orderId = params.id as string;
@@ -45,11 +81,7 @@ export default function ReviewDetailsPage() {
   const [itemChanges, setItemChanges] = useState<OrderItemChange[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchReviewDetails();
-  }, [orderId]);
-
-  const fetchReviewDetails = async () => {
+  const fetchReviewDetails = useCallback(async () => {
     try {
       const supabase = createClient();
 
@@ -103,7 +135,7 @@ export default function ReviewDetailsPage() {
       if (changesError) throw changesError;
 
       setReviewHistory(
-        (reviewData || []).map((review: any) => ({
+        (reviewData || []).map((review: ReviewData) => ({
           ...review,
           profile: Array.isArray(review.profile)
             ? review.profile[0]
@@ -111,7 +143,7 @@ export default function ReviewDetailsPage() {
         }))
       );
       setItemChanges(
-        (changesData || []).map((change: any) => ({
+        (changesData || []).map((change: ChangesData) => ({
           ...change,
           profile: Array.isArray(change.profile)
             ? change.profile[0]
@@ -127,7 +159,11 @@ export default function ReviewDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId]);
+
+  useEffect(() => {
+    fetchReviewDetails();
+  }, [fetchReviewDetails]);
 
   const getStepLabel = (step: string) => {
     const stepLabels: Record<string, string> = {

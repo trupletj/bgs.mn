@@ -7,21 +7,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/utils/supabase/client";
 import { getStepRoleId, StepType } from "@/utils/workflow";
 
+interface Profile {
+  id: string;
+  name: string;
+  phone: string;
+  department_name: string;
+}
+
 interface Reviewer {
   profile_id: string;
-  profile: {
-    id: string;
-    name: string;
-    phone: string;
-    department_name: string;
-  };
+  profile: Profile;
+}
+
+// Supabase-аас ирж буй өгөгдлийн төрөл
+interface DatabaseReviewer {
+  profile_id: string;
+  profile: Profile | Profile[];
 }
 
 interface TechnicalReviewerSelectorProps {
   selectedReviewers: string[];
   onReviewersChange: (userIds: string[]) => void;
   minimumSelection?: number;
-  currentStep: StepType; // Шинэ prop
+  currentStep: StepType;
   maxSelection?: number;
 }
 
@@ -63,14 +71,13 @@ export function TechnicalReviewerSelector({
           throw new Error(error.message);
         }
 
+        // any төрлийг DatabaseReviewer төрлөөр солих
         setReviewers(
-          (reviewers || []).map((r: any) => ({
+          (reviewers || []).map((r: DatabaseReviewer) => ({
             profile_id: r.profile_id,
             profile: Array.isArray(r.profile) ? r.profile[0] : r.profile,
           }))
         );
-        // console.log("Fetched reviewers:", reviewers);
-        // console.log("role_id:", role_id)
       } catch (err) {
         console.error("Error in fetchReviewers:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -80,13 +87,14 @@ export function TechnicalReviewerSelector({
     };
 
     fetchReviewers();
-  }, []);
+  }, [role_id]); // role_id-г dependency-д нэмэх
 
   const handleReviewerToggle = (userId: string) => {
     if (selectedReviewers.includes(userId)) {
       // Хэрэглэгчийг хасах (хасахгүй бол minimumSelection-аас бага болохгүй)
-
-      onReviewersChange(selectedReviewers.filter((id) => id !== userId));
+      if (selectedReviewers.length > minimumSelection) {
+        onReviewersChange(selectedReviewers.filter((id) => id !== userId));
+      }
     } else {
       // Хэрэглэгчийг нэмэх
       onReviewersChange([...selectedReviewers, userId]);
@@ -152,9 +160,8 @@ export function TechnicalReviewerSelector({
           ) : (
             reviewers.map((reviewer) => (
               <div
-                key={reviewer.profile.id}
-                className="flex items-center space-x-3"
-              >
+                key={reviewer.profile_id}
+                className="flex items-center space-x-3">
                 <Checkbox
                   id={`reviewer-${reviewer.profile_id}`}
                   checked={selectedReviewers.includes(reviewer.profile_id)}
@@ -170,8 +177,7 @@ export function TechnicalReviewerSelector({
                 />
                 <Label
                   htmlFor={`reviewer-${reviewer.profile_id}`}
-                  className="flex-1 cursor-pointer"
-                >
+                  className="flex-1 cursor-pointer">
                   <div className="font-medium">{reviewer.profile.name}</div>
                   <div className="text-sm text-gray-600">
                     {reviewer.profile.department_name} •{" "}

@@ -98,8 +98,6 @@ export default function ReviewedOrderDetail({
         .eq("order_id", orderId);
       if (itemsError) throw itemsError;
 
-      const itemIds = itemsData?.map((item) => item.id) || [];
-
       const { data: subItemsData, error: subItemsError } = await supabase
         .from("sub_order_item")
         .select("*")
@@ -350,8 +348,7 @@ export default function ReviewedOrderDetail({
                             </span>
                             <Badge
                               variant="outline"
-                              className="bg-yellow-100 text-yellow-800"
-                            >
+                              className="bg-yellow-100 text-yellow-800">
                               Өөрчлөгдсөн
                             </Badge>
                           </>
@@ -374,8 +371,7 @@ export default function ReviewedOrderDetail({
                         ) : (
                           <Badge
                             variant="outline"
-                            className="bg-gray-100 text-gray-800"
-                          >
+                            className="bg-gray-100 text-gray-800">
                             Өөрчлөгдөөгүй
                           </Badge>
                         )}

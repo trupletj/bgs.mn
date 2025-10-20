@@ -1,5 +1,4 @@
 import React from "react";
-import { createClient } from "@/utils/supabase/client";
 import ClauseList from "./ClauseList";
 import { getSections } from "@/actions/section";
 

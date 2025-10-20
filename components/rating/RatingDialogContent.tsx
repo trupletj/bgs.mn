@@ -76,12 +76,6 @@ const RatingDialogContent = ({
     setSelectedClauseJobPosition(clauseJob);
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-    setClauseJobs([]);
-    setSelectedClauseJobPosition(null);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] lg:max-w-[1000px] w-full h-[80vh]">

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Building2Icon, HashIcon, ClockIcon, UsersIcon } from "lucide-react";
+import { Building2Icon, ClockIcon, UsersIcon } from "lucide-react";
 import { PositionSelector } from "../position-selector";
 import {
   createJobDescription,
