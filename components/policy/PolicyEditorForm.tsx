@@ -65,6 +65,19 @@ export default function PolicyEditerForm({
     })) || []
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const updateClauseNumbers = (
+    clauses: Clause[],
+    parentRef: string
+  ): Clause[] => {
+    return clauses.map((clause, idx) => ({
+      ...clause,
+      referenceNumber: `${parentRef}.${idx + 1}`,
+      children: updateClauseNumbers(
+        clause.children ?? [],
+        `${parentRef}.${idx + 1}`
+      ),
+    }));
+  };
 
   const addSection = useCallback(() => {
     if (isProcessing) return;
@@ -105,17 +118,13 @@ export default function PolicyEditerForm({
       console.log("Section inserted before:", { sectionIndex });
       setIsProcessing(false);
     },
-    [isProcessing, initialData?.id]
+    [isProcessing, initialData?.id, updateClauseNumbers]
   );
 
   const deleteSection = useCallback((sectionIndex: number) => {
     if (!confirm("Бүлгийг устгахдаа итгэлтэй байна уу?")) return;
     setIsProcessing(true);
     setSections((prev) => {
-      const section = prev[sectionIndex];
-      console.log("Deleting section (UI only):", {
-        sectionId: section.id || `index-${sectionIndex}`,
-      });
       return prev
         .filter((_, idx) => idx !== sectionIndex)
         .map((s, idx) => ({
@@ -352,20 +361,6 @@ export default function PolicyEditerForm({
     },
     [isProcessing]
   );
-
-  const updateClauseNumbers = (
-    clauses: Clause[],
-    parentRef: string
-  ): Clause[] => {
-    return clauses.map((clause, idx) => ({
-      ...clause,
-      referenceNumber: `${parentRef}.${idx + 1}`,
-      children: updateClauseNumbers(
-        clause.children ?? [],
-        `${parentRef}.${idx + 1}`
-      ),
-    }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

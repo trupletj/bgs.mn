@@ -4,7 +4,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Policy, Section, Clause } from "@/types/types";
+import { Policy, Clause } from "@/types/types";
 import { PolicyHeader } from "./PolicyHeader";
 import { SectionItem } from "./SectionItem";
 import { Button } from "@/components/ui/button";

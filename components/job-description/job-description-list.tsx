@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -16,14 +16,18 @@ import JobDescSeeButton from "./job-desc-see-button";
 // import JobDescDeleteButton from "./job-desc-delete-button";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Search } from "lucide-react";
+import { routerServerGlobal } from "next/dist/server/lib/router-utils/router-server-context";
+import { redirect } from "next/dist/server/api-utils";
 
 interface JobDescription {
   id: string;
-  job_position: {
-    name: string | null;
-  }[]; // Allow array here
+  job_position: JobPosition[]; // Allow array here
   a_code: string | null;
+}
+
+interface JobPosition {
+  name: string | null;
 }
 
 export default function JobDescriptionList() {
@@ -39,12 +43,11 @@ export default function JobDescriptionList() {
     fetchJobDescriptions();
   }, [currentPage, debouncedSearchTerm]);
 
-  const fetchJobDescriptions = async () => {
+  const fetchJobDescriptions = useCallback(async () => {
     setIsLoading(true);
     try {
       const supabase = createClient();
 
-      // Query-г засах - name-ийн оронд байгаа column-уудыг ашиглах
       let query = supabase
         .from("job_description")
         .select("id, job_position:job_position_id(name), a_code", {
@@ -52,9 +55,8 @@ export default function JobDescriptionList() {
         })
         .eq("is_deleted", false)
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
-        .order("id", { ascending: false }); // created_at эсвэл өөр column
+        .order("id", { ascending: false });
 
-      // Хайлтыг title эсвэл a_code дээр хийх
       if (debouncedSearchTerm) {
         query = query.or(
           `title.ilike.%${debouncedSearchTerm}%,a_code.ilike.%${debouncedSearchTerm}%`
@@ -73,9 +75,13 @@ export default function JobDescriptionList() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearchTerm]);
 
-  const getJobPositionName = (jobPosition: any[] | null): string => {
+  useEffect(() => {
+    fetchJobDescriptions();
+  }, [fetchJobDescriptions]);
+
+  const getJobPositionName = (jobPosition: JobPosition[] | null): string => {
     if (
       !jobPosition ||
       (Array.isArray(jobPosition) && jobPosition.length === 0)
@@ -91,36 +97,27 @@ export default function JobDescriptionList() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      <Link
-        href="/job-descriptions/new"
-        className="flex cursor-pointer justify-end mb-2">
-        <Button className="items-center flex">
-          <PlusIcon className="h-4 w-4 " />
-          Нэмэх
-        </Button>
-      </Link>
+      <div className="flex justify-end mb-2 w-min-content">
+        <Link href="/job-descriptions/new" className="flex cursor-pointer">
+          <Button className="items-center flex">
+            <PlusIcon className="h-4 w-4 " />
+            Нэмэх
+          </Button>
+        </Link>
+      </div>
       <div className="flex justify-between mb-6">
-        <h2 className="text-2xl font-bold">Ажлын байрны тодорхойлолтууд</h2>
-        <div className="relative flex items-center">
+        <h2 className="text-2xl font-bold min-w-[300px]">
+          Ажлын байрны тодорхойлолтууд
+        </h2>
+        <div className="relative flex items-center border p-2 rounded-md min-w-1/2">
+          <Search className="mr-2" />
           <input
             type="text"
             placeholder="Код эсвэл нэрээр хайх..."
-            className="border px-4 py-2 rounded-md pl-10 min-w-[600px]"
+            className="w-full"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <svg
-            className="absolute left-3 top-3 h-4 w-4 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
         </div>
       </div>
       {isLoading ? (

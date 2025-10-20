@@ -9,6 +9,34 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
+// Supabase-аас ирж буй өгөгдлийн төрөл
+interface DatabaseProfile {
+  name: string;
+  department_name: string;
+}
+
+interface DatabaseOrder {
+  id: number;
+  order_number: string;
+  title: string;
+  description: string;
+  status: string;
+  urgency_level: string;
+  created_at: string;
+  profile: DatabaseProfile | DatabaseProfile[];
+}
+
+interface DatabaseReviewRequest {
+  id: number;
+  order_id: number;
+  reviewer_type: string;
+  assigned_at: string;
+  status: string;
+  is_reviewed: boolean;
+  orders: DatabaseOrder | DatabaseOrder[];
+}
+
+// Боловсруулсан өгөгдлийн төрөл
 interface ReviewRequest {
   id: number;
   order_id: number;
@@ -42,7 +70,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
 
   useEffect(() => {
     fetchReviewRequests();
-  }, []);
+  }, [profile_id]); // profile_id-г dependency-д нэмэх
 
   const fetchReviewRequests = async () => {
     try {
@@ -80,15 +108,29 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
         throw new Error(error.message);
       }
 
-      const processedData = (data || []).map((item: any) => ({
-        ...item,
-        orders: {
-          ...(Array.isArray(item.orders) ? item.orders[0] : item.orders),
-          profile: Array.isArray(item.orders?.profile)
-            ? item.orders.profile[0]
-            : item.orders?.profile,
-        },
-      }));
+      // any төрлийг DatabaseReviewRequest төрлөөр солих
+      const processedData = (data || []).map((item: DatabaseReviewRequest) => {
+        const ordersEntry = Array.isArray(item.orders)
+          ? item.orders[0]
+          : item.orders;
+
+        let profileEntry: DatabaseProfile | undefined;
+        if (ordersEntry) {
+          if (Array.isArray(ordersEntry.profile)) {
+            profileEntry = ordersEntry.profile[0];
+          } else {
+            profileEntry = ordersEntry.profile as DatabaseProfile | undefined;
+          }
+        }
+
+        return {
+          ...item,
+          orders: {
+            ...(ordersEntry || ({} as DatabaseOrder)),
+            profile: profileEntry || { name: "", department_name: "" },
+          },
+        } as ReviewRequest;
+      });
 
       setReviewRequests(processedData);
     } catch (error) {
@@ -149,22 +191,6 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: "Хүлээгдэж байна", variant: "outline" as const },
-      approved: { label: "Зөвшөөрсөн", variant: "default" as const },
-      changes_requested: {
-        label: "Өөрчлөлттэй",
-        variant: "secondary" as const,
-      },
-      rejected: { label: "Татгалзсан", variant: "destructive" as const },
-    };
-
-    const config =
-      statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
   if (loading) {
     return <div>Ачааллаж байна...</div>;
   }
@@ -195,8 +221,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
         return (
           <Card
             key={`${request.order_id}-${request.reviewer_type}`}
-            className="hover:shadow-md transition-shadow"
-          >
+            className="hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -210,8 +235,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                     {/* Шалгуулагчийн тоо ба статус */}
                     <Badge
                       variant="outline"
-                      className="bg-blue-50 text-blue-700"
-                    >
+                      className="bg-blue-50 text-blue-700">
                       {reviewedCount}/{totalReviewers} шалгуулагч
                     </Badge>
 
@@ -245,8 +269,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                       onClick={() =>
                         handleReview(request.orders.id, request.reviewer_type)
                       }
-                      className="w-full"
-                    >
+                      className="w-full">
                       Хянах
                     </Button>
                   ) : (
@@ -262,8 +285,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                               ? "destructive"
                               : "outline"
                           }
-                          className="w-full justify-center"
-                        >
+                          className="w-full justify-center">
                           {request.status === "approved"
                             ? "Та зөвшөөрсөн"
                             : request.status === "changes_requested"
@@ -284,8 +306,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                         request.reviewer_type
                       )
                     }
-                    className="w-full"
-                  >
+                    className="w-full">
                     Дэлгэрэнгүй харах
                   </Button>
                 </div>

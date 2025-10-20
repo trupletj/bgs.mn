@@ -277,15 +277,6 @@ export function PositionSelector({
     fetchHeltesPositions(selectedOrganization!, heltes);
   };
 
-  const handleDirectPositionsSelect = () => {
-    setCurrentStep("positions");
-    // Байгууллагад шууд харьяалагдсан ажлын байрууд
-    const directPositions = positions.filter(
-      (position) => !position.heltes_id && !position.alba_id
-    );
-    setPositions(directPositions);
-  };
-
   const handlePositionSelect = (position: JobPosition) => {
     if (multiple) {
       const isAlreadySelected = selectedPositions.some(

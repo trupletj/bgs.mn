@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { Label } from "./ui/label";
 
 interface ImageUploaderProps {
   multiple?: boolean;

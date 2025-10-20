@@ -68,12 +68,14 @@ export default function PolicyList() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      <Link href="/policy/new" className="flex cursor-pointer justify-end mb-2">
-        <Button className="items-center flex">
-          <PlusIcon className="h-4 w-4 " />
-          Нэмэх
-        </Button>
-      </Link>
+      <div className="flex justify-end mb-2 w-min-content">
+        <Link href="/policy/new" className="flex cursor-pointer">
+          <Button className="items-center flex">
+            <PlusIcon className="h-4 w-4 " />
+            Нэмэх
+          </Button>
+        </Link>
+      </div>
       <div className="flex justify-between mb-6">
         <h2 className="text-2xl font-bold">Журмууд</h2>
         <div className="relative flex items-center">

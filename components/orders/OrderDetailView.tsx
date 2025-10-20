@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Calendar,
-  DollarSign,
   Package,
   User,
   Clock,
@@ -42,7 +41,6 @@ import { formatDistanceToNow } from "date-fns";
 import { StatusUpdateDialog } from "./StatusUpdateDialog";
 import type { Order, OrderItem, WorkflowEntry } from "@/actions/orders";
 import { UNIT_OPTIONS } from "@/types/types";
-import Image from "next/image";
 import ImageViewer from "../image-viewer";
 
 interface OrderDetailViewProps {

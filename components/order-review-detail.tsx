@@ -1,7 +1,7 @@
 // components/order-reviewer-detail.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ReviewOrderForm } from "@/components/review-order-form";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
@@ -52,13 +52,13 @@ export default function OrderReviewerDetail({
     fetchOrderDetails();
   }, [orderId, profile_id]);
 
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const supabase = createClient();
 
-      // Одоогийн шалгуулагчийн мэдээлэл
+      // Шалгуулагчийн мэдээлэл
       const { data: reviewer, error: reviewerError } = await supabase
         .from("order_reviewers")
         .select("*")
@@ -80,24 +80,25 @@ export default function OrderReviewerDetail({
       if (isValidStep(reviewer.reviewer_type)) {
         setCurrentStep(reviewer.reviewer_type);
       }
+
       // Захиалгын мэдээлэл
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .select(
           `
-          id,
-          order_number,
-          title,
-          description,
-          status,
-          urgency_level,
-          created_at,
-          requested_delivery_date,
-          profile:created_profile (
-            name,
-            department_name
-          )
-        `
+        id,
+        order_number,
+        title,
+        description,
+        status,
+        urgency_level,
+        created_at,
+        requested_delivery_date,
+        profile:created_profile (
+          name,
+          department_name
+        )
+      `
         )
         .eq("id", orderId)
         .single();
@@ -106,6 +107,7 @@ export default function OrderReviewerDetail({
         console.error("Order error:", orderError);
         throw new Error("Захиалгын мэдээлэл авахад алдаа гарлаа");
       }
+
       if (!orderData) {
         setError("Захиалга олдсонгүй");
         return;
@@ -136,7 +138,7 @@ export default function OrderReviewerDetail({
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, profile_id]);
 
   if (loading) {
     return (
