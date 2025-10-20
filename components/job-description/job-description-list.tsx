@@ -20,13 +20,14 @@ import { PlusIcon } from "lucide-react";
 
 interface JobDescription {
   id: string;
-  title: string | null;
-  //   approved_date: string | null;
-  code: string | null;
+  job_position: {
+    name: string | null;
+  }[]; // Allow array here
+  a_code: string | null;
 }
 
 export default function JobDescriptionList() {
-  const [jobDescriptions, setjobDescriptions] = useState<JobDescription[]>([]);
+  const [jobDescriptions, setJobDescriptions] = useState<JobDescription[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
@@ -35,35 +36,57 @@ export default function JobDescriptionList() {
   const pageSize = 15;
 
   useEffect(() => {
-    fetchjobDescriptions();
+    fetchJobDescriptions();
   }, [currentPage, debouncedSearchTerm]);
 
-  const fetchjobDescriptions = async () => {
+  const fetchJobDescriptions = async () => {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const {
-        data: jobDescriptionsData,
-        error,
-        count,
-      } = await supabase
+
+      // Query-г засах - name-ийн оронд байгаа column-уудыг ашиглах
+      let query = supabase
         .from("job_description")
-        .select("id, title, code", { count: "exact" })
-        .ilike("title", `%${debouncedSearchTerm}%`)
+        .select("id, job_position:job_position_id(name), a_code", {
+          count: "exact",
+        })
         .eq("is_deleted", false)
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
-        .order("title", { ascending: false });
+        .order("id", { ascending: false }); // created_at эсвэл өөр column
+
+      // Хайлтыг title эсвэл a_code дээр хийх
+      if (debouncedSearchTerm) {
+        query = query.or(
+          `title.ilike.%${debouncedSearchTerm}%,a_code.ilike.%${debouncedSearchTerm}%`
+        );
+      }
+
+      const { data: jobDescriptionsData, error, count } = await query;
 
       if (error) throw error;
 
-      setjobDescriptions(jobDescriptionsData || []);
-      setTotalPages(Math.ceil(count! / pageSize));
+      setJobDescriptions(jobDescriptionsData || []);
+      setTotalPages(Math.ceil((count || 0) / pageSize));
     } catch (error) {
       console.error("Fetch jobDescriptions error:", error);
       toast.error(`Алдаа: ${(error as Error).message}`);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getJobPositionName = (jobPosition: any[] | null): string => {
+    if (
+      !jobPosition ||
+      (Array.isArray(jobPosition) && jobPosition.length === 0)
+    ) {
+      return "Ажлын байргүй";
+    }
+    const positions = Array.isArray(jobPosition) ? jobPosition : [jobPosition];
+    return positions
+      .map((p) => p.name || "")
+      .filter(Boolean)
+      .join(", ");
   };
 
   return (
@@ -81,7 +104,7 @@ export default function JobDescriptionList() {
         <div className="relative flex items-center">
           <input
             type="text"
-            placeholder="Хайх..."
+            placeholder="Код эсвэл нэрээр хайх..."
             className="border px-4 py-2 rounded-md pl-10 min-w-[600px]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -112,15 +135,15 @@ export default function JobDescriptionList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[100px]">
+                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[30px]">
                     Код
                   </TableHead>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
-                    Нэр
-                  </TableHead>
-                  {/* <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[120px]">
-                    Баталсан огноо
+                  {/* <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
+                    Гарчиг
                   </TableHead> */}
+                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
+                    Ажлын байр
+                  </TableHead>
                   <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[150px]">
                     Үйлдэл
                   </TableHead>
@@ -129,31 +152,33 @@ export default function JobDescriptionList() {
               <TableBody>
                 {jobDescriptions.map((job_description) => (
                   <TableRow key={job_description.id}>
-                    <TableCell className="px-4 py-2">
-                      {job_description.code}
+                    <TableCell className="px-4 py-2 text-center">
+                      {job_description.a_code || "Кодгүй"}
                     </TableCell>
+                    {/* <TableCell className="px-4 py-2">
+                      <div
+                        className="break-words whitespace-normal"
+                        title={job_description.title || "Гарчиггүй"}>
+                        {job_description.title || "Гарчиггүй"}
+                      </div>
+                    </TableCell> */}
                     <TableCell className="px-4 py-2">
                       <div
                         className="break-words whitespace-normal"
-                        title={job_description.title || ""}>
-                        {job_description.title}
+                        title={getJobPositionName(
+                          job_description.job_position
+                        )}>
+                        {getJobPositionName(job_description.job_position)}
                       </div>
                     </TableCell>
-                    {/* <TableCell className="px-4 py-2 text-center">
-                      {policy.approved_date
-                        ? new Date(policy.approved_date).toLocaleDateString(
-                            "mn-MN"
-                          )
-                        : "Огноогүй"}
-                    </TableCell> */}
                     <TableCell className="px-4 py-2">
                       <div className="flex gap-2 justify-center items-center">
                         <JobDescSeeButton
                           job_description_id={job_description.id}
                         />
                         {/* <JobDescDeleteButton
-                          policy_id={job_description.id}
-                          onDeleted={fetchjobDescriptions}
+                          job_description_id={job_description.id}
+                          onDeleted={fetchJobDescriptions}
                         /> */}
                       </div>
                     </TableCell>
@@ -165,7 +190,7 @@ export default function JobDescriptionList() {
           {!isLoading && jobDescriptions.length > 0 && (
             <div className="flex justify-between items-center mt-4">
               <div className="text-sm text-gray-500">
-                Нийт: {totalPages} --- {currentPage}-р хуудас
+                Нийт {totalPages} хуудасны {currentPage}-р хуудас
               </div>
               <div className="flex gap-2">
                 <Button
