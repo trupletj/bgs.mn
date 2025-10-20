@@ -1,7 +1,7 @@
 import type React from "react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 interface JobPosition {
@@ -13,14 +13,27 @@ interface JobPosition {
   department?: string;
 }
 
+interface CommunicationScope {
+  company_internal: {
+    department_heads: boolean;
+    employees: boolean;
+  };
+  external: {
+    clients: boolean;
+    contractors: boolean;
+  };
+}
+
 interface JobDescriptionData {
   id: string;
   title: string;
   job_position_id: string;
-  code: string;
-  supervisor_pos_id: string;
-  subordinate_pos_id: string;
+  a_code: string;
+  at_code: string;
+  supervisor_pos_id: string | string[];
+  subordinate_pos_id: string | string[];
   communication_scope: string;
+  job_condition: string;
   purpose: string;
   schedule: string;
   daily_hours: string;
@@ -38,8 +51,8 @@ interface JobDescriptionData {
   relevant_laws: string[];
   note: string;
   job_position?: JobPosition;
-  supervisor?: JobPosition;
-  subordinate?: JobPosition;
+  supervisors: JobPosition[];
+  subordinates: JobPosition[];
 }
 
 interface JobDescriptionDetailProps {
@@ -47,152 +60,248 @@ interface JobDescriptionDetailProps {
 }
 
 export function JobDescriptionDetail({ data }: JobDescriptionDetailProps) {
+  const parseCommunicationScope = (): CommunicationScope => {
+    try {
+      return data.communication_scope
+        ? JSON.parse(data.communication_scope)
+        : {
+            company_internal: { department_heads: false, employees: false },
+            external: { clients: false, contractors: false },
+          };
+    } catch {
+      return {
+        company_internal: { department_heads: false, employees: false },
+        external: { clients: false, contractors: false },
+      };
+    }
+  };
+
+  const getCommunicationScopeText = (): string => {
+    const scope = parseCommunicationScope();
+    const internal: string[] = [];
+    const external: string[] = [];
+
+    if (scope.company_internal.department_heads) {
+      internal.push("Хэлтэс/албаны дарга нар");
+    }
+    if (scope.company_internal.employees) {
+      internal.push("Бусад ажилчид");
+    }
+    if (scope.external.clients) {
+      external.push("Харилцагчид");
+    }
+    if (scope.external.contractors) {
+      external.push("Гүйцэтгэгчид");
+    }
+
+    const parts: string[] = [];
+    if (internal.length > 0) {
+      parts.push(`Компани дотор: ${internal.join(", ")}`);
+    }
+    if (external.length > 0) {
+      parts.push(`Гадна: ${external.join(", ")}`);
+    }
+
+    return parts.length > 0 ? parts.join("\n") : "-";
+  };
+
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="flex justify-end mb-4">
-        <div className="flex-shrink-0 ml-4">
-          <Link href="/job_descriptions">
-            <Button variant="outline" className="mr-2">
-              Буцах
-            </Button>
-          </Link>
-          <Link href={`/job-descriptions/${data.id}/edit`}>
-            <Button variant="secondary" className="ml-2">
-              Засварлах
-            </Button>
-          </Link>
-        </div>
+    <div className="mx-auto max-w-5xl p-4">
+      {/* Action Buttons */}
+      <div className="mb-6 flex justify-end gap-3">
+        <Link href="/job_descriptions">
+          <Button variant="outline">Буцах</Button>
+        </Link>
+        <Link href={`/job-descriptions/${data.id}/edit`}>
+          <Button variant="default">Засварлах</Button>
+        </Link>
       </div>
-      <Card className="border-2 border-border bg-card p-8 shadow-lg md:p-12">
+
+      {/* Main Document Card */}
+      <Card className="border-2 bg-card p-8 shadow-sm md:p-12">
         {/* Document Header */}
-        <div className="mb-4 text-center">
-          <h1 className="mb-2 font-serif text-3xl font-bold text-foreground md:text-4xl">
-            АЖЛЫН БАЙРНЫ ТОДОРХОЙЛОЛТ
+        <header className="mb-8 text-center">
+          <h1 className="mb-4 font-serif text-3xl font-bold uppercase tracking-wide md:text-4xl">
+            Албан тушаалын тодорхойлолт
           </h1>
-          <div className="mt-4 flex flex-col gap-1 text-lg md:flex-row md:justify-center md:gap-6">
-            <div>
-              <span>Код:</span> {data.code}
+          <div className="mt-6 flex flex-col gap-2 text-base md:flex-row md:justify-center md:gap-8">
+            <div className="font-medium">
+              <span className="text-muted-foreground">Код:</span> {data.a_code}
             </div>
-            <div>
-              <span>Албан тушаал:</span>{" "}
-              {data.job_position?.name || data.job_position_id}
+            <div className="font-medium">
+              <span className="text-muted-foreground">Албан тушаал:</span>{" "}
+              {data.job_position?.name || data.title}
             </div>
           </div>
-        </div>
+        </header>
 
-        <Separator className="my-4" />
+        <Separator className="my-8" />
 
-        {/* Basic Information */}
-        <Section title="I. Үндсэн мэдээлэл">
+        {/* A. General Information */}
+        <Section title="А. Нийтлэг үндэслэл">
+          <InfoRow label="Албан тушаалын нэр" value={data.title} />
           <InfoRow
-            label="Шууд удирдлагын албан тушаал"
-            value={data.supervisor?.name || data.supervisor_pos_id}
+            label="Үндэсний ажил мэргэжлийн ангилалын код"
+            value={data.a_code}
           />
+          <InfoRow label="Албан тушаалын код" value={data.at_code} />
+
           <InfoRow
-            label="Шууд захирагдах албан тушаал"
-            value={data.subordinate?.name || data.subordinate_pos_id}
+            label="Шууд харьяалагдах албан тушаал"
+            value={
+              data.supervisors?.length > 0
+                ? data.supervisors.map((s) => s.name).join(", ")
+                : "-"
+            }
           />
-          <InfoRow label="Харилцах хүрээ" value={data.communication_scope} />
+
+          <InfoRow
+            label="Шууд удирдах албан тушаал"
+            value={
+              data.subordinates?.length > 0
+                ? data.subordinates.map((s) => s.name).join(", ")
+                : "-"
+            }
+          />
+
+          <InfoRow
+            label="Хөдөлмөрийн нөхцөл"
+            value={data.job_condition || "-"}
+          />
+
+          <InfoRow
+            label="Харилцах хүрээ"
+            value={getCommunicationScopeText()}
+            multiline
+          />
         </Section>
 
-        {/* Detailed Information */}
-        <Section title="II. Дэлгэрэнгүй мэдээлэл">
-          <InfoRow label="Зорилго" value={data.purpose} />
-          <InfoRow label="Ажлын хуваарь" value={data.schedule} />
+        {/* B. Detailed Job Information */}
+        <Section title="Б. Албан тушаалын дэлгэрэнгүй мэдээлэл">
+          <InfoRow
+            label="Албан тушаалын зорилго"
+            value={data.purpose}
+            multiline
+          />
+          <InfoRow label="Ажлын хуваарь" value={data.schedule} multiline />
           <InfoRow label="Өдрийн ажлын цаг" value={data.daily_hours} />
-          <InfoRow label="Завсарлагааны цаг" value={data.break_time} />
+          <InfoRow label="Цайны цаг" value={data.break_time} />
         </Section>
 
-        {/* Duties and Responsibilities */}
-        <Section title="III. Үүрэг хариуцлага">
-          <List items={data.duties} />
+        {/* C. Job Duties */}
+        <Section title="С. Албан тушаалын гүйцэтгэх үүрэг">
+          {data.duties && data.duties.length > 0 ? (
+            <table className="w-full border-collapse border border-border">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="border border-border px-4 py-3 text-left font-semibold w-16">
+                    №
+                  </th>
+                  <th className="border border-border px-4 py-3 text-left font-semibold">
+                    Ажил үүрэг
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.duties.map((duty, index) => (
+                  <tr key={index} className="hover:bg-muted/30">
+                    <td className="border border-border px-4 py-3 text-center align-top">
+                      {index + 1}
+                    </td>
+                    <td className="border border-border px-4 py-3">{duty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-muted-foreground">Мэдээлэл байхгүй</p>
+          )}
         </Section>
 
-        {/* Requirements */}
-        <Section title="IV. Шаардлага">
-          <div className="space-y-4">
-            <InfoRow label="Боловсролын түвшин" value={data.education_level} />
-            <InfoRow label="Ажлын туршлага" value={data.work_experience} />
+        {/* D. Requirements */}
+        <Section title="Д. Албан тушаалд тавигдах шаардлага">
+          <div className="space-y-6">
+            <SubSection title="Ерөнхий шаардлага">
+              <InfoRow
+                label="Боловсролын түвшин"
+                value={data.education_level}
+                multiline
+              />
+              <InfoRow
+                label="Ажлын туршлага"
+                value={data.work_experience}
+                multiline
+              />
+            </SubSection>
 
             {data.general_skills && data.general_skills.length > 0 && (
-              <div>
-                <p className="mb-2 font-medium text-foreground">
-                  Ерөнхий ур чадвар:
-                </p>
+              <SubSection title="Ерөнхий ур чадвар">
                 <List items={data.general_skills} />
-              </div>
+              </SubSection>
             )}
 
             {data.professional_skills &&
               data.professional_skills.length > 0 && (
-                <div>
-                  <p className="mb-2 font-medium text-foreground">
-                    Мэргэжлийн ур чадвар:
-                  </p>
-                  <List items={data.professional_skills} />
-                </div>
+                <SubSection title="Мэргэжлийн ур чадвар">
+                  <List items={data.professional_skills} numbered />
+                </SubSection>
               )}
 
             {data.additional_courses && data.additional_courses.length > 0 && (
-              <div>
-                <p className="mb-2 font-medium text-foreground">
-                  Нэмэлт сургалт:
-                </p>
+              <SubSection title="Хамрагдсан байвал зохих сургалт">
                 <List items={data.additional_courses} />
-              </div>
+              </SubSection>
             )}
           </div>
         </Section>
 
-        {/* Resources */}
-        {data.resources && (
-          <Section title="V. Нөөц, хэрэгсэл">
-            <p className="text-foreground">{data.resources}</p>
-          </Section>
-        )}
+        {/* E. Other Factors */}
+        <Section title="Е. Бусад хүчин зүйлс">
+          <div className="space-y-6">
+            {data.resources && (
+              <SubSection title="Нөөц хэрэгсэл">
+                <p className="leading-relaxed">{data.resources}</p>
+              </SubSection>
+            )}
 
-        {/* Authority */}
-        {data.authority && data.authority.length > 0 && (
-          <Section title="VI. Эрх мэдэл">
-            <List items={data.authority} />
-          </Section>
-        )}
+            {data.authority && data.authority.length > 0 && (
+              <SubSection title="Эрх мэдэл">
+                <List items={data.authority} numbered />
+              </SubSection>
+            )}
 
-        {/* Responsibilities */}
-        {data.responsibilities && data.responsibilities.length > 0 && (
-          <Section title="VII. Хариуцлага">
-            <List items={data.responsibilities} />
-          </Section>
-        )}
+            {data.responsibilities && data.responsibilities.length > 0 && (
+              <SubSection title="Хариуцлага">
+                <List items={data.responsibilities} numbered />
+              </SubSection>
+            )}
 
-        {/* Property Liability */}
-        {data.property_liability && data.property_liability.length > 0 && (
-          <Section title="VIII. Эд хөрөнгийн хариуцлага">
-            <List items={data.property_liability} />
-          </Section>
-        )}
+            {data.property_liability && data.property_liability.length > 0 && (
+              <SubSection title="Эд хөрөнгийн хариуцлага">
+                <p className="leading-relaxed">
+                  {data.property_liability.join(" ")}
+                </p>
+              </SubSection>
+            )}
 
-        {/* Relevant Laws */}
-        {data.relevant_laws && data.relevant_laws.length > 0 && (
-          <Section title="IX. Холбогдох хууль эрх зүй">
-            <List items={data.relevant_laws} />
-          </Section>
-        )}
+            {data.relevant_laws && data.relevant_laws.length > 0 && (
+              <SubSection title="Холбогдох хууль тогтоомж">
+                <List items={data.relevant_laws} numbered />
+              </SubSection>
+            )}
 
-        {/* Note */}
-        {data.note && (
-          <Section title="X. Тэмдэглэл">
-            <p className="italic text-muted-foreground">{data.note}</p>
-          </Section>
-        )}
-
-        {/* <Separator className="my-8" /> */}
-
-        {/* Signature Section */}
-        {/* <div className="mt-8 grid gap-8 md:grid-cols-2">
-          <SignatureBlock title="Боловсруулсан" />
-          <SignatureBlock title="Батлав" />
-        </div> */}
+            <SubSection title="Бусад">
+              <List
+                items={[
+                  'Энэхүү албан тушаалын тодорхойлолт нь зөвхөн "БТЕГ" ХХК-д ажиллах тохиолдолд мөрдлөг болно.',
+                  "Маргаантай асуудал гарвал хөдөлмөр олгогч болон ажилтан харилцан ярилцаж шийдвэрлэнэ.",
+                  "Энэхүү баримт бичиг нь хөдөлмөрийн гэрээний салшгүй хэсэг болно.",
+                ]}
+                numbered
+              />
+            </SubSection>
+          </div>
+        </Section>
       </Card>
     </div>
   );
@@ -206,61 +315,82 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-6">
-      <h2 className="mb-3 font-serif text-xl font-semibold text-foreground">
+    <section className="mb-10">
+      <h2 className="mb-5 border-b pb-2 font-serif text-2xl font-semibold">
         {title}
       </h2>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function SubSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold text-lg">{title}</h3>
       <div className="pl-4">{children}</div>
     </div>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  multiline?: boolean;
+}) {
   if (!value) return null;
 
   return (
-    <div className="mb-3 flex flex-col gap-1 md:flex-row md:gap-2">
-      <span className="font-medium text-foreground md:min-w-[200px]">
-        {label}:
-      </span>
-      <span className="text-foreground">{value}</span>
+    <div className="grid grid-cols-1 gap-2 py-2 md:grid-cols-[280px_1fr]">
+      <span className="font-medium">{label}:</span>
+      {multiline ? (
+        <pre className="whitespace-pre-wrap font-sans leading-relaxed">
+          {value}
+        </pre>
+      ) : (
+        <span className="leading-relaxed">{value}</span>
+      )}
     </div>
   );
 }
 
-function List({ items }: { items: string[] }) {
+function List({
+  items,
+  numbered = false,
+}: {
+  items: string[];
+  numbered?: boolean;
+}) {
   if (!items || items.length === 0) return null;
 
+  if (numbered) {
+    return (
+      <ol className="list-decimal space-y-2 pl-6 leading-relaxed">
+        {items.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ol>
+    );
+  }
+
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2 leading-relaxed">
       {items.map((item, index) => (
-        <li key={index} className="flex gap-3 text-foreground">
+        <li key={index} className="flex gap-3">
           <span className="text-muted-foreground">•</span>
-          <span>{item}</span>
+          <span className="flex-1">{item}</span>
         </li>
       ))}
     </ul>
-  );
-}
-
-function SignatureBlock({ title }: { title: string }) {
-  return (
-    <div className="space-y-4">
-      <p className="font-medium text-foreground">{title}:</p>
-      <div className="space-y-2">
-        <div className="flex gap-2">
-          <span className="text-muted-foreground">Нэр:</span>
-          <div className="flex-1 border-b border-border" />
-        </div>
-        <div className="flex gap-2">
-          <span className="text-muted-foreground">Гарын үсэг:</span>
-          <div className="flex-1 border-b border-border" />
-        </div>
-        <div className="flex gap-2">
-          <span className="text-muted-foreground">Огноо:</span>
-          <div className="flex-1 border-b border-border" />
-        </div>
-      </div>
-    </div>
   );
 }

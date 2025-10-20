@@ -25,14 +25,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { CommunicationScopeSelector } from "./communication-scope";
 
 interface JobDescriptionData {
   id?: string;
-  title: string;
   job_position_id: string;
-  code: string;
-  supervisor_pos_id: string;
-  subordinate_pos_id: string;
+  a_code: string;
+  at_code: string;
+  supervisor_pos_id: string | string[]; // Олон утга
+  subordinate_pos_id: string | string[]; // Олон утга
+  job_condition: string;
   communication_scope: string;
   purpose: string;
   schedule: string;
@@ -65,11 +67,12 @@ export function JobDescriptionForm({
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<JobDescriptionData>({
-    title: "",
     job_position_id: "",
-    code: "",
+    a_code: "",
+    at_code: "",
     supervisor_pos_id: "",
     subordinate_pos_id: "",
+    job_condition: "",
     communication_scope: "",
     purpose: "",
     schedule: "",
@@ -94,11 +97,12 @@ export function JobDescriptionForm({
     if (initialData) {
       setFormData({
         id: initialData.id,
-        title: initialData.title || "",
         job_position_id: initialData.job_position_id || "",
-        code: initialData.code || "",
+        a_code: initialData.a_code || "",
+        at_code: initialData.at_code || "",
         supervisor_pos_id: initialData.supervisor_pos_id || "",
         subordinate_pos_id: initialData.subordinate_pos_id || "",
+        job_condition: initialData.job_condition || "",
         communication_scope: initialData.communication_scope || "",
         purpose: initialData.purpose || "",
         schedule: initialData.schedule || "",
@@ -169,24 +173,32 @@ export function JobDescriptionForm({
     }));
   };
 
-  const handleJobPositionSelect = (jobPositionId: string) => {
+  const handleJobPositionSelect = (jobPositionId: string | string[]) => {
+    // Job position нь үргэлж ганц утга байх ёстой
+    if (Array.isArray(jobPositionId)) {
+      setFormData((prev) => ({
+        ...prev,
+        job_position_id: jobPositionId[0] || "", // Эхний утгыг авах
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        job_position_id: jobPositionId,
+      }));
+    }
+  };
+
+  const handleSupervisorSelect = (supervisorIds: string | string[]) => {
     setFormData((prev) => ({
       ...prev,
-      job_position_id: jobPositionId,
+      supervisor_pos_id: supervisorIds,
     }));
   };
 
-  const handleSupervisorSelect = (supervisorId: string) => {
+  const handleSubordinateSelect = (subordinateIds: string | string[]) => {
     setFormData((prev) => ({
       ...prev,
-      supervisor_pos_id: supervisorId,
-    }));
-  };
-
-  const handleSubordinateSelect = (subordinateId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      subordinate_pos_id: subordinateId,
+      subordinate_pos_id: subordinateIds,
     }));
   };
 
@@ -203,7 +215,8 @@ export function JobDescriptionForm({
       } else {
         result = await createJobDescription(formData);
       }
-
+      console.log("submission result:", result);
+      console.log(JSON.stringify(result, null, 2));
       if (result.error) {
         toast.error(`Алдаа гарлаа: ${result.error.message}`);
         return;
@@ -213,7 +226,7 @@ export function JobDescriptionForm({
 
       // Detail page руу redirect хийх
       setTimeout(() => {
-        router.push(`/job-descriptions/${result.data?.id || formData.id}`);
+        router.push(`/job-descriptions/${result.id}`);
         router.refresh();
       }, 1500);
     } catch (error) {
@@ -254,6 +267,13 @@ export function JobDescriptionForm({
 
   const closeModal = () => {
     setIsModalOpen(false);
+  };
+
+  const handleCommunicationScopeChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      communication_scope: value,
+    }));
   };
 
   return (
@@ -301,21 +321,6 @@ export function JobDescriptionForm({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2 break-after-all">
-              <Label htmlFor="title">Тодорхойлолтын нэр</Label>
-              <Textarea
-                id="title"
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    title: e.target.value,
-                  }))
-                }
-                placeholder="жишээ: “БОЛДТӨМӨР ЕРӨӨ ГОЛ” ХХК-Н УДИРДЛАГА ХЯНАЛТЫН АЛБАНЫ МЭДЭЭЛЛИЙН СҮЛЖЭЭНИЙ  ИНЖЕНЕРИЙН АЛБАН ТУШААЛЫН ТОДОРХОЙЛОЛТ"
-                required
-              />
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Ажлын байраа сонгоно</Label>
@@ -327,28 +332,67 @@ export function JobDescriptionForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="code" className="flex items-center gap-2">
-                  <HashIcon className="h-4 w-4" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+              <div className="flex flex-col space-y-1">
+                <Label
+                  htmlFor="a_code"
+                  className="flex items-center gap-2 min-h-[2.5rem]">
                   Үндэсний ажил мэргэжлийн ангилалын код *
                 </Label>
                 <Input
-                  id="code"
-                  value={formData.code}
+                  id="a_code"
+                  value={formData.a_code}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      code: e.target.value,
+                      a_code: e.target.value,
                     }))
                   }
                   placeholder="жишээ: 2511-11"
                   required
                 />
               </div>
+              <div className="flex flex-col space-y-1">
+                <Label
+                  htmlFor="at_code"
+                  className="flex items-center gap-2 min-h-[2.5rem]">
+                  Албан тушаалын код *
+                </Label>
+                <Input
+                  id="at_code"
+                  value={formData.at_code}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      at_code: e.target.value,
+                    }))
+                  }
+                  placeholder="жишээ: 123"
+                  required
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <Label
+                  htmlFor="job_condition"
+                  className="flex items-center gap-2 min-h-[2.5rem]">
+                  Хөдөлмөрийн нөхцөл *
+                </Label>
+                <Input
+                  id="job_condition"
+                  value={formData.job_condition}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      job_condition: e.target.value,
+                    }))
+                  }
+                  placeholder="жишээ: Хэвийн"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Шууд харьяалагдах албан тушаал</Label>
                 <PositionSelector
@@ -366,21 +410,41 @@ export function JobDescriptionForm({
                   placeholder="Харьяалагдах хүнийг сонгоно..."
                 />
               </div>
+            </div> */}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label>Шууд харьяалагдах албан тушаал</Label>
+                <PositionSelector
+                  value={formData.supervisor_pos_id}
+                  onChange={handleSupervisorSelect}
+                  placeholder="Даргаа сонгоно..."
+                  multiple={true}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Нэг эсвэл олон дарга сонгож болно
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Шууд харьяалах албан тушаал</Label>
+                <PositionSelector
+                  value={formData.subordinate_pos_id}
+                  onChange={handleSubordinateSelect}
+                  placeholder="Харьяалагдах хүнийг сонгоно..."
+                  multiple={true}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Нэг эсвэл олон харьяалагдах хүн сонгож болно
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="communication_scope">Харилцах хүрээ</Label>
-              <Textarea
-                id="communication_scope"
+              <Label>Харилцах хүрээ</Label>
+              <CommunicationScopeSelector
                 value={formData.communication_scope}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    communication_scope: e.target.value,
-                  }))
-                }
-                placeholder="Компани дотор: Бусад ажилчид&#10;Гадна: Харилцагчид болон бусад"
-                rows={3}
+                onChange={handleCommunicationScopeChange}
               />
             </div>
           </CardContent>
