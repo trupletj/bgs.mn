@@ -167,7 +167,7 @@ export interface Section {
 export interface Policy {
   id?: string;
   name: string;
-  reference_a_code: string;
+  reference_code: string;
   approved_date: Date | null;
   section: Section[];
 }
