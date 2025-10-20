@@ -31,10 +31,10 @@ export default async function EditJobDescriptionPage({
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Ажлын байрны тодорхойлолт засварлах
+                Албан тушаалын тодорхойлолт засварлах
               </h1>
               <p className="text-muted-foreground">
-                Ажлын байрны дэлгэрэнгүй мэдээллийг засварлана уу
+                Албан тушаалын дэлгэрэнгүй мэдээллийг засварлана уу.
               </p>
             </div>
             <JobDescriptionForm initialData={data} isEdit={true} />
