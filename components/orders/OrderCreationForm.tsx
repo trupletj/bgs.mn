@@ -29,7 +29,6 @@ import { toast } from "sonner";
 import {
   createOrder,
   addOrderItem,
-  type PartsCatalog,
   addTechnicalReviewers,
   deleteImagesFromStorage,
 } from "@/actions/orders";
@@ -47,9 +46,6 @@ export function OrderCreationForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  // const [searchQuery, setSearchQuery] = useState("");
-  // const [categories, setCategories] = useState<string[]>([]);
-  // const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedTechnicalReviewers, setSelectedTechnicalReviewers] = useState<
     string[]
   >([]);
@@ -65,13 +61,10 @@ export function OrderCreationForm() {
     title: "",
     description: "",
     order_type: "",
-    // equipment_name: "",
-    // equipment_model: "",
-    // equipment_serial: "",
-    // equipment_location: "",
     urgency_level: "medium",
     requested_delivery_date: "",
     notes: "",
+    status: "created_step",
   });
 
   const [orderItems, setOrderItems] = useState<OrderItemForm[]>([
@@ -94,20 +87,6 @@ export function OrderCreationForm() {
   };
 
   useEffect(() => {
-    // Get current user
-    // Load categories
-    // const loadCategories = async () => {
-    //   try {
-    //     const { data, error } = await getPartsCategories();
-    //     console.log("Categories data:", data, "Error:", error);
-    //     if (data) setCategories(data);
-    //   } catch (err) {
-    //     console.error("Error loading categories:", err);
-    //   }
-    // };
-    // loadCategories();
-
-    // Set loading to false after initial load
     setTimeout(() => setInitialLoading(false), 100);
   }, []);
 
@@ -145,6 +124,7 @@ export function OrderCreationForm() {
       {
         part_name: "",
         quantity: 1,
+        unit: "piece",
       },
     ]);
   };
@@ -155,33 +135,7 @@ export function OrderCreationForm() {
     }
   };
 
-  // const searchParts = async () => {
-  //   if (!searchQuery.trim()) return;
-
-  //   const categoryFilter =
-  //     selectedCategory === "all" ? undefined : selectedCategory;
-  //   const { data, error } = await searchPartsCatalog(
-  //     searchQuery,
-  //     categoryFilter
-  //   );
-  //   if (error) {
-  //     toast.error("Failed to search parts: " + error.message);
-  //   } else {
-  //     setSearchResults(data);
-  //   }
-  // };
-
-  // const selectPart = (part: PartsCatalog, itemIndex: number) => {
-  //   handleItemChange(itemIndex, "part_id", part.id);
-  //   handleItemChange(itemIndex, "part_number", part.part_number);
-  //   handleItemChange(itemIndex, "part_name", part.name);
-  //   handleItemChange(itemIndex, "part_description", part.description);
-  //   handleItemChange(itemIndex, "manufacturer", part.manufacturer);
-  //   setSearchResults([]);
-  //   setSearchQuery("");
-  // };
-
-  const handleSubmit = async (isDraft: boolean = false) => {
+  const handleSubmit = async () => {
     if (!formData.title.trim()) {
       toast.error("Захиалгын гарчиг оруулах шаардлагатай.");
       return;
@@ -192,7 +146,7 @@ export function OrderCreationForm() {
       return;
     }
 
-    if (!isDraft && selectedTechnicalReviewers.length === 0) {
+    if (selectedTechnicalReviewers.length === 0) {
       toast.error("Хамгийн багадаа 1 хянагч сонгоно уу");
       return;
     }
@@ -205,14 +159,10 @@ export function OrderCreationForm() {
         title: formData.title,
         description: formData.description,
         order_type: formData.order_type,
-        // equipment_name: formData.equipment_name,
-        // equipment_model: formData.equipment_model,
-        // equipment_serial: formData.equipment_serial,
-        // equipment_location: formData.equipment_location,
         urgency_level: formData.urgency_level,
         requested_delivery_date: formData.requested_delivery_date || undefined,
         notes: formData.notes,
-        status: isDraft ? "draft" : "pending_technical_review",
+        status: formData.status,
       });
 
       if (orderError || !order) {
@@ -223,6 +173,7 @@ export function OrderCreationForm() {
 
       // 2. Сэлбэгүүд нэмэх (зургийн URL-г оруулах)
       for (const [index, item] of orderItems.entries()) {
+        console.log("Uploading item:", item);
         const imageUrl = uploadedImages[index];
 
         const { error: itemError } = await addOrderItem({
@@ -246,18 +197,16 @@ export function OrderCreationForm() {
       if (pendingImageDeletions.length > 0) {
         await deleteImagesFromStorage(pendingImageDeletions);
       }
+      console.log("");
 
-      if (!isDraft) {
-        await addTechnicalReviewers(
-          order.id.toString(),
-          selectedTechnicalReviewers
-        );
-      }
+      await addTechnicalReviewers(
+        order.id.toString(),
+        selectedTechnicalReviewers,
+        order.status
+      );
 
       toast.success(
-        `Захиалга #${order.order_number} амжилттай үүслээ${
-          isDraft ? " (Ноорог)" : " хяналтад илгээгдлээ"
-        }`
+        `Захиалга #${order.order_number} амжилттай үүсэж хяналтад илгээгдлээ`
       );
       router.push(`/orders/${order.id}`);
     } catch (error) {
@@ -281,60 +230,6 @@ export function OrderCreationForm() {
       </div>
     );
   }
-
-  // Show authentication required message if no user
-  // if (!user) {
-  //   return (
-  //     <div className="max-w-6xl mx-auto space-y-8">
-  //       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-  //         <div className="flex flex-col items-center space-y-4">
-  //           <div className="bg-yellow-100 rounded-full p-3">
-  //             <InfoIcon className="h-8 w-8 text-yellow-600" />
-  //           </div>
-  //           <div>
-  //             <h3 className="text-lg font-semibold text-yellow-800">
-  //               Authentication Required
-  //             </h3>
-  //             <p className="text-yellow-700 mt-2">
-  //               You need to be logged in to create an order. Please sign in with
-  //               your phone number.
-  //             </p>
-  //             <p className="text-sm text-yellow-600 mt-1">
-  //               For testing: Use register number + phone &ldquo;99135213&rdquo;
-  //             </p>
-  //           </div>
-  //           <div className="flex space-x-3">
-  //             <Button
-  //               onClick={() => router.push("/")}
-  //               variant="outline"
-  //               className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-  //             >
-  //               Go to Login
-  //             </Button>
-  //             <Button
-  //               onClick={() => router.refresh()}
-  //               className="bg-yellow-600 hover:bg-yellow-700 text-white"
-  //             >
-  //               Refresh Page
-  //             </Button>
-  //             <Button
-  //               onClick={() => {
-  //                 // Temporary test mode - simulate user for testing
-  //                 setUser({ id: "2f04b895-e3f2-4b10-af5e-444a1ef9c366" } as {
-  //                   id: string;
-  //                 });
-  //                 toast.info("Test mode activated - Using test user");
-  //               }}
-  //               className="bg-blue-600 hover:bg-blue-700 text-white"
-  //             >
-  //               Test Mode (Dev Only)
-  //             </Button>
-  //           </div>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   );
-  // }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -482,92 +377,6 @@ export function OrderCreationForm() {
         </CardContent>
       </Card>
 
-      {/* Equipment Information */}
-      {/* Div-г card-р солих */}
-      <div className="shadow-sm border-0 ring-1 ring-gray-200">
-        {/* <CardHeader className="bg-gray-50/50 border-b border-gray-200">
-          <CardTitle className="flex items-center space-x-2">
-            <SettingsIcon className="h-5 w-5 text-indigo-600" />
-            <span>Equipment Information</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label
-                htmlFor="equipment_name"
-                className="text-sm font-medium text-gray-700"
-              >
-                Equipment Name
-              </Label>
-              <Input
-                id="equipment_name"
-                value={formData.equipment_name}
-                onChange={(e) =>
-                  handleInputChange("equipment_name", e.target.value)
-                }
-                placeholder="e.g., Excavator, Truck, Generator"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label
-                htmlFor="equipment_model"
-                className="text-sm font-medium text-gray-700"
-              >
-                Model
-              </Label>
-              <Input
-                id="equipment_model"
-                value={formData.equipment_model}
-                onChange={(e) =>
-                  handleInputChange("equipment_model", e.target.value)
-                }
-                placeholder="e.g., CAT 320D, Volvo FH16"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label
-                htmlFor="equipment_serial"
-                className="text-sm font-medium text-gray-700"
-              >
-                Serial Number
-              </Label>
-              <Input
-                id="equipment_serial"
-                value={formData.equipment_serial}
-                onChange={(e) =>
-                  handleInputChange("equipment_serial", e.target.value)
-                }
-                placeholder="Equipment serial number"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label
-                htmlFor="equipment_location"
-                className="text-sm font-medium text-gray-700"
-              >
-                Location
-              </Label>
-              <Input
-                id="equipment_location"
-                value={formData.equipment_location}
-                onChange={(e) =>
-                  handleInputChange("equipment_location", e.target.value)
-                }
-                placeholder="e.g., Mine Site A, Workshop 2"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </CardContent> */}
-      </div>
-
       {/* Parts Selection */}
       <Card>
         <CardHeader>
@@ -580,38 +389,6 @@ export function OrderCreationForm() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Parts Search */}
-          {/* <div className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                placeholder="Search parts catalog..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && searchParts()}
-              />
-            </div>
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="button" onClick={searchParts}>
-              <SearchIcon className="h-4 w-4" />
-            </Button>
-          </div> */}
-
-          {/* Order Items */}
           <div className="space-y-6">
             {orderItems.map((item, index) => (
               <div
@@ -742,30 +519,6 @@ export function OrderCreationForm() {
                       </div>
                     )}
                   </div>
-
-                  {/* Зураг оруулах хэсэг */}
-                  <div className="md:col-span-2 lg:col-span-3 border-2 border-dashed border-border rounded-lg p-4 bg-white">
-                    <ImageUploader
-                      multiple={false}
-                      onUpload={(url) =>
-                        handleImageUpload(
-                          index,
-                          Array.isArray(url) ? url[0] : url
-                        )
-                      }
-                    />
-
-                    {uploadedImages[index] && (
-                      <div className="mt-4">
-                        <ImageViewer
-                          images={[uploadedImages[index]]}
-                          editable
-                          onDelete={handleMarkImageForDeletion}
-                          pendingDeletion={pendingImageDeletions}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             ))}
@@ -796,9 +549,6 @@ export function OrderCreationForm() {
               className="min-h-[120px] border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
               rows={5}
             />
-            {/* <p className="text-xs text-gray-500">
-              Энэ мэдээлэл нь удирдлагууд болон худалдан авах ажиллагааны багт харагдах болно.
-            </p> */}
           </div>
         </CardContent>
       </Card>
@@ -842,22 +592,7 @@ export function OrderCreationForm() {
           </Button>
           <Button
             type="button"
-            variant="secondary"
-            onClick={() => handleSubmit(true)}
-            disabled={loading}
-            className="h-11 px-6 bg-gray-100 text-gray-800 hover:bg-gray-200">
-            {loading ? (
-              <>
-                <ClockIcon className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save as Draft"
-            )}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => handleSubmit(false)}
+            onClick={() => handleSubmit()}
             disabled={loading || selectedTechnicalReviewers.length <= 1}
             className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium">
             {loading ? (

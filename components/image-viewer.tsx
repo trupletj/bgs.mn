@@ -47,7 +47,7 @@ export default function ImageViewer({
               alt={`Image ${idx + 1}`}
               width={192}
               height={192}
-              className="w-48 h-48 object-cover cursor-pointer"
+              className="object-cover cursor-pointer"
               onClick={() => {
                 if (!isPendingDeletion) {
                   setCurrentIndex(idx);

@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { updateOrderStepStatus } from "./workflow";
 import { getNextStep } from "@/utils/workflow";
+import { success } from "zod";
 
 interface SubmitReviewParams {
   status: "approved" | "rejected" | "changes_requested";
@@ -20,6 +21,7 @@ export async function getProfileIdFromAuthUserId() {
   } = await supabase.auth.getUser();
   if (!user) {
     throw new Error("Хэрэглэгч олдсонгүй");
+    //logout
   }
   return supabase
     .from("profile")
@@ -51,7 +53,8 @@ export async function submitReview(params: SubmitReviewParams) {
       })
       .eq("order_id", params.order_id)
       .eq("profile_id", profile_id) // ЗӨВХӨН ӨӨРИЙН PROFILE_ID
-      .eq("reviewer_type", params.currentStep);
+      .eq("reviewer_type", params.currentStep)
+      .neq("status", "pending");
 
     if (reviewerError) {
       throw new Error(reviewerError.message);
@@ -66,6 +69,7 @@ export async function submitReview(params: SubmitReviewParams) {
             quantity: quantity,
             status: "changed_approved",
             created_by: profile_id,
+            order_id: params.order_id,
           });
 
         if (subItemError) {
@@ -75,13 +79,6 @@ export async function submitReview(params: SubmitReviewParams) {
         }
       }
     }
-
-    // Шинэчлэгдсэн: Бүх шалгуулагчдын статусыг шалгах
-    const stepResult = await updateOrderStepStatus(
-      params.order_id,
-      params.currentStep
-    );
-
     if (params.status === "rejected") {
       const { error: orderError } = await supabase
         .from("orders")
@@ -95,13 +92,10 @@ export async function submitReview(params: SubmitReviewParams) {
       if (orderError) {
         console.error("Захиалгын статус шинэчлэхэд алдаа:", orderError);
       }
+      return { success: false };
     }
-
-    revalidatePath("/review-request");
     return {
       success: true,
-      stepStatus: stepResult.status,
-      nextStep: (stepResult as any).nextStep,
     };
   } catch (error) {
     console.error("Submit review error:", error);
@@ -200,15 +194,59 @@ export async function assignNextReviewers({
 
     if (!nextStep) throw new Error("Дараагийн шат байхгүй байна");
 
-    const reviewersToAdd = reviewerIds.map((userId) => ({
-      order_id: order_id,
-      profile_id: userId,
-      reviewer_type: nextStep,
-      status: "pending",
-      sender_id: profile_id,
-      is_reviewed: false,
-      assigned_at: new Date().toISOString(),
-    }));
+    //хүн сонгосон тул дараагийн шат байх ёстой. Эцсийн шат бол яах бэ? Бодох л асуудал
+
+    // Шалгуулагчаа нэмэхдээ status-г бодож үзмээр байна.
+
+    // Шинэчлэгдсэн: Бүх шалгуулагчдын статусыг шалгаж дараагийн шалгуулагчид бэлэн эсэхийг шалгах
+    // мөн orders шинэчилнэ, хэрэв 1 татгалзсан orders-г rejected болгоно
+    const stepResult = await updateOrderStepStatus(
+      order_id,
+      currentStep,
+      profile_id
+    );
+
+    if (stepResult.status === "rejected") {
+      // Захиалгыг rejected болгосон тул шинэ шалгуулагч нэмэх шаардлагагүй
+      revalidatePath("/review-request");
+      return {
+        success: false,
+        message: "Захиалгыг татгалзсан тул шинэ шалгуулагч нэмэгдсэнгүй.",
+      };
+    }
+
+    let reviewersToAdd: {
+      order_id: string;
+      profile_id: string;
+      reviewer_type: string;
+      status: string;
+      sender_id: string;
+      is_reviewed: boolean;
+      assigned_at: string;
+    }[] = [];
+
+    // status-г шалгаад тохирох нэмэлтүүдийг хийж байна
+    if (stepResult.status === "pending") {
+      reviewersToAdd = reviewerIds.map((userId) => ({
+        order_id: order_id,
+        profile_id: userId,
+        reviewer_type: nextStep,
+        status: "pending",
+        sender_id: profile_id,
+        is_reviewed: false,
+        assigned_at: new Date().toISOString(),
+      }));
+    } else {
+      reviewersToAdd = reviewerIds.map((userId) => ({
+        order_id: order_id,
+        profile_id: userId,
+        reviewer_type: nextStep,
+        status: "in_review",
+        sender_id: profile_id,
+        is_reviewed: false,
+        assigned_at: new Date().toISOString(),
+      }));
+    }
 
     const { error } = await supabase
       .from("order_reviewers")
@@ -217,17 +255,6 @@ export async function assignNextReviewers({
     if (error) {
       throw new Error(error.message);
     }
-
-    const nextStepStatus = `pending_${nextStep.replace("_step", "")}`;
-
-    // const { error: orderError } = await supabase
-    //   .from("orders")
-    //   .update({ status: nextStepStatus })
-    //   .eq("id", order_id);
-
-    // if (orderError) {
-    //   console.error("Захиалгын статус шинэчлэхэд алдаа:", orderError);
-    // }
 
     revalidatePath("/review-request");
     return { success: true };

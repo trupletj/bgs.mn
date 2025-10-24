@@ -4,6 +4,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
 import { getProfileIdFromAuthUserId } from "./review";
 import { createClient } from "@/utils/supabase/server";
+import { getNextStep, StepType } from "@/utils/workflow";
 
 export type Order = {
   id: number;
@@ -11,13 +12,8 @@ export type Order = {
   title: string;
   description?: string;
   order_type: string;
-  // equipment_name?: string;
-  // equipment_model?: string;
-  // equipment_serial?: string;
-  // equipment_location?: string;
   urgency_level: "low" | "medium" | "high" | "critical";
   requested_delivery_date?: string;
-  // total_estimated_cost: number;
   status: string;
   created_by: string;
   created_at: string;
@@ -77,6 +73,10 @@ export async function createOrder(orderData: Partial<Order>): Promise<{
   error: PostgrestError | null;
 }> {
   const supabase = await createClient();
+  let status = "";
+  if (orderData.status === "created_step") {
+    status = getNextStep("created_step" as StepType) ?? "created_step";
+  }
 
   const {
     data: { user },
@@ -93,8 +93,8 @@ export async function createOrder(orderData: Partial<Order>): Promise<{
     .from("orders")
     .insert({
       ...orderData,
+      status: status,
       created_profile: profile_id, // Use the public.users.id instead of auth user ID
-      status: "draft",
       auth_user_id: auth_user_id,
     })
     .select()
@@ -103,36 +103,24 @@ export async function createOrder(orderData: Partial<Order>): Promise<{
   return { data, error };
 }
 
-export async function getOrdersByUser(authUserId: string): Promise<{
+export async function getOrdersByUser(): Promise<{
   data: Order[];
   error: PostgrestError | null;
 }> {
-  const supabase = getSupabaseAdmin();
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  // First, find the user in public.users table that matches the auth user ID
-  const { data: user, error: userError } = await supabase
-    .from("users")
-    .select("id")
-    .eq("auth_user_id", authUserId)
-    .single();
-
-  if (userError || !user) {
-    return {
-      data: [],
-      error: {
-        message:
-          "User not found in users table. Please ensure your account is properly linked.",
-        details: userError?.message || "No matching user found",
-        hint: "Contact administrator to link your account",
-        code: "USER_NOT_LINKED",
-      } as any,
-    };
+  if (authError || !user) {
+    throw new Error("Хэрэглэгчийн мэдээлэл авах үед алдаа гарлаа.");
   }
-
+  const auth_user_id = user?.id;
   const { data, error } = await supabase
     .from("orders")
     .select("*")
-    .eq("created_by", user.id) // Use the public.users.id
+    .eq("auth_user_id", auth_user_id)
     .order("created_at", { ascending: false });
 
   return { data: data ?? [], error };
@@ -522,15 +510,16 @@ export async function addOrderNote(
 
 export async function addTechnicalReviewers(
   orderId: string,
-  reviewerIds: string[]
+  reviewerIds: string[],
+  status: string
 ) {
   const supabase = getSupabaseAdmin();
   const profile_id = await getProfileIdFromAuthUserId();
 
   const reviewersToAdd = reviewerIds.map((userId) => ({
     order_id: orderId,
-    reviewer_type: "first_step",
-    status: "pending",
+    reviewer_type: status,
+    status: status,
     sender_id: profile_id,
     profile_id: userId,
   }));

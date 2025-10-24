@@ -6,8 +6,11 @@ import { ReviewOrderForm } from "@/components/review-order-form";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { UnitType } from "@/types/types";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StepType, isValidStep } from "@/utils/workflow";
 import { Badge } from "./ui/badge";
+import { Label } from "./ui/label";
+import { PreviousReviewersActions } from "./orders/previous-reviewers-action";
 
 interface OrderReviewerDetailProps {
   orderId: string;
@@ -20,6 +23,7 @@ interface OrderDetails {
   title: string;
   description: string;
   status: string;
+  requested_delivery_date?: string;
   urgency_level: string;
   created_at: string;
   profile: {
@@ -36,6 +40,7 @@ interface OrderItem {
   notes: string;
   unit: UnitType;
   requested_delivery_date: string;
+  image_url: string | null;
 }
 
 export default function OrderReviewerDetail({
@@ -52,6 +57,34 @@ export default function OrderReviewerDetail({
     fetchOrderDetails();
   }, [orderId, profile_id]);
 
+  const getUrgencyBadge = (urgency: string) => {
+    const urgencyConfig = {
+      low: { label: "Бага", className: "bg-gray-100 text-gray-800" },
+      medium: { label: "Дунд", className: "bg-blue-100 text-blue-800" },
+      high: { label: "Яаралтай", className: "bg-orange-100 text-orange-800" },
+      critical: {
+        label: "Нэн яаралтай",
+        className: "bg-red-100 text-red-800",
+      },
+    };
+
+    const config =
+      urgencyConfig[urgency as keyof typeof urgencyConfig] ||
+      urgencyConfig.medium;
+
+    return <Badge className={config.className}>{config.label}</Badge>;
+  };
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "Тодорхойгүй";
+
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+
+    return `${year} оны ${month} сарын ${day}-нд`;
+  };
+
   const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
@@ -65,6 +98,7 @@ export default function OrderReviewerDetail({
         .eq("order_id", orderId)
         .eq("profile_id", profile_id)
         .neq("is_reviewed", true)
+        .neq("status", "pending")
         .maybeSingle();
 
       if (reviewerError) {
@@ -178,7 +212,7 @@ export default function OrderReviewerDetail({
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-6 px-4">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Захиалга шалгуулах</h1>
         <p className="text-gray-600 mt-2">
@@ -188,6 +222,53 @@ export default function OrderReviewerDetail({
           {currentStep.replace("_", " ").toUpperCase()} шат
         </Badge>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Захиалгын дэлгэрэнгүй</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-gray-600">Захиалгын дугаар</Label>
+              <p className="font-semibold">{order.order_number}</p>
+            </div>
+            <div>
+              <Label className="text-gray-600">Гарчиг</Label>
+              <p className="font-semibold">{order.title}</p>
+            </div>
+            <div>
+              <Label className="text-gray-600">Яаралтай түвшин</Label>
+              <div className="mt-1">{getUrgencyBadge(order.urgency_level)}</div>
+            </div>
+            <div>
+              <Label className="text-gray-600">
+                Хүргэлтийн хүсэгдсэн огноо
+              </Label>
+              <p className="font-medium">
+                {formatDate(order.requested_delivery_date)}
+              </p>
+            </div>
+            <div>
+              <Label className="text-gray-600">Хүсэлт гаргасан</Label>
+              <p>{order.profile.name}</p>
+              <p className="text-sm text-gray-600">
+                {order.profile.department_name}
+              </p>
+            </div>
+            {order.description && (
+              <div className="md:col-span-2">
+                <Label className="text-gray-600">Тайлбар</Label>
+                <p className="mt-1 p-3 bg-gray-50 rounded-md">
+                  {order.description}
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <PreviousReviewersActions orderId={orderId} currentStep={currentStep} />
 
       <ReviewOrderForm
         order={order}

@@ -226,7 +226,7 @@ export function JobDescriptionForm({
 
       // Detail page руу redirect хийх
       setTimeout(() => {
-        router.push(`/job-descriptions/${result.id}`);
+        router.push(`/dashboard/job-descriptions/${result.id}`);
         router.refresh();
       }, 1500);
     } catch (error) {
@@ -239,9 +239,9 @@ export function JobDescriptionForm({
 
   const handleCancel = () => {
     if (isEdit && formData.id) {
-      router.push(`/job-descriptions/${formData.id}`);
+      router.push(`/dashboard/job-descriptions/${formData.id}`);
     } else {
-      router.push("/job-descriptions");
+      router.push("/dashboard/job-descriptions");
     }
   };
 
@@ -251,7 +251,7 @@ export function JobDescriptionForm({
       await deleteJobDescription(formData.id!); // Устгах үйлдэл
       toast.success("Амжилттай устгагдлаа");
       setTimeout(() => {
-        router.push("/job-descriptions");
+        router.push("/dashboard/job-descriptions");
         router.refresh();
       }, 1500);
     } catch (error) {

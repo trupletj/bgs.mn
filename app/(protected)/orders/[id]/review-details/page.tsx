@@ -110,29 +110,29 @@ export default function ReviewDetailsPage() {
       if (reviewError) throw reviewError;
 
       // Сэлбэгийн өөрчлөлтүүд
-      const { data: changesData, error: changesError } = await supabase
-        .from("order_item_changes")
-        .select(
-          `
-          id,
-          order_item_id,
-          reviewer_id,
-          old_quantity,
-          new_quantity,
-          changed_at,
-          profile:reviewer_id (
-            name
-          ),
-          order_item:order_item_id (
-            part_name,
-            part_number
-          )
-        `
-        )
-        .eq("order_id", orderId)
-        .order("changed_at", { ascending: true });
+      // const { data: changesData, error: changesError } = await supabase
+      //   .from("order_item_changes")
+      //   .select(
+      //     `
+      //     id,
+      //     order_item_id,
+      //     reviewer_id,
+      //     old_quantity,
+      //     new_quantity,
+      //     changed_at,
+      //     profile:reviewer_id (
+      //       name
+      //     ),
+      //     order_item:order_item_id (
+      //       part_name,
+      //       part_number
+      //     )
+      //   `
+      //   )
+      //   .eq("order_id", orderId)
+      //   .order("changed_at", { ascending: true });
 
-      if (changesError) throw changesError;
+      // if (changesError) throw changesError;
 
       setReviewHistory(
         (reviewData || []).map((review: ReviewData) => ({
@@ -142,17 +142,17 @@ export default function ReviewDetailsPage() {
             : review.profile,
         }))
       );
-      setItemChanges(
-        (changesData || []).map((change: ChangesData) => ({
-          ...change,
-          profile: Array.isArray(change.profile)
-            ? change.profile[0]
-            : change.profile,
-          order_item: Array.isArray(change.order_item)
-            ? change.order_item[0]
-            : change.order_item,
-        }))
-      );
+      // setItemChanges(
+      //   (changesData || []).map((change: ChangesData) => ({
+      //     ...change,
+      //     profile: Array.isArray(change.profile)
+      //       ? change.profile[0]
+      //       : change.profile,
+      //     order_item: Array.isArray(change.order_item)
+      //       ? change.order_item[0]
+      //       : change.order_item,
+      //   }))
+      // );
     } catch (error) {
       toast.error("Үнэлгээний дэлгэрэнгүй мэдээллийг авахад алдаа гарлаа");
       console.error(error);

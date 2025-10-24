@@ -47,6 +47,7 @@ export interface OrderFormData {
   urgency_level: "low" | "medium" | "high" | "critical";
   requested_delivery_date: string;
   notes: string;
+  status: string;
 }
 
 // export interface Clause {
