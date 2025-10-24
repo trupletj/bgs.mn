@@ -101,6 +101,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
           )
         `
         )
+        .neq("status", "pending")
         .eq("profile_id", profile_id)
         .order("assigned_at", { ascending: false });
 

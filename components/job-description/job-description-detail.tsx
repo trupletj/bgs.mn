@@ -109,10 +109,10 @@ export function JobDescriptionDetail({ data }: JobDescriptionDetailProps) {
     <div className="mx-auto max-w-5xl p-4">
       {/* Action Buttons */}
       <div className="mb-6 flex justify-end gap-3">
-        <Link href="/job-descriptions">
+        <Link href="/dashboard/job-descriptions">
           <Button variant="outline">Буцах</Button>
         </Link>
-        <Link href={`/job-descriptions/${data.id}/edit`}>
+        <Link href={`/dashboard/job-descriptions/${data.id}/edit`}>
           <Button variant="default">Засварлах</Button>
         </Link>
       </div>

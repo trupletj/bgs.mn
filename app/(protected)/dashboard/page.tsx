@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Briefcase } from "lucide-react";
+import { FileText, Briefcase, ClipboardList } from "lucide-react";
 
 export default function Page() {
   const systems = [
@@ -19,7 +19,7 @@ export default function Page() {
     {
       title: "Ажлын байрны тодорхойлолт",
       description: "Ажлын байрны тодорхойлолт",
-      href: "/job-descriptions",
+      href: "/dashboard/job-descriptions",
       icon: Briefcase,
     },
   ];

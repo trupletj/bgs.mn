@@ -6,7 +6,8 @@ import { STEP_SEQUENCE, getNextStep, isValidStep } from "@/utils/workflow";
 
 export async function updateOrderStepStatus(
   orderId: string,
-  currentStep: string
+  currentStep: string,
+  profile_id: string
 ) {
   const supabase = await createClient();
 
@@ -21,9 +22,24 @@ export async function updateOrderStepStatus(
       .eq("order_id", orderId)
       .eq("reviewer_type", currentStep);
 
+    const { data: reviewersData, error: reviewersErrorData } = await supabase
+      .from("order_reviewers")
+      .select("*")
+      .eq("order_id", orderId)
+      .eq("reviewer_type", currentStep)
+      .eq("profile_id", profile_id)
+      .in("status", ["approved", "changes_requested"]);
+
+    if (reviewersData) {
+      // Энэ шалгуулагч аль хэдийнэ зөвшөөрсөн эсвэл өөрчлөлттэй зөвшөөрсөн байна
+      return { status: "approved" };
+    }
+
     if (reviewersError) throw new Error(reviewersError.message);
 
     const totalReviewers = reviewers.length;
+
+    //шалгаагүй шалгуулагчдын тоо
     const reviewedReviewers = reviewers.filter((r) => r.is_reviewed).length;
 
     // Бүх шалгуулагч дууссаныг шалгах
@@ -52,10 +68,9 @@ export async function updateOrderStepStatus(
 
       if (allApprovedOrChangesRequested) {
         const nextStep = getNextStep(currentStep as any);
-
         let newStatus = nextStep ? nextStep : "completed";
 
-        let updateData: any = { status: newStatus };
+        let updateData: any = { status: currentStep };
 
         switch (currentStep) {
           case "first_step":
@@ -78,10 +93,11 @@ export async function updateOrderStepStatus(
           .eq("id", orderId);
 
         if (error) throw new Error(error.message);
+        // бүх хүн шалгаж эерэг үзүүлэлттэй зөшөөрсөн үед approved буцаана.
         return { status: "approved", nextStep: newStatus };
       }
     }
-
+    //бүгд шалгаагүй үед pending-status буцаана.
     return { status: "pending" };
   } catch (error) {
     console.error("Update order step status error:", error);

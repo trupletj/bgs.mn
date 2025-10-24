@@ -98,7 +98,9 @@ export default function JobDescriptionList() {
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
       <div className="flex justify-end mb-2 w-min-content">
-        <Link href="/job-descriptions/new" className="flex cursor-pointer">
+        <Link
+          href="/dashboard/job-descriptions/new"
+          className="flex cursor-pointer">
           <Button className="items-center flex">
             <PlusIcon className="h-4 w-4 " />
             Нэмэх

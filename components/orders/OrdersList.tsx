@@ -14,9 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CalendarIcon, ClockIcon, UserIcon, SearchIcon } from "lucide-react";
-import { toast } from "sonner";
-import { getOrdersByUser, type Order } from "@/actions/orders";
-import { createClient } from "@/utils/supabase/client";
+import { type Order } from "@/actions/orders";
 
 const statusColors = {
   draft: "bg-gray-100 text-gray-800",
@@ -38,53 +36,14 @@ const urgencyColors = {
   critical: "bg-red-100 text-red-800",
 };
 
-export function OrdersList() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ id: string } | null>(null);
+interface Props {
+  orders: Order[];
+}
+
+export function OrdersList({ orders }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [urgencyFilter, setUrgencyFilter] = useState<string>("all");
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const supabase = createClient();
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError) {
-          console.error("Auth error:", authError);
-          setUser(null);
-        } else {
-          setUser(user);
-        }
-
-        if (!user) {
-          console.log("No authenticated user found");
-          setLoading(false);
-          return;
-        }
-
-        const { data, error } = await getOrdersByUser(user.id);
-        if (error) {
-          console.error("Error loading orders:", error);
-          toast.error("Failed to load orders: " + error.message);
-        } else {
-          setOrders(data);
-        }
-      } catch (err) {
-        console.error("Unexpected error:", err);
-        toast.error("Failed to load orders");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -115,66 +74,6 @@ export function OrdersList() {
       .join(" ");
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse bg-gray-200 h-32 rounded-lg" />
-        ))}
-      </div>
-    );
-  }
-
-  // Show authentication required message if no user
-  if (!user) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="text-center py-12">
-            <div className="flex flex-col items-center space-y-4">
-              <div className="bg-yellow-100 rounded-full p-3">
-                <UserIcon className="h-8 w-8 text-yellow-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-800">
-                  Authentication Required
-                </h3>
-                <p className="text-yellow-700 mt-2">
-                  You need to be logged in to view your orders.
-                </p>
-                <p className="text-sm text-yellow-600 mt-1">
-                  For testing: Use register number + phone
-                  &ldquo;99135213&rdquo;
-                </p>
-              </div>
-              <div className="flex space-x-3">
-                <Link href="/">
-                  <Button
-                    variant="outline"
-                    className="border-yellow-300 text-yellow-700 hover:bg-yellow-50">
-                    Go to Login
-                  </Button>
-                </Link>
-                <Button
-                  onClick={() => {
-                    // Temporary test mode - simulate user for testing
-                    setUser({ id: "2f04b895-e3f2-4b10-af5e-444a1ef9c366" } as {
-                      id: string;
-                    });
-                    // Reload data with test user
-                    window.location.reload();
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Test Mode (Dev Only)
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -200,7 +99,7 @@ export function OrdersList() {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">Захиалгын төлөв</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="pending_review">Pending Review</SelectItem>
                 <SelectItem value="in_review">In Review</SelectItem>
@@ -241,11 +140,6 @@ export function OrdersList() {
                 ? "You haven't created any orders yet."
                 : "Try adjusting your filters."}
             </p>
-            {orders.length === 0 && (
-              <Link href="/orders/create">
-                <Button className="mt-4">Create Your First Order</Button>
-              </Link>
-            )}
           </CardContent>
         </Card>
       ) : (

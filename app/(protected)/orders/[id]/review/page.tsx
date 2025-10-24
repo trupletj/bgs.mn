@@ -5,14 +5,14 @@ import ReviewedOrderDetail from "@/components/reviewed-order";
 import OrderReviewerDetail from "@/components/order-review-detail";
 
 interface ReviewOrderPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
+  searchParams: { step?: string };
 }
 
-export default async function ReviewOrderPage({
-  params,
-}: ReviewOrderPageProps) {
+export default async function ReviewOrderPage(props: ReviewOrderPageProps) {
   try {
-    const { id } = await params;
+    const { id } = await props.params;
+    const { step } = await props.searchParams;
     const profile_id = await getProfileIdFromAuthUserId();
 
     const supabase = createClient();
@@ -23,15 +23,24 @@ export default async function ReviewOrderPage({
       .select("*")
       .eq("order_id", id)
       .eq("profile_id", profile_id)
+      .eq("reviewer_type", step)
+      .neq("status", "pending")
       .single();
-
-    if (error) {
-      console.error("Order reviewer error:", error);
+    if (order_reviewer === null) {
       return (
         <div className="container mx-auto py-6">
           <div className="text-center text-red-500">
             Та энэ захиалгыг шалгах эрхгүй байна эсвэл захиалга олдсонгүй
           </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      console.error("Order reviewer error:", error);
+      return (
+        <div className="container mx-auto py-6">
+          <div className="text-center text-red-500">Захиалга олдсонгүй</div>
         </div>
       );
     }

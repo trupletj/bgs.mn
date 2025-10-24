@@ -21,6 +21,11 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   rejected: "Татгалзсан",
 };
 
+export function getPreviousStep(currentStep: StepType): StepType | null {
+  const currentIndex = STEP_SEQUENCE.indexOf(currentStep);
+  return currentIndex > 0 ? STEP_SEQUENCE[currentIndex - 1] : null; // Хэрвээ currentStep нь анхны шат бол null буцаах
+}
+
 export function getNextStep(currentStep: StepType): StepType | null {
   const currentIndex = STEP_SEQUENCE.indexOf(currentStep);
   return currentIndex >= 0 && currentIndex < STEP_SEQUENCE.length - 1
