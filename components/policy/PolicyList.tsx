@@ -25,7 +25,13 @@ interface Policy {
   reference_code: string | null;
 }
 
-export default function PolicyList() {
+export default function PolicyList({
+  is_create,
+  is_delete,
+}: {
+  is_create?: boolean;
+  is_delete?: boolean;
+}) {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -68,14 +74,16 @@ export default function PolicyList() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      <div className="flex justify-end mb-2 w-min-content">
-        <Link href="/policy/new" className="flex cursor-pointer">
-          <Button className="items-center flex">
-            <PlusIcon className="h-4 w-4 " />
-            Нэмэх
-          </Button>
-        </Link>
-      </div>
+      {is_create && (
+        <div className="flex justify-end mb-2 w-min-content">
+          <Link href="/policy/new" className="flex cursor-pointer">
+            <Button className="items-center flex">
+              <PlusIcon className="h-4 w-4 " />
+              Нэмэх
+            </Button>
+          </Link>
+        </div>
+      )}
       <div className="flex justify-between mb-6">
         <h2 className="text-2xl font-bold">Журмууд</h2>
         <div className="relative flex items-center">
@@ -147,10 +155,13 @@ export default function PolicyList() {
                     <TableCell className="px-4 py-2">
                       <div className="flex gap-2 justify-center items-center">
                         <PolicySeeButton policy_id={policy.id} />
-                        <DeletePolicyButton
-                          policy_id={policy.id}
-                          onDeleted={fetchPolicies}
-                        />
+                        {is_delete && (
+                          <DeletePolicyButton
+                            policy_id={policy.id}
+                            onDeleted={fetchPolicies}
+                            canDelete={is_delete}
+                          />
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

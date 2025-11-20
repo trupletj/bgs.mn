@@ -16,34 +16,48 @@ export async function updateOrderStepStatus(
   }
 
   try {
+    console.log("current step", currentStep);
+    //Тухайн шатны бүх шалгуулагчдын мэдээллийг авч байна
     const { data: reviewers, error: reviewersError } = await supabase
       .from("order_reviewers")
       .select("*")
       .eq("order_id", orderId)
       .eq("reviewer_type", currentStep);
 
-    const { data: reviewersData, error: reviewersErrorData } = await supabase
-      .from("order_reviewers")
-      .select("*")
-      .eq("order_id", orderId)
-      .eq("reviewer_type", currentStep)
-      .eq("profile_id", profile_id)
-      .in("status", ["approved", "changes_requested"]);
-
-    if (reviewersData) {
-      // Энэ шалгуулагч аль хэдийнэ зөвшөөрсөн эсвэл өөрчлөлттэй зөвшөөрсөн байна
-      return { status: "approved" };
-    }
-
     if (reviewersError) throw new Error(reviewersError.message);
 
-    const totalReviewers = reviewers.length;
+    console.log("reviewers", reviewers);
+    if (!reviewers || reviewers.length === 0) {
+      return { status: "pending" };
+    }
 
-    //шалгаагүй шалгуулагчдын тоо
-    const reviewedReviewers = reviewers.filter((r) => r.is_reviewed).length;
+    // Давхардсан profile_id-уудыг бүлэглэх
+    const profileGroups: Record<string, any[]> = reviewers.reduce(
+      (acc: Record<string, any[]>, reviewer: any) => {
+        if (!acc[reviewer.profile_id]) acc[reviewer.profile_id] = [];
+        acc[reviewer.profile_id].push(reviewer);
+        return acc;
+      },
+      {}
+    );
 
-    // Бүх шалгуулагч дууссаныг шалгах
-    if (totalReviewers > 0 && reviewedReviewers === totalReviewers) {
+    console.log("Profile", profileGroups);
+
+    // Нийт ялгаатай profile_id-ийн тоо
+    const totalProfiles = Object.keys(profileGroups).length;
+
+    console.log("totalProfiles", totalProfiles);
+
+    // Шалгасан profile_id-уудын тоо (дор хаяж нэг is_reviewed=true мөртэй)
+    const reviewedProfiles = Object.values(profileGroups).filter(
+      (group: any[]) => group.some((r: { is_reviewed: any }) => r.is_reviewed)
+    ).length;
+
+    console.log("reviewedProfiles", reviewedProfiles);
+
+    // --------------------------
+    // Бүх profile_id дор хаяж нэг шалгасан бол үргэлжлүүлнэ
+    if (totalProfiles > 0 && reviewedProfiles === totalProfiles) {
       // Ядаж нэг татгалзсан байгаа эсэхийг шалгах
       const hasRejection = reviewers.some((r) => r.status === "rejected");
 
@@ -61,42 +75,100 @@ export async function updateOrderStepStatus(
         return { status: "rejected" };
       }
 
-      // Бүгд зөвшөөрсөн эсвэл өөрчлөлттэй зөвшөөрсөн байгаа эсэхийг шалгах
-      const allApprovedOrChangesRequested = reviewers.every(
-        (r) => r.status === "approved" || r.status === "changes_requested"
-      );
+      const nextStep = getNextStep(currentStep as any);
+      let newStatus = nextStep ? nextStep : "completed";
 
-      if (allApprovedOrChangesRequested) {
-        const nextStep = getNextStep(currentStep as any);
-        let newStatus = nextStep ? nextStep : "completed";
+      let updateData: any = { status: currentStep };
 
-        let updateData: any = { status: currentStep };
-
-        switch (currentStep) {
-          case "first_step":
-            updateData.is_passed_first = true;
-            break;
-          case "second_step":
-            updateData.is_passed_second = true;
-            break;
-          case "third_step":
-            updateData.is_passed_third = true;
-            break;
-          case "fourth_step":
-            updateData.is_passed_fourth = true;
-            break;
-        }
-
-        const { error } = await supabase
-          .from("orders")
-          .update(updateData)
-          .eq("id", orderId);
-
-        if (error) throw new Error(error.message);
-        // бүх хүн шалгаж эерэг үзүүлэлттэй зөшөөрсөн үед approved буцаана.
-        return { status: "approved", nextStep: newStatus };
+      switch (currentStep) {
+        case "first_step":
+          updateData.is_passed_first = true;
+          break;
+        case "second_step":
+          updateData.is_passed_second = true;
+          break;
+        case "third_step":
+          updateData.is_passed_third = true;
+          break;
+        case "fourth_step":
+          updateData.is_passed_fourth = true;
+          break;
       }
+
+      const { error } = await supabase
+        .from("orders")
+        .update(updateData)
+        .eq("id", orderId);
+
+      if (error) throw new Error(error.message);
+
+      // Бүх хүн шалгаж, эерэг үзүүлэлттэй бол approved буцаана
+      return { status: "approved", nextStep: newStatus };
     }
+
+    //Тухайн шатны 1 хүнийг 2 удаа дуудсан гэхдээ DB-д нэг мөрийг шинэчилж байгаа тул бүх хүн шалгасан гэж үзэхгүй байна.
+
+    // Нийт шалгуулагчдын тоо
+    // const totalReviewers = reviewers.length;
+
+    // // Шалгасан хүмүүсийн тоо
+    // const reviewedReviewers = reviewers.filter((r) => r.is_reviewed).length;
+
+    // // Бүх хүн шалгаж дууссан эсэхийг шалгах
+    // if (totalReviewers > 0 && reviewedReviewers === totalReviewers) {
+    //   // Ядаж нэг татгалзсан байгаа эсэхийг шалгах
+    //   const hasRejection = reviewers.some((r) => r.status === "rejected");
+
+    //   if (hasRejection) {
+    //     // Нэг ч татгалзсан байвал бүх шатыг татгалзсан болгох
+    //     const { error } = await supabase
+    //       .from("orders")
+    //       .update({
+    //         status: "rejected",
+    //         rejected_at: new Date().toISOString(),
+    //       })
+    //       .eq("id", orderId);
+
+    //     if (error) throw new Error(error.message);
+    //     return { status: "rejected" };
+    //   }
+
+    //   // Бүгд зөвшөөрсөн эсвэл өөрчлөлттэй зөвшөөрсөн байгаа эсэхийг шалгах
+    //   const allApprovedOrChangesRequested = reviewers.every(
+    //     (r) => r.status === "approved" || r.status === "changes_requested"
+    //   );
+
+    //   if (allApprovedOrChangesRequested) {
+    //     const nextStep = getNextStep(currentStep as any);
+    //     let newStatus = nextStep ? nextStep : "completed";
+
+    //     let updateData: any = { status: currentStep };
+
+    //     switch (currentStep) {
+    //       case "first_step":
+    //         updateData.is_passed_first = true;
+    //         break;
+    //       case "second_step":
+    //         updateData.is_passed_second = true;
+    //         break;
+    //       case "third_step":
+    //         updateData.is_passed_third = true;
+    //         break;
+    //       case "fourth_step":
+    //         updateData.is_passed_fourth = true;
+    //         break;
+    //     }
+
+    //     const { error } = await supabase
+    //       .from("orders")
+    //       .update(updateData)
+    //       .eq("id", orderId);
+
+    //     if (error) throw new Error(error.message);
+    //     // бүх хүн шалгаж эерэг үзүүлэлттэй зөшөөрсөн үед approved буцаана.
+    //     return { status: "approved", nextStep: newStatus };
+    //   }
+    // }
     //бүгд шалгаагүй үед pending-status буцаана.
     return { status: "pending" };
   } catch (error) {

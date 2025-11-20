@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import Link from "next/link";
 
 // Supabase-аас ирж буй өгөгдлийн төрөл
 interface DatabaseProfile {
@@ -160,23 +161,23 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
     router.push(`/orders/${orderId}/review?step=${reviewerType}`);
   };
 
-  const handleViewDetails = (orderId: number, reviewerType: string) => {
-    router.push(`/orders/${orderId}/review-details?step=${reviewerType}`);
-  };
+  // const handleViewDetails = (orderId: number, reviewerType: string) => {
+  //   router.push(`/orders/${orderId}/review-details?step=${reviewerType}`);
+  // };
 
-  const getUrgencyBadge = (urgency: string) => {
-    const urgencyConfig = {
-      low: { label: "Бага", variant: "secondary" as const },
-      medium: { label: "Дунд", variant: "outline" as const },
-      high: { label: "Яаралтай", variant: "destructive" as const },
-      critical: { label: "Нэн яаралтай", variant: "destructive" as const },
-    };
+  // const getUrgencyBadge = (urgency: string) => {
+  //   const urgencyConfig = {
+  //     low: { label: "Бага", variant: "secondary" as const },
+  //     medium: { label: "Дунд", variant: "outline" as const },
+  //     high: { label: "Яаралтай", variant: "destructive" as const },
+  //     critical: { label: "Нэн яаралтай", variant: "destructive" as const },
+  //   };
 
-    const config =
-      urgencyConfig[urgency as keyof typeof urgencyConfig] ||
-      urgencyConfig.medium;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  //   const config =
+  //     urgencyConfig[urgency as keyof typeof urgencyConfig] ||
+  //     urgencyConfig.medium;
+  //   return <Badge variant={config.variant}>{config.label}</Badge>;
+  // };
 
   const getStepBadge = (reviewerType: string) => {
     const stepConfig = {
@@ -230,7 +231,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                     <h3 className="font-semibold text-lg">
                       {request.orders.order_number}
                     </h3>
-                    {getUrgencyBadge(request.orders.urgency_level)}
+                    {/* {getUrgencyBadge(request.orders.urgency_level)} */}
                     {getStepBadge(request.reviewer_type)}
 
                     {/* Шалгуулагчийн тоо ба статус */}
@@ -286,7 +287,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                               ? "destructive"
                               : "outline"
                           }
-                          className="w-full justify-center">
+                          className="w-full text-sm justify-center">
                           {request.status === "approved"
                             ? "Та зөвшөөрсөн"
                             : request.status === "changes_requested"
@@ -299,7 +300,7 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                     </div>
                   )}
 
-                  <Button
+                  {/* <Button
                     variant="outline"
                     onClick={() =>
                       handleViewDetails(
@@ -309,7 +310,14 @@ export function ReviewRequestsList({ profile_id }: ReviewRequestProp) {
                     }
                     className="w-full">
                     Дэлгэрэнгүй харах
-                  </Button>
+                  </Button> */}
+                  <div className="text-right">
+                    <Link href={`/orders/${request.orders.id}`}>
+                      <Button variant="outline" size="sm" className="mt-2">
+                        Захиалгын мэдээллийг харах
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </CardContent>

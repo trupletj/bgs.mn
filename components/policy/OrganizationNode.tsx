@@ -31,6 +31,8 @@ import {
   AlbaWithJobRelations,
 } from "@/types/types";
 import { Button } from "../ui/button";
+import { createClient } from "@/utils/supabase/client";
+import { JobDescriptionSheet } from "../job-description/job-description-sheet";
 
 interface Props {
   organization: OrganizationWithJobRelations;
@@ -53,40 +55,87 @@ const actionTypes: { value: ActionType; label: string }[] = [
 
 export default function OrganizationNode({ organization }: Props) {
   const [isOpen, setIsOpen] = React.useState(true);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [selectedPositionId, setSelectedPositionId] =
+    React.useState<string>("");
+
+  const handleSelectPosition = (posId: string) => {
+    setSelectedPositionId(posId);
+    setSheetOpen(true);
+  };
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-start p-2 h-auto">
-          <ChevronRight
-            className={`h-4 w-4 transition-transform ${
-              isOpen ? "rotate-90" : ""
-            }`}
-          />
-          <Building2 className="h-5 w-5 ml-1 mr-2 text-blue-600" />
-          <span className="font-semibold text-lg">{organization.name}</span>
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="ml-6 mt-2 space-y-2">
-        {organization.job_position && organization.job_position.length > 0 && (
-          <div className="ml-4 space-y-1">
-            {organization.job_position.map((position) => (
-              <PositionNode key={position.id} position={position} />
-            ))}
-          </div>
-        )}
+    <>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="w-full justify-start p-2 h-auto">
+            <ChevronRight
+              className={`h-4 w-4 transition-transform ${
+                isOpen ? "rotate-90" : ""
+              }`}
+            />
+            <Building2 className="h-5 w-5 ml-1 mr-2 text-blue-600" />
+            <span className="font-semibold text-lg">{organization.name}</span>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="ml-6 mt-2 space-y-2">
+          {organization.job_position &&
+            organization.job_position.length > 0 && (
+              <div className="ml-4 space-y-1">
+                {organization.job_position.map((position) => (
+                  <PositionNode
+                    key={position.id}
+                    position={position}
+                    onSelectPosition={handleSelectPosition}
+                  />
+                ))}
+              </div>
+            )}
 
-        {organization.heltes.map((helts) => (
-          <DepartmentNode key={helts.id} department={helts} />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
+          {organization.heltes.map((helts) => (
+            <DepartmentNode
+              key={helts.id}
+              department={helts}
+              onSelectPosition={handleSelectPosition}
+            />
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+      <JobDescriptionSheet
+        isOpen={sheetOpen}
+        onOpenChange={setSheetOpen}
+        positionId={selectedPositionId}
+      />
+    </>
   );
 }
 
-function PositionNode({ position }: { position: JobPosition }) {
+function PositionNode({
+  position,
+  onSelectPosition,
+}: {
+  position: JobPosition;
+  onSelectPosition: (posId: string) => void;
+}) {
   const [data, setData] = useState<ClauseJobPosition | null>(null);
   const { clause_id } = useParams<Params>();
+  const supabase = createClient();
+
+  const handleClick = async () => {
+    console.log("Clicked Position:", position.id);
+    onSelectPosition(position.id);
+    const { data, error } = await supabase
+      .from("job_description")
+      .select("*")
+      .eq("job_position_id", position.id)
+      .eq("is_deleted", false);
+
+    if (error) {
+      console.error("Fetch error:", error);
+    } else {
+      console.log("Job descriptions:", data);
+    }
+  };
 
   const handleTypeChange = async (value: ActionType) => {
     if (data) {
@@ -186,7 +235,11 @@ function PositionNode({ position }: { position: JobPosition }) {
         data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 mr-2"
       />
       <User className="h-3 w-3 mr-2 text-gray-500" />
-      <span className="text-sm">{position.name}</span>
+      <span
+        className="text-sm cursor-pointer hover:underline"
+        onClick={handleClick}>
+        {position.name}
+      </span>
       {data?.is_checked && (
         <Select
           onValueChange={(val) => handleTypeChange(val as ActionType)}
@@ -213,8 +266,10 @@ function PositionNode({ position }: { position: JobPosition }) {
 
 function DepartmentNode({
   department,
+  onSelectPosition,
 }: {
   department: HeltesWithJobRelations;
+  onSelectPosition: (posId: string) => void;
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -235,21 +290,35 @@ function DepartmentNode({
         {department.job_position && department.job_position.length > 0 && (
           <div className="ml-4 space-y-1">
             {department.job_position.map((position) => (
-              <PositionNode key={position.id} position={position} />
+              <PositionNode
+                key={position.id}
+                position={position}
+                onSelectPosition={onSelectPosition}
+              />
             ))}
           </div>
         )}
 
         {department.alba &&
           department.alba.map((division) => (
-            <DivisionNode key={division.id} division={division} />
+            <DivisionNode
+              key={division.id}
+              division={division}
+              onSelectPosition={onSelectPosition}
+            />
           ))}
       </CollapsibleContent>
     </Collapsible>
   );
 }
 
-function DivisionNode({ division }: { division: AlbaWithJobRelations }) {
+function DivisionNode({
+  division,
+  onSelectPosition,
+}: {
+  division: AlbaWithJobRelations;
+  onSelectPosition: (posId: string) => void;
+}) {
   const [isOpen, setIsOpen] = React.useState(false);
 
   return (
@@ -267,7 +336,11 @@ function DivisionNode({ division }: { division: AlbaWithJobRelations }) {
       </CollapsibleTrigger>
       <CollapsibleContent className="ml-6 mt-2 space-y-1">
         {division.job_position.map((position) => (
-          <PositionNode key={position.id} position={position} />
+          <PositionNode
+            key={position.id}
+            position={position}
+            onSelectPosition={onSelectPosition}
+          />
         ))}
       </CollapsibleContent>
     </Collapsible>

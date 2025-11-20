@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,17 +24,40 @@ interface PreviousReviewersActionsProps {
   currentStep: StepType;
 }
 
+interface Profile {
+  name: string;
+  position_name: string;
+  department_name: string;
+}
+
 interface ReviewerAction {
   id: number;
   reviewer_type: StepType;
   status: string;
   comments: string;
   completed_at: string;
-  profile: {
-    name: string;
-    position_name: string;
-    department_name: string;
-  };
+  profile: Profile;
+}
+
+interface OrderItem {
+  id: number;
+  part_name: string;
+  part_number: string;
+  quantity: number;
+}
+
+interface SubOrderItem {
+  id: number;
+  quantity: number;
+  description: string;
+  created_at: string;
+  created_by: string;
+  order_item_id: number;
+
+  order_item:
+    | { part_name?: string; part_number?: string }
+    | { part_name?: string; part_number?: string }[];
+  profile: { name?: string } | { name?: string }[];
 }
 
 interface ItemChange {
@@ -62,11 +85,7 @@ export function PreviousReviewersActions({
   const [itemChanges, setItemChanges] = useState<ItemChange[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchPreviousReviewersActions();
-  }, [orderId, currentStep]);
-
-  const fetchPreviousReviewersActions = async () => {
+  const fetchPreviousReviewersActions = useCallback(async () => {
     try {
       const supabase = createClient();
       const previousStep = getPreviousStep(currentStep);
@@ -76,6 +95,7 @@ export function PreviousReviewersActions({
         return;
       }
 
+      // Fetch reviewers data
       const { data: reviewersData, error: reviewersError } = await supabase
         .from("order_reviewers")
         .select(
@@ -95,11 +115,13 @@ export function PreviousReviewersActions({
         .eq("order_id", orderId)
         .eq("reviewer_type", previousStep)
         .neq("status", "pending")
-        // .eq("status", "approved")
         .order("completed_at", { ascending: false });
 
       if (reviewersError) throw reviewersError;
 
+      const reviewerIds = (reviewersData || []).map((rev) => rev.id);
+
+      // Fetch sub order items
       const { data: subOrderItemsData, error: subOrderItemsError } =
         await supabase
           .from("sub_order_item")
@@ -121,10 +143,12 @@ export function PreviousReviewersActions({
         `
           )
           .eq("order_id", orderId)
+          .in("order_reviewer_id", reviewerIds)
           .order("created_at", { ascending: false });
 
       if (subOrderItemsError) throw subOrderItemsError;
 
+      // Fetch original order items
       const { data: originalOrderItems, error: originalItemsError } =
         await supabase
           .from("order_items")
@@ -133,15 +157,19 @@ export function PreviousReviewersActions({
 
       if (originalItemsError) throw originalItemsError;
 
-      const processedReviewers = (reviewersData || []).map((item: any) => ({
-        ...item,
-        profile: Array.isArray(item.profile) ? item.profile[0] : item.profile,
-      }));
+      // Process reviewers data
+      const processedReviewers: ReviewerAction[] = (reviewersData || []).map(
+        (item) => ({
+          ...item,
+          profile: Array.isArray(item.profile) ? item.profile[0] : item.profile,
+        })
+      );
 
+      // Process item changes
       const processedChanges: ItemChange[] = [];
-      (subOrderItemsData || []).forEach((subItem: any) => {
+      (subOrderItemsData || []).forEach((subItem: SubOrderItem) => {
         const originalItem = originalOrderItems?.find(
-          (item: any) => item.id === subItem.order_item_id
+          (item) => item.id === subItem.order_item_id
         );
 
         if (originalItem) {
@@ -174,7 +202,11 @@ export function PreviousReviewersActions({
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, currentStep]);
+
+  useEffect(() => {
+    fetchPreviousReviewersActions();
+  }, [fetchPreviousReviewersActions]);
 
   const getStepLabel = (step: StepType) => {
     const stepLabels: Record<StepType, string> = {
@@ -225,15 +257,6 @@ export function PreviousReviewersActions({
     );
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   const groupActionsByReviewer = (): ReviewerWithActions[] => {
     return reviewerActions.map((reviewer) => {
       const reviewerItemChanges = itemChanges.filter(
@@ -276,7 +299,7 @@ export function PreviousReviewersActions({
   const reviewersWithActions = groupActionsByReviewer();
 
   return (
-    <Card className="shadow-sm border-border/50">
+    <Card className="shadow-sm border-border/50 mt-3">
       <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-slate-100/50">
         <CardTitle className="flex items-center gap-3 text-lg">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-sm">
@@ -303,27 +326,6 @@ export function PreviousReviewersActions({
                   {/* Reviewer Header Section */}
                   <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b-2 border-slate-200 p-5">
                     <div className="flex items-start gap-4">
-                      {/* Avatar */}
-                      {
-                        // <div className="relative flex-shrink-0">
-                        //   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-lg ring-4 ring-white">
-                        //     {getInitials(reviewer.profile.name)}
-                        //   </div>
-                        //   {/* Status indicator on avatar */}
-                        //   <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-md">
-                        //     {reviewer.status === "approved" && (
-                        //       <CheckCircle2 className="w-4 h-4 text-green-600" />
-                        //     )}
-                        //     {reviewer.status === "changes_requested" && (
-                        //       <AlertCircle className="w-4 h-4 text-amber-600" />
-                        //     )}
-                        //     {reviewer.status === "rejected" && (
-                        //       <XCircle className="w-4 h-4 text-red-600" />
-                        //     )}
-                        //   </div>
-                        // </div>
-                      }
-
                       {/* Reviewer Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">

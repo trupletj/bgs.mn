@@ -22,35 +22,10 @@ interface ReviewDetail {
   };
 }
 
-interface OrderItemChange {
-  id: number;
-  order_item_id: number;
-  reviewer_id: number;
-  old_quantity: number;
-  new_quantity: number;
-  changed_at: string;
-  profile: {
-    name: string;
-  };
-  order_item: {
-    part_name: string;
-    part_number?: string;
-  };
-}
-
 interface Profile {
   name: string;
   position_name: string;
   department_name: string;
-}
-
-interface SimpleProfile {
-  name: string;
-}
-
-interface OrderItem {
-  part_name: string;
-  part_number?: string;
 }
 
 interface ReviewData {
@@ -60,25 +35,18 @@ interface ReviewData {
   comments: string;
   assigned_at: string;
   completed_at: string;
+  profile_id: string;
   profile: Profile | Profile[];
 }
 
-interface ChangesData {
-  id: number;
-  order_item_id: number;
-  reviewer_id: number;
-  old_quantity: number;
-  new_quantity: number;
-  changed_at: string;
-  profile: SimpleProfile | SimpleProfile[];
-  order_item: OrderItem | OrderItem[];
+interface ReviewAccumulator {
+  [key: string]: ReviewData;
 }
 
 export default function ReviewDetailsPage() {
   const params = useParams();
   const orderId = params.id as string;
   const [reviewHistory, setReviewHistory] = useState<ReviewDetail[]>([]);
-  const [itemChanges, setItemChanges] = useState<OrderItemChange[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchReviewDetails = useCallback(async () => {
@@ -96,6 +64,7 @@ export default function ReviewDetailsPage() {
           comments,
           assigned_at,
           completed_at,
+          profile_id,
           profile:profile_id (
             name,
             position_name,
@@ -104,55 +73,33 @@ export default function ReviewDetailsPage() {
         `
         )
         .eq("order_id", orderId)
+        .neq("status", "pending")
         .order("reviewer_type", { ascending: true })
         .order("assigned_at", { ascending: true });
 
       if (reviewError) throw reviewError;
 
-      // Сэлбэгийн өөрчлөлтүүд
-      // const { data: changesData, error: changesError } = await supabase
-      //   .from("order_item_changes")
-      //   .select(
-      //     `
-      //     id,
-      //     order_item_id,
-      //     reviewer_id,
-      //     old_quantity,
-      //     new_quantity,
-      //     changed_at,
-      //     profile:reviewer_id (
-      //       name
-      //     ),
-      //     order_item:order_item_id (
-      //       part_name,
-      //       part_number
-      //     )
-      //   `
-      //   )
-      //   .eq("order_id", orderId)
-      //   .order("changed_at", { ascending: true });
-
-      // if (changesError) throw changesError;
+      const latestReviewsByStatus = Object.values(
+        (reviewData || []).reduce((acc: ReviewAccumulator, row: ReviewData) => {
+          const key = `${row.profile_id}-${row.status}`;
+          if (
+            !acc[key] ||
+            new Date(row.assigned_at) > new Date(acc[key].assigned_at)
+          ) {
+            acc[key] = row;
+          }
+          return acc;
+        }, {} as ReviewAccumulator)
+      );
 
       setReviewHistory(
-        (reviewData || []).map((review: ReviewData) => ({
+        (latestReviewsByStatus || []).map((review: ReviewData) => ({
           ...review,
           profile: Array.isArray(review.profile)
             ? review.profile[0]
             : review.profile,
         }))
       );
-      // setItemChanges(
-      //   (changesData || []).map((change: ChangesData) => ({
-      //     ...change,
-      //     profile: Array.isArray(change.profile)
-      //       ? change.profile[0]
-      //       : change.profile,
-      //     order_item: Array.isArray(change.order_item)
-      //       ? change.order_item[0]
-      //       : change.order_item,
-      //   }))
-      // );
     } catch (error) {
       toast.error("Үнэлгээний дэлгэрэнгүй мэдээллийг авахад алдаа гарлаа");
       console.error(error);
@@ -192,7 +139,16 @@ export default function ReviewDetailsPage() {
   };
 
   if (loading) {
-    return <div>Ачааллаж байна...</div>;
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">Ачааллаж байна...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -200,90 +156,68 @@ export default function ReviewDetailsPage() {
       <h1 className="text-2xl font-bold mb-6">Үнэлгээний дэлгэрэнгүй</h1>
 
       {/* Үнэлгээний түүх */}
-      <div className="space-y-4 mb-8">
+      <div className="space-y-4">
         <h2 className="text-xl font-semibold">Шат бүрийн үнэлгээ</h2>
-        {reviewHistory.map((review) => (
-          <Card key={review.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>{getStepLabel(review.reviewer_type)}</span>
-                {getStatusBadge(review.status)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="font-semibold">Шалгуулагч:</p>
-                  <p>{review.profile.name}</p>
-                  <p>{review.profile.position_name}</p>
-                  <p>{review.profile.department_name}</p>
-                </div>
-                <div>
-                  <p className="font-semibold">Хугацаа:</p>
-                  <p>
-                    Огноо: {new Date(review.assigned_at).toLocaleDateString()}
-                  </p>
-                  {review.completed_at && (
-                    <p>
-                      Дууссан:{" "}
-                      {new Date(review.completed_at).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-              </div>
 
-              {review.comments && (
-                <div className="mt-4">
-                  <p className="font-semibold">Тайлбар:</p>
-                  <p className="text-gray-700 bg-gray-50 p-2 rounded mt-1">
-                    {review.comments}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Сэлбэгийн өөрчлөлтүүд */}
-      {itemChanges.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Сэлбэгийн өөрчлөлтүүд</h2>
-          {itemChanges.map((change) => (
-            <Card key={change.id}>
+        {reviewHistory.length > 0 ? (
+          reviewHistory.map((review) => (
+            <Card key={review.id} className="shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">
-                  {change.order_item.part_name}
-                  {change.order_item.part_number &&
-                    ` (${change.order_item.part_number})`}
+                <CardTitle className="flex items-center justify-between">
+                  <span>{getStepLabel(review.reviewer_type)}</span>
+                  {getStatusBadge(review.status)}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="font-semibold">Өөрчилсөн хүн:</p>
-                    <p>{change.profile.name}</p>
+                    <p className="font-semibold">Шалгуулагч:</p>
+                    <p className="font-medium">{review.profile.name}</p>
+                    <p className="text-gray-600">
+                      {review.profile.position_name}
+                    </p>
+                    <p className="text-gray-600">
+                      {review.profile.department_name}
+                    </p>
                   </div>
                   <div>
-                    <p className="font-semibold">Өөрчлөлт:</p>
-                    <p>
-                      <span className="line-through text-red-600 mr-2">
-                        {change.old_quantity}
-                      </span>
-                      <span className="text-green-600 font-semibold">
-                        → {change.new_quantity}
-                      </span>
+                    <p className="font-semibold">Хугацаа:</p>
+                    <p className="text-gray-600">
+                      Огноо:{" "}
+                      {new Date(review.assigned_at).toLocaleDateString("mn-MN")}
                     </p>
-                    <p>
-                      Огноо: {new Date(change.changed_at).toLocaleDateString()}
-                    </p>
+                    {review.completed_at && (
+                      <p className="text-gray-600">
+                        Дууссан:{" "}
+                        {new Date(review.completed_at).toLocaleDateString(
+                          "mn-MN"
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {review.comments && (
+                  <div className="mt-4">
+                    <p className="font-semibold">Тайлбар:</p>
+                    <p className="text-gray-700 bg-gray-50 p-3 rounded mt-1 border">
+                      {review.comments}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        ) : (
+          <Card>
+            <CardContent className="py-8">
+              <div className="text-center text-gray-500">
+                <p>Үнэлгээний түүх олдсонгүй</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

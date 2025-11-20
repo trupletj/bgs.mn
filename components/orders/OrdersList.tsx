@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { CalendarIcon, ClockIcon, UserIcon, SearchIcon } from "lucide-react";
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from "@/components/ui/select";
+import { CalendarIcon, ClockIcon, SearchIcon } from "lucide-react";
 import { type Order } from "@/actions/orders";
 
 const statusColors = {
@@ -59,19 +59,30 @@ export function OrdersList({ orders }: Props) {
     return matchesSearch && matchesStatus && matchesUrgency;
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  function formatDateCustom(dateString: string) {
+    const date = new Date(dateString);
+
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+
+    return `${year} оны ${month} сарын ${day} өдөр`;
+  }
 
   const formatStatus = (status: string) => {
-    return status
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+    const statusTranslations: { [key: string]: string } = {
+      rejected: "Татгалзсан",
+      changed_requested: "Утга өөрчлөгдсөн",
+      approved: "Батлагдсан",
+    };
+
+    return (
+      statusTranslations[status] ||
+      status
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    );
   };
 
   return (
@@ -79,7 +90,7 @@ export function OrdersList({ orders }: Props) {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filter Orders</CardTitle>
+          <CardTitle>Захиалгыг шүүх</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
@@ -87,14 +98,14 @@ export function OrdersList({ orders }: Props) {
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search orders..."
+                  placeholder="Хайлт хийх ..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            {/* <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -119,13 +130,13 @@ export function OrdersList({ orders }: Props) {
                 <SelectValue placeholder="All Urgency" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Urgency</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="emergency">Яаралтай</SelectItem>
+                <SelectItem value="service">Үйлчилгээний</SelectItem>
+                <SelectItem value="major repairs">Их засвар</SelectItem>
+                <SelectItem value="safety reserves">Аюулгүйн нөөц</SelectItem>
+                <SelectItem value="other">Бусад</SelectItem>
               </SelectContent>
-            </Select>
+            </Select> */}
           </div>
         </CardContent>
       </Card>
@@ -134,11 +145,11 @@ export function OrdersList({ orders }: Props) {
       {filteredOrders.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
-            <p className="text-gray-500 text-lg">No orders found</p>
+            <p className="text-gray-500 text-lg">Илэрц олдсонгүй</p>
             <p className="text-gray-400 mt-2">
               {orders.length === 0
-                ? "You haven't created any orders yet."
-                : "Try adjusting your filters."}
+                ? "Ямарч захиалга үүсгээгүй байна."
+                : "Шүүлтүүрийн тохиргоог өөрчилж дахин оролдоно уу."}
             </p>
           </CardContent>
         </Card>
@@ -183,25 +194,22 @@ export function OrdersList({ orders }: Props) {
                     <div className="flex items-center gap-6 text-sm text-gray-500">
                       <div className="flex items-center gap-1">
                         <CalendarIcon className="h-4 w-4" />
-                        Created {formatDate(order.created_at)}
+                        Үүсгэсэн огноо: {formatDateCustom(order.created_at)}
                       </div>
                       {order.requested_delivery_date && (
                         <div className="flex items-center gap-1">
                           <ClockIcon className="h-4 w-4" />
-                          Delivery: {formatDate(order.requested_delivery_date)}
+                          Шаардлагатай огноо:{" "}
+                          {formatDateCustom(order.requested_delivery_date)}
                         </div>
                       )}
-                      <div className="flex items-center gap-1">
-                        <UserIcon className="h-4 w-4" />
-                        You
-                      </div>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <Link href={`/orders/${order.id}`}>
                       <Button variant="outline" size="sm" className="mt-2">
-                        View Details
+                        Захиалгын мэдээллийг харах
                       </Button>
                     </Link>
                   </div>

@@ -4,7 +4,6 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { updateOrderStepStatus } from "./workflow";
 import { getNextStep } from "@/utils/workflow";
-import { success } from "zod";
 
 interface SubmitReviewParams {
   status: "approved" | "rejected" | "changes_requested";
@@ -12,6 +11,26 @@ interface SubmitReviewParams {
   comments: string;
   newQuantities: Record<number, number>;
   currentStep: string;
+}
+
+export async function getProfileInfo() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Хэрэглэгч олдсонгүй");
+  }
+  const { data: profile, error } = await supabase
+    .from("profile")
+    .select("*")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (error) {
+    throw new Error("Профайл олдсонгүй");
+  }
+  return profile;
 }
 
 export async function getProfileIdFromAuthUserId() {
@@ -43,7 +62,7 @@ export async function submitReview(params: SubmitReviewParams) {
     const profile_id = await getProfileIdFromAuthUserId();
 
     // ЗӨВШӨӨРӨЛТ: Зөвхөн өөрийн үнэлгээг шинэчлэх
-    const { error: reviewerError } = await supabase
+    const { data: reviewer, error: reviewerError } = await supabase
       .from("order_reviewers")
       .update({
         status: params.status,
@@ -54,10 +73,16 @@ export async function submitReview(params: SubmitReviewParams) {
       .eq("order_id", params.order_id)
       .eq("profile_id", profile_id) // ЗӨВХӨН ӨӨРИЙН PROFILE_ID
       .eq("reviewer_type", params.currentStep)
-      .neq("status", "pending");
+      .neq("status", "pending")
+      .select();
 
     if (reviewerError) {
       throw new Error(reviewerError.message);
+    }
+
+    const reviewer_id = (reviewer as any)?.[0]?.id;
+    if (!reviewer_id) {
+      throw new Error("Шалгуулагчийн мэдээлэл олдсонгүй");
     }
 
     if (Object.keys(params.newQuantities).length > 0) {
@@ -65,9 +90,10 @@ export async function submitReview(params: SubmitReviewParams) {
         const { error: subItemError } = await supabase
           .from("sub_order_item")
           .insert({
+            order_reviewer_id: reviewer_id,
             order_item_id: parseInt(itemId),
             quantity: quantity,
-            status: "changed_approved",
+            status: "changed_requested",
             created_by: profile_id,
             order_id: params.order_id,
           });
@@ -84,7 +110,6 @@ export async function submitReview(params: SubmitReviewParams) {
         .from("orders")
         .update({
           status: "rejected",
-          is_reviewed: true,
           updated_at: new Date().toISOString(),
         })
         .eq("id", params.order_id);
@@ -94,6 +119,22 @@ export async function submitReview(params: SubmitReviewParams) {
       }
       return { success: false };
     }
+
+    if (params.currentStep === "fourth_step") {
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({
+          status: params.status,
+          completed_at: new Date().toISOString(),
+          is_passed_fourth: true,
+        })
+        .eq("id", params.order_id);
+
+      if (orderError) {
+        console.error("Захиалгын статус шинэчлэхэд алдаа:", orderError);
+      }
+    }
+
     return {
       success: true,
     };
@@ -190,6 +231,7 @@ export async function assignNextReviewers({
 
   try {
     const profile_id = await getProfileIdFromAuthUserId();
+
     const nextStep = getNextStep(currentStep as any);
 
     if (!nextStep) throw new Error("Дараагийн шат байхгүй байна");
@@ -205,6 +247,8 @@ export async function assignNextReviewers({
       currentStep,
       profile_id
     );
+
+    console.log("Step result:", stepResult);
 
     if (stepResult.status === "rejected") {
       // Захиалгыг rejected болгосон тул шинэ шалгуулагч нэмэх шаардлагагүй

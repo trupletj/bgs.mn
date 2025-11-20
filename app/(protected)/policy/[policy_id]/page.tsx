@@ -3,6 +3,7 @@ import Link from "next/link";
 // import { policy } from "@repo/database/generated/prisma/client/client";
 import { createClient } from "@/utils/supabase/client";
 import SectionList from "@/components/policy/SectionList";
+import { hasPermission } from "@/actions/rbac";
 // import { hasAccess } from "@/action/PermissionService";
 
 interface PolicyDetailPageProps {
@@ -13,7 +14,7 @@ export default async function PolicyDetailPage({
   params,
 }: PolicyDetailPageProps) {
   const { policy_id } = await params;
-  const isEditAccess = true;
+  const isEditAccess = await hasPermission("policy", "edit");
   //   const isEditAccess = await hasAccess("/dashboard/policy/edit", "UPDATE");
   const supabase = createClient();
   const { data: policy, error } = await supabase

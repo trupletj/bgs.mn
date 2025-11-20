@@ -7,22 +7,14 @@ import { Button } from "../ui/button";
 const DeletePolicyButton = ({
   policy_id,
   onDeleted,
+  canDelete,
 }: {
   policy_id: string;
   onDeleted?: () => void;
+  canDelete?: boolean;
 }) => {
-  // const [canDelete, setCanDelete] = useState<boolean>(false);
-  const canDelete = true;
-
-  //   useEffect(() => {
-  //     // const checkAccess = async () => {
-  //     //   const access = await hasAccess("/dashboard/policy", "DELETE");
-  //     //   setCanDelete(access);
-  //     // };
-  //     // checkAccess();
-  //   }, []);
-
   const handleDelete = async (policy_id: string) => {
+    if (!canDelete) return null;
     if (!confirm("Журмыг устгахдаа итгэлтэй байна уу?")) return;
     try {
       const response = await fetch(`/api/policy?id=${policy_id}`, {
@@ -39,8 +31,6 @@ const DeletePolicyButton = ({
       toast.error(`Алдаа: ${(error as Error).message}`);
     }
   };
-
-  if (!canDelete) return null;
 
   return (
     <Button
