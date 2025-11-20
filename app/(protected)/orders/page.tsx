@@ -4,7 +4,6 @@ import { PlusIcon } from "lucide-react";
 import { OrdersList } from "@/components/orders/OrdersList";
 import { getOrdersByUser } from "@/actions/orders";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReviewRequestsList } from "@/components/review-requests-list";
 import { getProfileIdFromAuthUserId } from "@/actions/review";
 

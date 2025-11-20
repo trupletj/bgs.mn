@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ReviewOrderForm } from "@/components/review-order-form";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
-import { UnitType } from "@/types/types";
+import { SparePartType, UnitType } from "@/types/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StepType, isValidStep } from "@/utils/workflow";
 import { Badge } from "./ui/badge";
@@ -26,6 +26,7 @@ interface OrderDetails {
   requested_delivery_date?: string;
   urgency_level: string;
   created_at: string;
+  order_type: string;
   profile: {
     name: string;
     department_name: string;
@@ -39,6 +40,7 @@ interface OrderItem {
   quantity: number;
   notes: string;
   unit: UnitType;
+  spare_type: SparePartType;
   requested_delivery_date: string;
   image_url: string | null;
 }
@@ -57,23 +59,36 @@ export default function OrderReviewerDetail({
     fetchOrderDetails();
   }, [orderId, profile_id]);
 
-  const getUrgencyBadge = (urgency: string) => {
-    const urgencyConfig = {
-      low: { label: "Бага", className: "bg-gray-100 text-gray-800" },
-      medium: { label: "Дунд", className: "bg-blue-100 text-blue-800" },
-      high: { label: "Яаралтай", className: "bg-orange-100 text-orange-800" },
-      critical: {
-        label: "Нэн яаралтай",
+  const getOrderTypeBadge = (orderType: string) => {
+    const typeConfig = {
+      emergency: {
+        label: "Яаралтай",
         className: "bg-red-100 text-red-800",
+      },
+      service: {
+        label: "Үйлчилгээний",
+        className: "bg-yellow-100 text-yellow-800",
+      },
+      "major repairs": {
+        label: "Их засвар",
+        className: "bg-orange-100 text-orange-800",
+      },
+      "safety reserves": {
+        label: "Аюулгүйн нөөц",
+        className: "bg-green-100 text-green-800",
+      },
+      other: {
+        label: "Бусад",
+        className: "bg-blue-100 text-blue-800",
       },
     };
 
     const config =
-      urgencyConfig[urgency as keyof typeof urgencyConfig] ||
-      urgencyConfig.medium;
+      typeConfig[orderType as keyof typeof typeConfig] || typeConfig.other;
 
     return <Badge className={config.className}>{config.label}</Badge>;
   };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Тодорхойгүй";
 
@@ -119,15 +134,7 @@ export default function OrderReviewerDetail({
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .select(
-          `
-        id,
-        order_number,
-        title,
-        description,
-        status,
-        urgency_level,
-        created_at,
-        requested_delivery_date,
+          `*,
         profile:created_profile (
           name,
           department_name
@@ -215,9 +222,7 @@ export default function OrderReviewerDetail({
     <div className="container mx-auto py-6 px-4">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Захиалга шалгуулах</h1>
-        <p className="text-gray-600 mt-2">
-          Захиалга #{order.order_number} - {order.title}
-        </p>
+
         <Badge variant="outline" className="mt-2">
           {currentStep.replace("_", " ").toUpperCase()} шат
         </Badge>
@@ -230,16 +235,12 @@ export default function OrderReviewerDetail({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-gray-600">Захиалгын дугаар</Label>
-              <p className="font-semibold">{order.order_number}</p>
-            </div>
-            <div>
               <Label className="text-gray-600">Гарчиг</Label>
               <p className="font-semibold">{order.title}</p>
             </div>
             <div>
-              <Label className="text-gray-600">Яаралтай түвшин</Label>
-              <div className="mt-1">{getUrgencyBadge(order.urgency_level)}</div>
+              <Label className="text-gray-600">Захиалгын төрөл</Label>
+              <div className="mt-1">{getOrderTypeBadge(order.order_type)}</div>
             </div>
             <div>
               <Label className="text-gray-600">
@@ -273,7 +274,7 @@ export default function OrderReviewerDetail({
       <ReviewOrderForm
         order={order}
         orderItems={orderItems}
-        onReviewComplete={fetchOrderDetails}
+        // onReviewComplete={fetchOrderDetails}
         currentStep={currentStep}
       />
     </div>

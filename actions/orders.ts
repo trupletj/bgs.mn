@@ -11,8 +11,13 @@ export type Order = {
   order_number: string;
   title: string;
   description?: string;
-  order_type: string;
-  urgency_level: "low" | "medium" | "high" | "critical";
+  order_type:
+    | "emergency"
+    | "service"
+    | "major repairs"
+    | "safety reserves"
+    | "other";
+  urgency_level: "";
   requested_delivery_date?: string;
   status: string;
   created_by: string;
@@ -35,6 +40,7 @@ export type OrderItem = {
   notes?: string;
   unit: string;
   image_url?: string;
+  spare_type: string;
 };
 
 export type PartsCatalog = {
@@ -67,6 +73,39 @@ export type WorkflowEntry = {
     phone?: string;
   };
 };
+
+export interface OrderReviewers {
+  id: number | string;
+  order_id: number;
+  reviewer_type: string;
+  assigned_at: string;
+  completed_at?: string;
+  status: string;
+  is_reviewed: boolean;
+  comments?: string;
+  profile?: {
+    id: string;
+    name?: string;
+    department_name?: string;
+    phone?: string;
+    position_name?: string;
+  };
+  profile_id?: number;
+  sender_id?: number;
+  sub_order_item?: SubOrderItem[];
+}
+
+export interface SubOrderItem {
+  id: number;
+  status: string;
+  order_id: number;
+  quantity: number;
+  created_at: string;
+  created_by: number;
+  description?: string;
+  order_item_id: number;
+  order_reviewer_id: number;
+}
 
 export async function createOrder(orderData: Partial<Order>): Promise<{
   data: Order | null;
@@ -145,7 +184,7 @@ export async function getOrderWithDetails(orderId: string): Promise<{
   data: {
     order: Order;
     items: OrderItem[];
-    workflow: WorkflowEntry[];
+    order_reviewers: OrderReviewers[];
     profile: {
       id: string;
       name?: string;
@@ -189,23 +228,26 @@ export async function getOrderWithDetails(orderId: string): Promise<{
       console.error("Order items fetch error:", itemsError);
     }
 
-    // Get workflow history - make this optional
-    let workflow: any[] = [];
+    let order_reviewers: any[] = [];
     try {
-      const { data: workflowData, error: workflowError } = await supabase
-        .from("order_workflow")
-        .select("*")
-        .eq("order_id", orderId)
-        .order("created_at", { ascending: false });
+      const { data: order_reviewers_data, error: orderflowError } =
+        await supabase
+          .from("order_reviewers")
+          .select("*, profile:profile_id(*), sub_order_item:sub_order_item(*)")
+          .eq("order_id", orderId)
+          .eq("is_reviewed", true);
 
-      if (workflowError) {
-        console.error("Workflow fetch error:", workflowError);
+      if (orderflowError) {
+        console.error(
+          "order_reviewers_data fetch error:",
+          order_reviewers_data
+        );
         // Continue with empty workflow instead of failing
       } else {
-        workflow = workflowData || [];
+        order_reviewers = order_reviewers_data || [];
       }
-    } catch (workflowErr) {
-      console.error("Workflow fetch exception:", workflowErr);
+    } catch (orderflowError) {
+      console.error("Workflow fetch exception:", orderflowError);
       // Continue with empty workflow
     }
 
@@ -232,8 +274,8 @@ export async function getOrderWithDetails(orderId: string): Promise<{
       data: {
         order,
         items: items || [],
-        workflow,
         profile,
+        order_reviewers,
       },
       error: null,
     };

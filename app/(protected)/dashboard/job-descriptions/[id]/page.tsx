@@ -1,3 +1,4 @@
+import { hasPermission, hasRole } from "@/actions/rbac";
 import { JobDescriptionDetail } from "@/components/job-description/job-description-detail";
 import { createClient } from "@/utils/supabase/client";
 
@@ -8,6 +9,8 @@ interface JobDescriptionDetailPageProps {
 export default async function Page({ params }: JobDescriptionDetailPageProps) {
   const { id } = await params;
   const supabase = createClient();
+  const is_admin = await hasRole("super_admin");
+  const is_edit = await hasPermission("job_description", "edit");
 
   // Job description-ийг авах
   const { data: jobDescription, error } = await supabase
@@ -68,7 +71,11 @@ export default async function Page({ params }: JobDescriptionDetailPageProps) {
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
-      <JobDescriptionDetail data={data} />
+      {is_admin ? (
+        <JobDescriptionDetail data={data} is_edit={true} />
+      ) : (
+        <JobDescriptionDetail data={data} is_edit={is_edit} />
+      )}
     </div>
   );
 }

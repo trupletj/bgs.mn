@@ -1,53 +1,33 @@
 import { JobDescription } from "@/types/types";
 import { createClient } from "@/utils/supabase/client";
+import { toast } from "sonner";
 const supabase = createClient();
 
 export const createJobDescription = async (data: JobDescription) => {
   try {
-    // Job position байгаа эсэхийг шалгах
-    // const { data: jobPosition, error: positionError } = await supabase
-    //   .from("job_position")
-    //   .select("id")
-    //   .eq("id", data.job_position_id)
-    //   .eq("is_active", true)
-    //   .single();
+    // Давхардсан job_position_id шалгах
+    if (data.job_position_id) {
+      const { data: existingJobDescription, error: existingError } =
+        await supabase
+          .from("job_description")
+          .select("id")
+          .eq("job_position_id", data.job_position_id)
+          .single();
 
-    // if (positionError || !jobPosition) {
-    //   throw new Error("Ажлын байр олдсонгүй");
-    // }
+      if (existingError) {
+        toast.warning("Ажлын байрны тодорхойлолт шалгахад алдаа гарлаа");
+        return;
+      }
 
-    // Supervisor position байгаа эсэхийг шалгах
-    // if (data.supervisor_pos_id) {
-    //   const { data: supervisor, error: supervisorError } = await supabase
-    //     .from("job_position")
-    //     .select("id")
-    //     .eq("id", data.supervisor_pos_id)
-    //     .eq("is_active", true)
-    //     .single();
-
-    //   if (supervisorError) {
-    //     throw new Error("Даргын ажлын байр олдсонгүй");
-    //   }
-    // }
-
-    // Subordinate position байгаа эсэхийг шалгах
-    // if (data.subordinate_pos_id) {
-    //   const { data: subordinate, error: subordinateError } = await supabase
-    //     .from("job_position")
-    //     .select("id")
-    //     .eq("id", data.subordinate_pos_id)
-    //     .eq("is_active", true)
-    //     .single();
-
-    //   if (subordinateError) {
-    //     throw new Error("Харьяалагдах ажлын байр олдсонгүй");
-    //   }
-    // }
+      if (existingJobDescription) {
+        return;
+      }
+    }
 
     const { data: jobDescription, error } = await supabase
       .from("job_description")
       .insert({
-        job_position_id: data.job_position_id,
+        job_position_id: data.job_position_id || null,
         a_code: data.a_code,
         at_code: data.at_code,
         supervisor_pos_id: data.supervisor_pos_id || null,

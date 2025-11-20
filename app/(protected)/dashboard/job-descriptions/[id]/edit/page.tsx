@@ -1,6 +1,7 @@
+import { hasPermission, hasRole } from "@/actions/rbac";
 import { JobDescriptionForm } from "@/components/job-description/job-description-form";
 import { createClient } from "@/utils/supabase/client";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 interface EditJobDescriptionPageProps {
   params: Promise<{ id: string }>;
@@ -9,6 +10,21 @@ interface EditJobDescriptionPageProps {
 export default async function EditJobDescriptionPage({
   params,
 }: EditJobDescriptionPageProps) {
+  const is_admin = await hasRole("super_admin");
+  if (!is_admin) {
+    const has_permission = await hasPermission("job_description", "edit");
+
+    if (!has_permission) {
+      redirect("/unauthorized");
+    }
+  }
+  let is_delete = false;
+  if (!is_admin) {
+    is_delete = await hasPermission("job_description", "delete");
+  } else {
+    is_delete = true;
+  }
+
   const { id } = await params;
   const supabase = createClient();
 
@@ -37,7 +53,11 @@ export default async function EditJobDescriptionPage({
                 Албан тушаалын дэлгэрэнгүй мэдээллийг засварлана уу.
               </p>
             </div>
-            <JobDescriptionForm initialData={data} isEdit={true} />
+            <JobDescriptionForm
+              initialData={data}
+              isEdit={true}
+              isDelete={is_delete}
+            />
           </div>
         </div>
       </main>

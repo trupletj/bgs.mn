@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { submitReview, assignNextReviewers } from "@/actions/review";
 import { TechnicalReviewerSelector } from "@/components/reviewer-selector";
-import { UnitDisplay } from "@/components/unit-display";
-import { UnitType } from "@/types/types";
+import { UnitDisplay, UnitSpareDisplay } from "@/components/unit-display";
+import { SparePartType, UnitType } from "@/types/types";
 import { StepType } from "@/utils/workflow";
 import ImageViewer from "./image-viewer";
 
@@ -37,6 +37,7 @@ interface OrderItem {
   part_number?: string;
   quantity: number;
   unit: UnitType;
+  spare_type: SparePartType;
   part_description?: string;
   image_url: string | null;
 }
@@ -44,14 +45,14 @@ interface OrderItem {
 interface ReviewOrderFormProps {
   order: OrderDetails;
   orderItems: OrderItem[];
-  onReviewComplete: () => void;
+  // onReviewComplete: () => void;
   currentStep: StepType; // currentStep prop нэмэгдлээ
 }
 
 export function ReviewOrderForm({
   order,
   orderItems,
-  onReviewComplete,
+  // onReviewComplete,
   currentStep, // Шинэ prop
 }: ReviewOrderFormProps) {
   const [comments, setComments] = useState("");
@@ -85,9 +86,11 @@ export function ReviewOrderForm({
   const handleReviewAction = async (
     status: "approved" | "rejected" | "changes_requested"
   ) => {
-    if (status !== "rejected" && nextReviewers.length === 0) {
-      toast.error("Дараагийн шалгуулагчаа сонгоно уу");
-      return;
+    if (currentStep !== "fourth_step") {
+      if (status !== "rejected" && nextReviewers.length === 0) {
+        toast.error("Дараагийн шалгуулагчаа сонгоно уу");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -103,6 +106,17 @@ export function ReviewOrderForm({
         toast.success("Захиалгыг амжилттай цуцаллаа.");
         return;
       }
+      if (currentStep === "fourth_step" && status !== "rejected") {
+        toast.success(
+          status === "approved"
+            ? "Захиалга зөвшөөрөгдлөө."
+            : status === "changes_requested"
+            ? "Өөрчлөлт шаардлага илгээгдлээ"
+            : "Захиалгыг татгалзлаа"
+        );
+        router.push("/orders");
+        return;
+      }
 
       if (status === "approved" || status === "changes_requested") {
         const is_success = await assignNextReviewers({
@@ -111,11 +125,11 @@ export function ReviewOrderForm({
           currentStep: currentStep,
         });
 
-        if (!is_success) {
+        if (!is_success.success) {
           toast.error(
             "Өмнөх шалгагч аль хэдийн талгалзсан тул дараагийн шалгуулагч рүү илгээгдсэнгүй."
           );
-          router.push("/review-request");
+          router.push("/orders");
         }
         toast.success(
           status === "approved"
@@ -126,8 +140,8 @@ export function ReviewOrderForm({
         toast.success("Захиалгыг татгалзлаа");
       }
 
-      onReviewComplete();
-      router.push("/review-request");
+      // onReviewComplete();
+      router.push("/orders");
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -158,7 +172,7 @@ export function ReviewOrderForm({
   return (
     <div className="space-y-6">
       {/* Сэлбэгүүд */}
-      <Card>
+      <Card className="mt-3">
         <CardHeader>
           <CardTitle>Сэлбэгүүд</CardTitle>
         </CardHeader>
@@ -172,7 +186,7 @@ export function ReviewOrderForm({
 
               return (
                 <div key={item.id} className="border rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
                     <div>
                       <Label className="text-gray-600">Сэлбэгийн нэр</Label>
                       <p className="font-medium">{item.part_name}</p>
@@ -223,6 +237,12 @@ export function ReviewOrderForm({
                       <Label className="text-gray-600">Нэгж</Label>
                       <p className="font-medium mt-1">
                         <UnitDisplay unit={item.unit} />
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600">Сэлбэгийн төрөл</Label>
+                      <p className="font-medium mt-1">
+                        <UnitSpareDisplay unit={item.spare_type} />
                       </p>
                     </div>
                     <div>
@@ -301,7 +321,10 @@ export function ReviewOrderForm({
             {hasChanges ? (
               <Button
                 onClick={handleRequestChanges}
-                disabled={isSubmitting || nextReviewers.length === 0}
+                disabled={
+                  isSubmitting ||
+                  (currentStep !== "fourth_step" && nextReviewers.length === 0)
+                }
                 variant="outline"
                 className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 flex-1">
                 {isSubmitting ? "Түр хүлээнэ үү..." : "Өөрчлөлт шаардах"}
@@ -309,7 +332,10 @@ export function ReviewOrderForm({
             ) : (
               <Button
                 onClick={handleApprove}
-                disabled={isSubmitting || nextReviewers.length === 0}
+                disabled={
+                  isSubmitting ||
+                  (currentStep !== "fourth_step" && nextReviewers.length === 0)
+                }
                 className="bg-green-600 hover:bg-green-700 flex-1">
                 {isSubmitting ? "Түр хүлээнэ үү..." : "Зөвшөөрөх"}
               </Button>

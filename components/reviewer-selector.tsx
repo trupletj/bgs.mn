@@ -63,8 +63,7 @@ export function TechnicalReviewerSelector({
             )
           `
           )
-          .eq("role_id", role_id)
-          .eq("is_active", true);
+          .eq("role_id", role_id);
 
         if (error) {
           console.error("Error fetching reviewers:", error);

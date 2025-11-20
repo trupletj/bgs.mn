@@ -17,8 +17,6 @@ import JobDescSeeButton from "./job-desc-see-button";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
 import { PlusIcon, Search } from "lucide-react";
-import { routerServerGlobal } from "next/dist/server/lib/router-utils/router-server-context";
-import { redirect } from "next/dist/server/api-utils";
 
 interface JobDescription {
   id: string;
@@ -30,7 +28,11 @@ interface JobPosition {
   name: string | null;
 }
 
-export default function JobDescriptionList() {
+export default function JobDescriptionList({
+  is_create,
+}: {
+  is_create?: boolean;
+}) {
   const [jobDescriptions, setJobDescriptions] = useState<JobDescription[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,6 +44,8 @@ export default function JobDescriptionList() {
   useEffect(() => {
     fetchJobDescriptions();
   }, [currentPage, debouncedSearchTerm]);
+
+  console.log("is_create:", is_create);
 
   const fetchJobDescriptions = useCallback(async () => {
     setIsLoading(true);
@@ -97,16 +101,18 @@ export default function JobDescriptionList() {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      <div className="flex justify-end mb-2 w-min-content">
-        <Link
-          href="/dashboard/job-descriptions/new"
-          className="flex cursor-pointer">
-          <Button className="items-center flex">
-            <PlusIcon className="h-4 w-4 " />
-            Нэмэх
-          </Button>
-        </Link>
-      </div>
+      {is_create && (
+        <div className="flex justify-end mb-2 w-min-content">
+          <Link
+            href="/dashboard/job-descriptions/new"
+            className="flex cursor-pointer">
+            <Button className="items-center flex">
+              <PlusIcon className="h-4 w-4 " />
+              Нэмэх
+            </Button>
+          </Link>
+        </div>
+      )}
       <div className="flex justify-between mb-6">
         <h2 className="text-2xl font-bold min-w-[300px]">
           Ажлын байрны тодорхойлолтууд

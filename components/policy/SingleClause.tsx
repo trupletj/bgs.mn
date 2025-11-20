@@ -12,11 +12,10 @@ import { useState } from "react";
 
 interface SingleClauseProps {
   clause: Clause;
+  isRating?: boolean;
 }
 
-const SingleClause = ({ clause }: SingleClauseProps) => {
-  //   const isRating = await hasAccess("/dashboard/policy/clause/rate", "UPDATE");
-  const isRating = true;
+const SingleClause = ({ clause, isRating }: SingleClauseProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   return (

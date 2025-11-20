@@ -13,6 +13,7 @@ export default async function OrderDetailPage({
 
   try {
     const { data: orderDetails, error } = await getOrderWithDetails(id);
+    // console.log("Fetched order details:", orderDetails);
 
     if (error) {
       console.error("Error fetching order details:", error);

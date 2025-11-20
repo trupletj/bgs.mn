@@ -38,6 +38,8 @@ import ImageViewer from "../image-viewer";
 import {
   OrderFormData,
   OrderItemForm,
+  SPARE_PART_OPTIONS,
+  SparePartType,
   UNIT_OPTIONS,
   UnitType,
 } from "@/types/types";
@@ -60,8 +62,8 @@ export function OrderCreationForm() {
   const [formData, setFormData] = useState<OrderFormData>({
     title: "",
     description: "",
-    order_type: "",
-    urgency_level: "medium",
+    order_type: "other",
+    urgency_level: "",
     requested_delivery_date: "",
     notes: "",
     status: "created_step",
@@ -72,6 +74,7 @@ export function OrderCreationForm() {
       part_name: "",
       quantity: 1,
       unit: "piece",
+      spare_type: "other",
     },
   ]);
 
@@ -125,6 +128,7 @@ export function OrderCreationForm() {
         part_name: "",
         quantity: 1,
         unit: "piece",
+        spare_type: "other",
       },
     ]);
   };
@@ -275,7 +279,7 @@ export function OrderCreationForm() {
                 className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label
                 htmlFor="title"
                 className="text-sm font-medium text-gray-700">
@@ -290,48 +294,64 @@ export function OrderCreationForm() {
                 placeholder="Хангамжийн бараа материал"
                 className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
-            </div>
+            </div> */}
             <div className="space-y-2">
               <Label
-                htmlFor="urgency"
+                // htmlFor="urgency"
                 className="text-sm font-medium text-gray-700">
-                Яаралтай байдлын түвшин
+                Захиалгын төрөл
               </Label>
               <Select
-                value={formData.urgency_level}
+                value={formData.order_type}
                 onValueChange={(
-                  value: "low" | "medium" | "high" | "critical"
-                ) => handleInputChange("urgency_level", value)}>
+                  value:
+                    | "emergency"
+                    | "service"
+                    | "major repairs"
+                    | "safety reserves"
+                    | "other"
+                ) => handleInputChange("order_type", value)}>
                 <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low" className="flex items-center">
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-800 mr-2">
-                      Бага
-                    </Badge>
-                  </SelectItem>
-                  <SelectItem value="medium" className="flex items-center">
-                    <Badge
-                      variant="secondary"
-                      className="bg-yellow-100 text-yellow-800 mr-2">
-                      Дунд
-                    </Badge>
-                  </SelectItem>
-                  <SelectItem value="high" className="flex items-center">
-                    <Badge
-                      variant="secondary"
-                      className="bg-orange-100 text-orange-800 mr-2">
-                      Яаралтай
-                    </Badge>
-                  </SelectItem>
-                  <SelectItem value="critical" className="flex items-center">
+                  <SelectItem value="emergency" className="flex items-center">
                     <Badge
                       variant="secondary"
                       className="bg-red-100 text-red-800 mr-2">
-                      Нэн яаралтай
+                      Яаралтай
+                    </Badge>
+                  </SelectItem>
+                  <SelectItem value="service" className="flex items-center">
+                    <Badge
+                      variant="secondary"
+                      className="bg-yellow-100 text-yellow-800 mr-2">
+                      Үйлчилгээний
+                    </Badge>
+                  </SelectItem>
+                  <SelectItem
+                    value="major repairs"
+                    className="flex items-center">
+                    <Badge
+                      variant="secondary"
+                      className="bg-orange-100 text-orange-800 mr-2">
+                      Их засвар
+                    </Badge>
+                  </SelectItem>
+                  <SelectItem
+                    value="safety reserves"
+                    className="flex items-center">
+                    <Badge
+                      variant="secondary"
+                      className="bg-green-100 text-green-800 mr-2">
+                      Аюулгүйн нөөц
+                    </Badge>
+                  </SelectItem>
+                  <SelectItem value="other" className="flex items-center">
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-100 text-blue-800 mr-2">
+                      Бусад
                     </Badge>
                   </SelectItem>
                 </SelectContent>
@@ -473,6 +493,26 @@ export function OrderCreationForm() {
                         {UNIT_OPTIONS.map((unit) => (
                           <SelectItem key={unit.value} value={unit.value}>
                             {unit.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="mb-1">Сэлбэгийн төрөл *</Label>
+                    <Select
+                      value={item.spare_type}
+                      onValueChange={(value: SparePartType) =>
+                        handleItemChange(index, "spare_type", value)
+                      }>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Сэлбэгийн төрөл сонгох" />
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        {SPARE_PART_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

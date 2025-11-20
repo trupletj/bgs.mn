@@ -57,9 +57,13 @@ interface JobDescriptionData {
 
 interface JobDescriptionDetailProps {
   data: JobDescriptionData;
+  is_edit?: boolean;
 }
 
-export function JobDescriptionDetail({ data }: JobDescriptionDetailProps) {
+export function JobDescriptionDetail({
+  data,
+  is_edit,
+}: JobDescriptionDetailProps) {
   const parseCommunicationScope = (): CommunicationScope => {
     try {
       return data.communication_scope
@@ -112,9 +116,11 @@ export function JobDescriptionDetail({ data }: JobDescriptionDetailProps) {
         <Link href="/dashboard/job-descriptions">
           <Button variant="outline">Буцах</Button>
         </Link>
-        <Link href={`/dashboard/job-descriptions/${data.id}/edit`}>
-          <Button variant="default">Засварлах</Button>
-        </Link>
+        {is_edit && (
+          <Link href={`/dashboard/job-descriptions/${data.id}/edit`}>
+            <Button variant="default">Засварлах</Button>
+          </Link>
+        )}
       </div>
 
       {/* Main Document Card */}

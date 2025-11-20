@@ -57,11 +57,13 @@ interface JobDescriptionData {
 interface JobDescriptionFormProps {
   initialData?: JobDescriptionData;
   isEdit?: boolean;
+  isDelete?: boolean;
 }
 
 export function JobDescriptionForm({
   initialData,
   isEdit = false,
+  isDelete = false,
 }: JobDescriptionFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -207,18 +209,21 @@ export function JobDescriptionForm({
     setIsLoading(true);
 
     try {
-      console.log("Job Description Data:", formData);
-
       let result;
       if (isEdit && formData.id) {
         result = await updateJobDescription(formData.id, formData);
       } else {
         result = await createJobDescription(formData);
       }
-      console.log("submission result:", result);
-      console.log(JSON.stringify(result, null, 2));
+
+      if (!result) {
+        toast.warning(
+          "Таны бүртгэх гэж буй ажлын байрны тодорхойлолт аль хэдийн бүртгэгдсэн байна."
+        );
+        return;
+      }
       if (result.error) {
-        toast.error(`Алдаа гарлаа: ${result.error.message}`);
+        toast.error(`Алдаа гарлаа result error: ${result.error.message}`);
         return;
       }
 
@@ -231,7 +236,7 @@ export function JobDescriptionForm({
       }, 1500);
     } catch (error) {
       console.error("Form submission error:", error);
-      toast.error(`Алдаа гарлаа: ${(error as Error).message}`);
+      toast.error(`Алдаа гарлаа catch: ${(error as Error).message}`);
     } finally {
       setIsLoading(false);
     }
@@ -247,6 +252,10 @@ export function JobDescriptionForm({
 
   const handleDelete = async () => {
     try {
+      if (!isDelete) {
+        toast.error("Танд устгах эрх байхгүй байна.");
+        return;
+      }
       setIsLoading(true);
       await deleteJobDescription(formData.id!); // Устгах үйлдэл
       toast.success("Амжилттай устгагдлаа");
@@ -283,12 +292,14 @@ export function JobDescriptionForm({
           <Button variant="outline" onClick={handleCancel}>
             Буцах
           </Button>
-          <Button
-            variant="outline"
-            className="bg-red-500 hover:bg-red-400"
-            onClick={confirmDelete}>
-            Устгах
-          </Button>
+          {isDelete && (
+            <Button
+              variant="outline"
+              className="bg-red-500 hover:bg-red-400"
+              onClick={confirmDelete}>
+              Устгах
+            </Button>
+          )}
         </div>
       ) : null}
 
