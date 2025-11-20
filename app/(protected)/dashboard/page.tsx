@@ -14,7 +14,7 @@ export default async function Page() {
       requiredRoles: ["monitoring_emp", "super_admin"],
     },
     {
-      title: "Захилга",
+      title: "Захиалга",
       description: "Захиалгын систем",
       href: "/orders",
       icon: ClipboardList,

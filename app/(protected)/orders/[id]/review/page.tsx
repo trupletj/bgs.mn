@@ -5,14 +5,16 @@ import ReviewedOrderDetail from "@/components/reviewed-order";
 import OrderReviewerDetail from "@/components/order-review-detail";
 
 interface ReviewOrderPageProps {
-  params: { id: string };
-  searchParams: { step?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ step?: string }>;
 }
 
 export default async function ReviewOrderPage(props: ReviewOrderPageProps) {
   try {
-    const { id } = await props.params;
-    const { step } = await props.searchParams;
+    const params = await props.params;
+    const searchParams = await props.searchParams;
+    const { id } = params;
+    const { step } = searchParams;
     const profile_id = await getProfileIdFromAuthUserId();
 
     const supabase = createClient();
@@ -26,6 +28,7 @@ export default async function ReviewOrderPage(props: ReviewOrderPageProps) {
       .eq("reviewer_type", step)
       .neq("status", "pending")
       .single();
+
     if (order_reviewer === null) {
       return (
         <div className="container mx-auto py-6">
