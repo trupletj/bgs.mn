@@ -32,3 +32,4 @@
 - Store credentials in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
 - Never commit service-role secrets; if policies change, describe rollback steps alongside the migration.
 - Keep the schema synchronized by running `supabase db diff` before committing SQL updates.
+- Use branch on supabase admin
