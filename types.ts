@@ -36,4 +36,4 @@ export const UNIT_OPTIONS = [
   { value: "roll", label: "Ороомог", type: "count" },
 ] as const;
 
-export type UnitType = (typeof UNIT_OPTIONS)[number]["value"];
+export type UnitOption = (typeof UNIT_OPTIONS)[number];

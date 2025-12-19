@@ -1,4 +1,3 @@
-// components/order-reviewer-detail.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
