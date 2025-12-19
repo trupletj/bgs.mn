@@ -31,12 +31,12 @@ import {
   addOrderItem,
   addTechnicalReviewers,
   deleteImagesFromStorage,
+  createOrderWithInstace,
 } from "@/actions/orders";
 import { TechnicalReviewerSelector } from "../reviewer-selector";
 import ImageUploader from "../image-uploader";
 import ImageViewer from "../image-viewer";
 import {
-  OrderFormData,
   OrderItemForm,
   SPARE_PART_OPTIONS,
   SparePartType,
@@ -44,13 +44,35 @@ import {
   UnitType,
 } from "@/types/types";
 
-export function OrderCreationForm() {
+export interface OrderFormData {
+  title: string;
+  description: string;
+  order_type:
+    | "emergency"
+    | "service"
+    | "major repairs"
+    | "safety reserves"
+    | "other";
+  order_process_id: string;
+  urgency_level: "";
+  requested_delivery_date: string;
+  notes: string;
+  status: string;
+}
+
+interface OrderProcesses {
+  id: string;
+  name: string;
+}
+
+interface OrderProcessesProps {
+  orderProcesses: OrderProcesses[];
+}
+
+export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [selectedTechnicalReviewers, setSelectedTechnicalReviewers] = useState<
-    string[]
-  >([]);
 
   const [pendingImageDeletions, setPendingImageDeletions] = useState<string[]>(
     []
@@ -67,6 +89,7 @@ export function OrderCreationForm() {
     requested_delivery_date: "",
     notes: "",
     status: "created_step",
+    order_process_id: "",
   });
 
   const [orderItems, setOrderItems] = useState<OrderItemForm[]>([
@@ -150,16 +173,10 @@ export function OrderCreationForm() {
       return;
     }
 
-    if (selectedTechnicalReviewers.length === 0) {
-      toast.error("Хамгийн багадаа 1 хянагч сонгоно уу");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      // Create order
-      const { data: order, error: orderError } = await createOrder({
+      const { data: order, error: orderError } = await createOrderWithInstace({
         title: formData.title,
         description: formData.description,
         order_type: formData.order_type,
@@ -167,6 +184,7 @@ export function OrderCreationForm() {
         requested_delivery_date: formData.requested_delivery_date || undefined,
         notes: formData.notes,
         status: formData.status,
+        order_process_id: formData.order_process_id,
       });
 
       if (orderError || !order) {
@@ -189,7 +207,7 @@ export function OrderCreationForm() {
           quantity: item.quantity,
           unit: item.unit,
           notes: item.notes,
-          image_url: imageUrl || "", // Зургийн URL-г оруулах
+          image_url: imageUrl || "",
           spare_type: item.spare_type,
         });
 
@@ -204,11 +222,11 @@ export function OrderCreationForm() {
       }
       console.log("");
 
-      await addTechnicalReviewers(
-        order.id.toString(),
-        selectedTechnicalReviewers,
-        order.status
-      );
+      //   await addTechnicalReviewers(
+      //     order.id.toString(),
+      //     selectedTechnicalReviewers,
+      //     order.status
+      //   );
 
       toast.success(
         `Захиалга #${order.order_number} амжилттай үүсэж хяналтад илгээгдлээ`
@@ -237,25 +255,7 @@ export function OrderCreationForm() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Progress Indicator */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <PackageIcon className="h-8 w-8 text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Тоног төхөөрөмжийн эд ангиудын захиалга үүсгэх
-            </h2>
-            <p className="text-gray-600">
-              Доорх дэлгэрэнгүй мэдээллийг бөглөж эд ангиудын хүсэлтээ үүсгэнэ
-              үү
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="w-full mx-auto space-y-8">
       {/* Захиалгын мэдээлэл */}
       <Card className="shadow-sm border-0 ring-1 ring-gray-200">
         <CardHeader className="bg-gray-50/50 border-b border-gray-200">
@@ -265,37 +265,21 @@ export function OrderCreationForm() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
+          <div className="space-y-2">
+            <Label
+              htmlFor="title"
+              className="text-sm font-medium text-gray-700">
+              Захиалгын гарчиг <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => handleInputChange("title", e.target.value)}
+              placeholder="Жишээ нь: Тоормосны системийн засвар үйлчилгээний сэлбэгүүд"
+              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label
-                htmlFor="title"
-                className="text-sm font-medium text-gray-700">
-                Захиалгын гарчиг <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
-                placeholder="Жишээ нь: Тоормосны системийн засвар үйлчилгээний сэлбэгүүд"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            {/* <div className="space-y-2">
-              <Label
-                htmlFor="title"
-                className="text-sm font-medium text-gray-700">
-                Захиалгын төрөл <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="order_type"
-                value={formData.order_type}
-                onChange={(e) =>
-                  handleInputChange("order_type", e.target.value)
-                }
-                placeholder="Хангамжийн бараа материал"
-                className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div> */}
             <div className="space-y-2">
               <Label
                 // htmlFor="urgency"
@@ -358,6 +342,29 @@ export function OrderCreationForm() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">
+                Захиалгын процесс <span className="text-red-500">*</span>
+              </Label>
+
+              <Select
+                value={formData.order_process_id}
+                onValueChange={(value) =>
+                  handleInputChange("order_process_id", value)
+                }>
+                <SelectTrigger className="h-11 border-gray-300">
+                  <SelectValue placeholder="Процесс сонгох" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {orderProcesses.map((process) => (
+                    <SelectItem key={process.id} value={process.id}>
+                      {process.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -403,14 +410,10 @@ export function OrderCreationForm() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Шаардлагатай сэлбэг, эд ангиуд
-            <Button type="button" onClick={addNewItem} size="sm">
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Сэлбэг нэмэх
-            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {orderItems.map((item, index) => (
               <div
                 key={index}
@@ -564,10 +567,15 @@ export function OrderCreationForm() {
               </div>
             ))}
           </div>
+          <div className="flex justify-end">
+            <Button type="button" onClick={addNewItem} size="sm">
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Сэлбэг нэмэх
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Additional Notes */}
       <Card className="shadow-sm border-0 ring-1 ring-gray-200">
         <CardHeader className="bg-gray-50/50 border-b border-gray-200">
           <CardTitle className="flex items-center space-x-2">
@@ -593,32 +601,6 @@ export function OrderCreationForm() {
           </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Шалгуулалтын үйл явц</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <TechnicalReviewerSelector
-            selectedReviewers={selectedTechnicalReviewers}
-            onReviewersChange={setSelectedTechnicalReviewers}
-            minimumSelection={2}
-            currentStep="created_step"
-          />
-
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-md">
-            <h4 className="font-medium text-amber-800 mb-2">
-              Шалгуулалтын үйл явц:
-            </h4>
-            <ol className="text-sm text-amber-700 list-decimal list-inside space-y-1">
-              <li>Эхлээд сонгосон хянагчид баталгажуулна</li>
-              <li>
-                Бүх хянагчид баталгаажуулсны дараа захиалга дараагийн шатанд
-                орно
-              </li>
-            </ol>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Actions */}
       <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 -mx-6 -mb-6">
@@ -634,15 +616,14 @@ export function OrderCreationForm() {
           <Button
             type="button"
             onClick={() => handleSubmit()}
-            disabled={loading || selectedTechnicalReviewers.length <= 1}
             className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium">
             {loading ? (
               <>
                 <ClockIcon className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
+                Захиалга үүсэж байна...
               </>
             ) : (
-              "Submit for Review"
+              "Захиалгыг үүсгэх"
             )}
           </Button>
         </div>

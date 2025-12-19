@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { getOrderWithDetails } from "@/actions/orders";
-import { OrderDetailView } from "@/components/orders/OrderDetailView";
+import { getOrderWithDetail } from "@/actions/orders";
+import { NewOrderDetailView } from "@/components/orders/order-detail-view";
 
 interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
@@ -12,8 +12,8 @@ export default async function OrderDetailPage({
   const { id } = await params;
 
   try {
-    const { data: orderDetails, error } = await getOrderWithDetails(id);
-    // console.log("Fetched order details:", orderDetails);
+    // const { data: orderDetails, error } = await getOrderWithDetails(id);
+    const { data: orderDetails, error } = await getOrderWithDetail(id);
 
     if (error) {
       console.error("Error fetching order details:", error);
@@ -25,7 +25,8 @@ export default async function OrderDetailPage({
       notFound();
     }
 
-    return <OrderDetailView orderDetails={orderDetails} />;
+    // return <OrderDetailView orderDetails={orderDetails} />;
+    return <NewOrderDetailView orderDetails={orderDetails} />;
   } catch (error) {
     console.error("Unexpected error fetching order:", error);
     notFound();

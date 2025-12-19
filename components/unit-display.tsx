@@ -20,7 +20,7 @@ export function UnitDisplay({ unit, className = "" }: UnitDisplayProps) {
   return <span className={className}>{unitConfig.label}</span>;
 }
 
-interface UnitSpareProps {
+export interface UnitSpareProps {
   unit: SparePartType;
   className?: string;
 }

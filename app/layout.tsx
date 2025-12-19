@@ -3,13 +3,11 @@ import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
-
 const montserrat = Montserrat({
   weight: "400",
   subsets: ["cyrillic", "latin"],
-  display: "swap"
+  display: "swap",
 });
-
 
 export const metadata: Metadata = {
   title: "BGS system",
@@ -21,14 +19,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  
   return (
     <html lang="en">
-      <body
-        className={montserrat.className}
-      >
+      <body className={montserrat.className}>
         {children}
-        <Toaster />
+        <Toaster richColors />
       </body>
     </html>
   );

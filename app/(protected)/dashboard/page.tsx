@@ -9,7 +9,7 @@ export default async function Page() {
     {
       title: "Журам, үнэлгээ",
       description: "Бодлого, журмын систем",
-      href: "/policy",
+      href: "/t-info",
       icon: FileText,
       requiredRoles: ["monitoring_emp", "super_admin"],
     },

@@ -1,4 +1,3 @@
-// app/orders/[id]/review/page.tsx
 import { createClient } from "@/utils/supabase/client";
 import { getProfileIdFromAuthUserId } from "@/actions/review";
 import ReviewedOrderDetail from "@/components/reviewed-order";
@@ -19,7 +18,6 @@ export default async function ReviewOrderPage(props: ReviewOrderPageProps) {
 
     const supabase = createClient();
 
-    // Order reviewers-г шалгах
     const { data: order_reviewer, error } = await supabase
       .from("order_reviewers")
       .select("*")
