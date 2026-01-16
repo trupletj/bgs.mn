@@ -65,7 +65,6 @@ export default function RateOrderForm({
         setCurrentStep(reviewer.order_steps as unknown as OrderStep);
       }
 
-      // 2. Order instance + order + created profile мэдээлэл авах
       const { data: instance, error: instanceError } = await supabase
         .from("order_instances")
         .select(

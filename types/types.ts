@@ -179,6 +179,10 @@ export interface Policy {
   section: Section[];
 }
 
+export function getUnitOptionLabel(value?: string) {
+  return UNIT_OPTIONS.find((u) => u.value === value)?.label || "Ширхэг";
+}
+
 export const UNIT_OPTIONS = [
   { value: "piece", label: "Ширхэг", type: "count" },
   { value: "meter", label: "Метр (м)", type: "length" },
@@ -193,6 +197,10 @@ export const UNIT_OPTIONS = [
 ] as const;
 
 export type UnitType = (typeof UNIT_OPTIONS)[number]["value"];
+
+export function getSparePartLabel(value?: string) {
+  return SPARE_PART_OPTIONS.find((u) => u.value === value)?.label || "Бусад";
+}
 
 export const SPARE_PART_OPTIONS = [
   { value: "safety_equipment", label: "Аюулгүй ажиллагааны тоноглол" },

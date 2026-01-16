@@ -36,7 +36,9 @@ export async function getOrderWithDetail(orderId: string) {
   // 2. Order items
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
-    .select("id, part_name, part_number, quantity, unit, spare_type")
+    .select(
+      "id, part_name, part_number, quantity, final_quantity, unit, spare_type"
+    )
     .eq("order_id", orderId)
     .order("id");
 
@@ -82,7 +84,10 @@ export async function getOrderWithDetail(orderId: string) {
   }
 
   const latestInstance = instances?.[0];
-  let reviewers = latestInstance?.order_step_reviewers || [];
+  let reviewers =
+    latestInstance?.order_step_reviewers?.filter(
+      (r: any) => r.status !== "skipped"
+    ) || [];
 
   // 4. Sub_order_item-үүдийг тусдаа авч, reviewer-т тааруулах
   if (latestInstance) {

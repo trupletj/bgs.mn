@@ -72,7 +72,7 @@ export function OrdersList({ orders }: Props) {
   const formatStatus = (status: string) => {
     const statusTranslations: { [key: string]: string } = {
       rejected: "Татгалзсан",
-      changed_requested: "Утга өөрчлөгдсөн",
+      changes_requested: "Өөрчлөлттэй батлагдсан",
       approved: "Батлагдсан",
     };
 

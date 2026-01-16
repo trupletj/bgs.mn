@@ -41,7 +41,6 @@ export function RequestedList({ profile_id }: ReviewRequestProp) {
       setLoading(true);
       setError(null);
       const data = await getAwaitingOrders(profile_id);
-      console.log("Fetched data:", data);
       setReviewRequests(data || []);
     } catch (error) {
       console.error("Error fetching review requests:", error);
