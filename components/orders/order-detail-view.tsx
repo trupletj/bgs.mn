@@ -16,6 +16,7 @@ import {
 import { UNIT_OPTIONS } from "@/types";
 import ImageViewer from "@/components/image-viewer";
 import { OrderWorkflow } from "./order-workflow";
+import { getSparePartLabel } from "@/types/types";
 
 interface NewOrderDetailViewProps {
   orderDetails: {
@@ -53,26 +54,45 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
   function formatDate(dateString: string) {
     const date = new Date(dateString);
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padEnd(2, "0");
-    const day = String(date.getDate()).padEnd(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     return `${year} он ${month} сар ${day} өдөр`;
   }
 
-  const getStatusBadge = (status: string) => {
-    const map: Record<string, { label: string; variant: any }> = {
-      completed: { label: "Дууссан", variant: "default" },
-      rejected: { label: "Татгалзсан", variant: "destructive" },
-      pending: { label: "Хүлээгдэж байна", variant: "secondary" },
-      default: { label: status, variant: "outline" },
+  const getStatusBadge = (status?: string) => {
+    const map: Record<
+      string,
+      {
+        label: string;
+        variant: "default" | "secondary" | "destructive" | "outline";
+      }
+    > = {
+      approved: {
+        label: "Батлагдсан",
+        variant: "default",
+      },
+      changes_requested: {
+        label: "Өөрчлөлттэй батлагдсан",
+        variant: "secondary",
+      },
+      rejected: {
+        label: "Татгалзсан",
+        variant: "destructive",
+      },
     };
-    const s = map[status?.toLowerCase()] || map.default;
+
+    const s = map[status ?? ""] || {
+      label: status ?? "Тодорхойгүйлгүй",
+      variant: "outline",
+    };
+
     return <Badge variant={s.variant}>{s.label}</Badge>;
   };
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
-      <Link href="/orders" className="inline-block mb-6">
+      <Link href="/orders/list" className="inline-block mb-6">
         <Button variant="outline" size="sm">
           <ArrowLeft className="h-4 w-4 mr-2" /> Буцах
         </Button>
@@ -81,7 +101,7 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
       <div className="mb-8 flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold mb-2">{order.title}</h1>
-          <p className="text-muted-foreground">#{order.order_number}</p>
+          {/* <p className="text-muted-foreground">#{order.order_number}</p> */}
         </div>
         {getStatusBadge(order.status)}
       </div>
@@ -140,14 +160,35 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         <Badge variant="outline">
                           {item.quantity}{" "}
                           {UNIT_OPTIONS.find((u) => u.value === item.unit)
                             ?.label || item.unit}
                         </Badge>
+                      </TableCell> */}
+                      <TableCell>
+                        {order.status === "approved" ||
+                        order.status === "changes_requested" ? (
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="default">
+                              Батлагдсан: {item.final_quantity ?? item.quantity}
+                            </Badge>
+
+                            {item.final_quantity !== item.quantity && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                Анх захиалсан: {item.quantity}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="outline">{item.quantity}</Badge>
+                        )}
                       </TableCell>
-                      <TableCell>{item.spare_type}</TableCell>
+
+                      <TableCell>
+                        {getSparePartLabel(item.spare_type)}
+                      </TableCell>
                       <TableCell>
                         {item.image_url ? (
                           <ImageViewer images={[item.image_url]} />

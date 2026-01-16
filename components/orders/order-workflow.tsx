@@ -14,6 +14,8 @@ import {
   MessageSquare,
   ArrowRight,
 } from "lucide-react";
+import { UNIT_OPTIONS } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface Reviewer {
   id: number;
@@ -36,7 +38,7 @@ interface OrderWorkflowProps {
 }
 
 export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const sorted = [...reviewers].sort((a, b) =>
     a.order_steps?.step_order && b.order_steps?.step_order
@@ -47,13 +49,26 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
   const getIcon = (status: string) => {
     switch (status) {
       case "approved":
-        return <CheckCircle className="h-6 w-6 text-green-600" />;
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
       case "rejected":
-        return <XCircle className="h-6 w-6 text-red-600" />;
+        return <XCircle className="h-5 w-5 text-red-600" />;
       case "changes_requested":
-        return <AlertCircle className="h-6 w-6 text-yellow-600" />;
+        return <AlertCircle className="h-5 w-5 text-amber-600" />;
       default:
-        return <Clock className="h-6 w-6 text-blue-600" />;
+        return <Clock className="h-5 w-5 text-blue-600" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "text-green-700 bg-green-50 border-green-200";
+      case "rejected":
+        return "text-red-700 bg-red-50 border-red-200";
+      case "changes_requested":
+        return "text-amber-700 bg-amber-50 border-amber-200";
+      default:
+        return "text-blue-700 bg-blue-50 border-blue-200";
     }
   };
 
@@ -70,24 +85,43 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
   };
 
   function formatDate(dateString: string) {
+    if (!dateString) return "Оноогдоогүй";
     const date = new Date(dateString);
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padEnd(2, "0");
-    const day = String(date.getDate()).padEnd(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
-    return `${year} он ${month} сар ${day} өдөр`;
+    return `${year}-${month}-${day}`;
   }
 
+  const getUnitLabel = (unit: string) => {
+    const unitOption = UNIT_OPTIONS.find((option) => option.value === unit);
+    return unitOption ? unitOption.label : unit;
+  };
+
+  const toggleExpanded = (id: number) => {
+    const newExpanded = new Set(expanded);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpanded(newExpanded);
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Баталгаажуулалтын явц</CardTitle>
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg font-semibold">
+          Баталгаажуулалтын явц
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {sorted.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
-            Явцын түүх байхгүй
-          </p>
+          <div className="text-center py-8 text-muted-foreground border rounded-lg">
+            <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>Явцын түүх байхгүй</p>
+          </div>
         ) : (
           <div className="space-y-4">
             {sorted.map((r, i) => {
@@ -96,94 +130,123 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                 `Алхам ${r.order_steps?.step_order || i + 1}`;
               const hasChanges =
                 r.sub_order_items && r.sub_order_items.length > 0;
-              const isExpanded = expanded === r.id;
+              const isExpanded = expanded.has(r.id);
+              // const hasComments = r.comments?.trim().length > 0;
 
               return (
-                <div key={r.id}>
-                  {i > 0 && (
-                    <div className="ml-8 border-l-2 border-muted h-8" />
-                  )}
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start p-4 hover:bg-muted/50"
-                    onClick={() => setExpanded(isExpanded ? null : r.id)}>
-                    <div className="flex gap-4 w-full items-start">
+                <div
+                  key={r.id}
+                  className={cn(
+                    "border rounded-lg transition-all duration-200",
+                    isExpanded
+                      ? "ring-2 ring-primary/10"
+                      : "hover:border-primary/50",
+                    getStatusColor(r.status || "pending")
+                  )}>
+                  <div
+                    className={cn(
+                      "flex items-start gap-3 p-4 cursor-pointer",
+                      hasChanges && "pb-3"
+                    )}
+                    onClick={() => toggleExpanded(r.id)}>
+                    <div className="flex-shrink-0 mt-0.5">
                       {getIcon(r.status || "pending")}
-                      <div className="flex-1 text-left">
-                        <div className="font-medium">{stepName}</div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          <User className="inline h-4 w-4 mr-1" />
-                          {r.profile?.name || "Нэр байхгүй"}
-                          {r.profile?.position_name &&
-                            ` (${r.profile.position_name})`}
-                        </div>
-                        <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                          <span>
-                            Оноосон: {formatDate(r.reviewed_at || "")}
-                          </span>
-                          {r.reviewed_at && (
-                            <span>Шалгасан: {formatDate(r.reviewed_at)}</span>
-                          )}
-                        </div>
-                        <div className="flex gap-2 mt-2">
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h3 className="font-medium text-sm">{stepName}</h3>
+                        <div className="flex items-center gap-2">
                           {getBadge(r.status || "pending")}
                           {hasChanges && (
-                            <Badge variant="secondary">
-                              {hasChanges} өөрчлөлт
-                            </Badge>
+                            <ChevronDown
+                              className={cn(
+                                "h-4 w-4 text-muted-foreground transition-transform flex-shrink-0",
+                                isExpanded && "rotate-180"
+                              )}
+                            />
                           )}
-                          <ChevronDown
-                            className={`ml-auto h-4 w-4 transition-transform ${
-                              isExpanded ? "rotate-180" : ""
-                            }`}
-                          />
                         </div>
                       </div>
-                    </div>
-                  </Button>
 
-                  {isExpanded && (
-                    <div className="ml-12 mt-2 space-y-4 pb-4">
-                      {hasChanges && (
-                        <div>
-                          <h4 className="font-medium mb-2">Өөрчлөлтүүд</h4>
-                          {r.sub_order_items?.map((sub) => {
-                            const orig = items.find(
-                              (it) => it.id === sub.order_item_id
-                            );
-                            return (
-                              <div
-                                key={sub.id}
-                                className="p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded border border-yellow-200">
-                                <p className="font-medium">{orig?.part_name}</p>
-                                <div className="flex items-center gap-4 mt-2">
-                                  <span>
-                                    {orig?.quantity} {orig?.unit}
-                                  </span>
-                                  <ArrowRight className="h-4 w-4" />
-                                  <span className="font-semibold">
-                                    {sub.quantity} {orig?.unit}
-                                  </span>
-                                </div>
-                                {sub.description && (
-                                  <p className="text-sm mt-1 italic">
-                                    {sub.description}
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })}
+                      <div className="flex items-center gap-2 text-xs  mb-2">
+                        <User className="h-3.5 w-3.5" />
+                        <span>{r.profile?.name || "Нэр байхгүй"}</span>
+                        {r.profile?.position_name && (
+                          <>
+                            <span className="text-muted-foreground/50">•</span>
+                            <span>{r.profile.position_name}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="">Оноосон:</span>
+                          <span className="font-medium">
+                            {formatDate(r.reviewed_at || "")}
+                          </span>
                         </div>
-                      )}
-                      {r.comments && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <MessageSquare className="h-4 w-4" />
-                            <span className="font-medium">Тайлбар</span>
+                        {r.reviewed_at && (
+                          <>
+                            <div className="w-px h-3 bg-border" />
+                            <div className="flex items-center gap-1">
+                              <span className="">Шалгасан:</span>
+                              <span className="font-medium">
+                                {formatDate(r.reviewed_at)}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isExpanded && hasChanges && (
+                    <div className="px-4 pb-4 pt-0 space-y-4">
+                      {hasChanges && (
+                        <div className="mt-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="h-px flex-1 bg-border" />
+                            <span className="text-xs font-medium px-2">
+                              Өөрчлөлтүүд
+                            </span>
+                            <div className="h-px flex-1 bg-border" />
                           </div>
-                          <p className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded">
-                            {r.comments}
-                          </p>
+                          <div className="space-y-2">
+                            {r.sub_order_items?.map((sub) => {
+                              const orig = items.find(
+                                (it) => it.id === sub.order_item_id
+                              );
+                              return (
+                                <div
+                                  key={sub.id}
+                                  className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded border border-yellow-300 dark:border-yellow-800/30">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="font-medium text-sm">
+                                      {orig?.part_name}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-muted-foreground">
+                                        {orig?.quantity}{" "}
+                                        {getUnitLabel(orig?.unit || "")}
+                                      </span>
+                                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="font-semibold text-amber-700">
+                                        {sub.quantity}{" "}
+                                        {getUnitLabel(orig?.unit || "")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {sub.description && (
+                                    <p className="text-xs text-muted-foreground mt-1 pl-1 border-l-2 border-amber-300 dark:border-amber-700">
+                                      {sub.description}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>

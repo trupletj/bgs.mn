@@ -19,7 +19,6 @@ export async function submitReview(params: SubmitReviewParams) {
   const supabase = createClient();
 
   try {
-    // 1. Бүх шаардлагатай шалгалтыг нэг дор хийх (хурдан, найдвартай)
     const checks = await performChecks(params);
     if (!checks.success) {
       return { success: false, error: checks.error };
@@ -32,7 +31,6 @@ export async function submitReview(params: SubmitReviewParams) {
       reviewer_role_id,
     } = checks;
 
-    // 2. Өөрийн review-г шинэчлэх
     const { error: updateError } = await supabase
       .from("order_step_reviewers")
       .update({
@@ -113,9 +111,7 @@ export async function submitReview(params: SubmitReviewParams) {
     }
 
     // Revalidate
-    revalidatePath(`/orders/${order_id}/review`);
-    revalidatePath("/dashboard");
-    revalidatePath("/orders");
+    revalidatePath(`/orders/list`);
 
     return { success: true };
   } catch (error) {
@@ -304,13 +300,19 @@ async function checkAndMoveToNextStep({
 
   if (approvedRoles.size < required_approval_count) return;
 
-  await moveToNextStep(order_instance_id, order_step_id, current_step_order);
+  await moveToNextStep(
+    order_instance_id,
+    order_step_id,
+    current_step_order,
+    required_approval_count
+  );
 }
 
 async function moveToNextStep(
   order_instance_id: number,
   current_step_id: number,
-  current_step_order: number
+  current_step_order: number,
+  required_approval_count: number
 ) {
   const supabase = createClient();
 
@@ -330,7 +332,7 @@ async function moveToNextStep(
     .maybeSingle();
 
   if (!nextStep) {
-    // Сүүлийн алхам → completed
+    // Сүүлийн алхам үед энд ирнэ
     await supabase
       .from("order_instances")
       .update({
@@ -338,6 +340,7 @@ async function moveToNextStep(
         completed_at: new Date().toISOString(),
       })
       .eq("id", order_instance_id);
+    finalizeOrder(order_instance_id);
     return;
   }
 
@@ -347,54 +350,157 @@ async function moveToNextStep(
     .update({ current_step_order: current_step_order + 1 })
     .eq("id", order_instance_id);
 
-  await createNextStepReviewers(order_instance_id, nextStep.id);
+  await createNextStepReviewers(
+    order_instance_id,
+    nextStep.id,
+    required_approval_count
+  );
 }
 
 async function createNextStepReviewers(
   order_instance_id: number,
-  next_step_id: number
+  next_step_id: number,
+  required_approval_count: number
 ) {
   const supabase = createClient();
 
-  const { data: roles, error: rolesError } = await supabase
+  //дараагийн шатны бүх role-уудаа авна
+  const { data: roles } = await supabase
     .from("order_step_roles")
     .select("role_id")
     .eq("order_step_id", next_step_id);
 
-  if (rolesError || !roles || roles.length === 0) {
-    throw new Error("Дараагийн алхамд role тодорхойлогдоогүй байна"); // Throw хэвээр, учир нь энэ unexpected (config алдаа)
+  if (!roles || roles.length === 0) {
+    throw new Error("Дараагийн алхамд role тодорхойлогдоогүй байна");
   }
 
-  const allReviewers: any[] = [];
+  // profile_id -> Set<role_id>
+  const reviewerMap = new Map<number, Set<number>>();
 
   for (const { role_id } of roles) {
-    const { data: profiles, error: profilesError } = await supabase
+    //role бүрт хамаарах хэрэглэгчдийг авна
+    const { data: profiles } = await supabase
       .from("roles_profiles")
       .select("profile_id")
       .eq("role_id", role_id);
 
-    if (profilesError || !profiles || profiles.length === 0) {
-      throw new Error(`Role ID ${role_id}-д хэрэглэгч олдсонгүй`); // Throw хэвээр
+    if (!profiles || profiles.length === 0) {
+      throw new Error(`Role ID ${role_id}-д хэрэглэгч олдсонгүй`);
     }
 
-    profiles.forEach((p) => {
-      allReviewers.push({
-        order_instance_id,
-        order_step_id: next_step_id,
-        reviewer_profile_id: p.profile_id,
-        status: "pending",
-        role_id,
-      });
-    });
+    for (const { profile_id } of profiles) {
+      if (!profile_id) continue;
+      if (!reviewerMap.has(profile_id)) {
+        reviewerMap.set(profile_id, new Set());
+      }
+      reviewerMap.get(profile_id)!.add(role_id);
+    }
   }
 
-  if (allReviewers.length === 0) {
-    throw new Error("Дараагийн алхамд шалгагч үүсгэх боломжгүй");
+  const reviewers = Array.from(reviewerMap.entries())
+    .filter(([profile_id]) => profile_id !== null)
+    .map(([profile_id, roleIds]) => ({
+      order_instance_id,
+      order_step_id: next_step_id,
+      reviewer_profile_id: profile_id,
+      role_id: Math.min(...Array.from(roleIds)),
+      status: "pending",
+    }));
+
+  if (reviewers.length < required_approval_count) {
+    throw new Error(
+      "Дараагийн алхамд шаардлагатай шалгагчдын тоо хүрэлцэхгүй байна"
+    );
   }
 
-  const { error: insertError } = await supabase
+  const { error } = await supabase
     .from("order_step_reviewers")
-    .insert(allReviewers);
+    .insert(reviewers);
 
-  if (insertError) throw insertError;
+  if (error) throw error;
+}
+
+async function finalizeOrder(order_instance_id: number) {
+  const supabase = createClient();
+
+  const { data: instance, error: instanceError } = await supabase
+    .from("order_instances")
+    .select("order_id, order_process_id")
+    .eq("id", order_instance_id)
+    .single();
+
+  if (instanceError || !instance) {
+    throw new Error("Instance олдсонгүй");
+  }
+
+  const { order_id, order_process_id } = instance;
+
+  /* FINAL STEP (хамгийн сүүлийн STEP) */
+  const { data: finalStep, error: stepError } = await supabase
+    .from("order_steps")
+    .select("id")
+    .eq("order_process_id", order_process_id)
+    .order("step_order", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (stepError || !finalStep) {
+    throw new Error("Final step олдсонгүй");
+  }
+
+  const final_step_id = finalStep.id;
+
+  /* Order items (анхны + өмнөх final_quantity)      */
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("id, quantity, final_quantity")
+    .eq("order_id", order_id);
+
+  if (itemsError || !items) return;
+
+  /* FINAL STEP дээрх sub_order_item-үүд              */
+  const { data: subs, error: subsError } = await supabase
+    .from("sub_order_item")
+    .select("order_item_id, quantity")
+    .eq("order_instance_id", order_instance_id)
+    .eq("order_step_id", final_step_id);
+
+  if (subsError) {
+    throw new Error("Final sub_order_item уншиж чадсангүй");
+  }
+  const finalMap = new Map<number, number>();
+
+  for (const sub of subs || []) {
+    finalMap.set(sub.order_item_id, sub.quantity);
+  }
+
+  for (const item of items) {
+    const finalQty =
+      finalMap.get(item.id) ?? // final step дээр өөрчилсөн
+      item.final_quantity ?? // өмнө батлагдсан
+      item.quantity; // анхны
+
+    await supabase
+      .from("order_items")
+      .update({ final_quantity: finalQty })
+      .eq("id", item.id);
+  }
+
+  const hasChanges = subs && subs.length > 0;
+
+  const finalOrderStatus = hasChanges ? "changes_requested" : "approved";
+
+  await supabase
+    .from("orders")
+    .update({ status: finalOrderStatus })
+    .eq("id", order_id);
+
+  //Ижилхэн finalOrderStatus-тай болгох хэрэгтэй байх гэхдээ ялгаатай байлгая
+  await supabase
+    .from("order_instances")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", order_instance_id);
 }

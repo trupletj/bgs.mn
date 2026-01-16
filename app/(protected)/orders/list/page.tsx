@@ -27,7 +27,7 @@ export default async function OrdersPage() {
               Та өөрийн илгээсэн захиалгуудаа доорх жагсаалтаас харах боломжтой.
             </p>
           </div>
-          <Link href="/orders/new">
+          <Link href="/orders/add">
             <Button>
               <PlusIcon className="h-4 w-4 mr-2" />
               Захиалга үүсгэх
