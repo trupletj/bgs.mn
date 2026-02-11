@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { mn } from "date-fns/locale";
+import { StatusFlow } from "./status-flow";
 
 interface StatusHistoryItem {
   id: string;
@@ -28,16 +29,17 @@ interface StatusHistoryItem {
 
 interface StatusHistoryProps {
   orderId: string;
+  refreshKey?: number;
 }
 
-export function StatusHistory({ orderId }: StatusHistoryProps) {
+export function StatusHistory({ orderId, refreshKey }: StatusHistoryProps) {
   const supabase = createClient();
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStatusHistory();
-  }, [orderId]);
+  }, [orderId, refreshKey]);
 
   async function fetchStatusHistory() {
     try {
@@ -53,10 +55,10 @@ export function StatusHistory({ orderId }: StatusHistoryProps) {
           profile:changed_by(
             name
           )
-        `
+        `,
         )
         .eq("order_id", orderId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
 
@@ -113,40 +115,50 @@ export function StatusHistory({ orderId }: StatusHistoryProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Статус өөрчлөлтийн түүх</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Хуучин статус</TableHead>
-              <TableHead>Шинэ статус</TableHead>
-              <TableHead>Шалтгаан</TableHead>
-              <TableHead>Хэн</TableHead>
-              <TableHead>Хэзээ</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {history.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{getStatusBadge(item.old_status)}</TableCell>
-                <TableCell>{getStatusBadge(item.new_status)}</TableCell>
-                <TableCell className="max-w-[200px]">
-                  {item.reason || "-"}
-                </TableCell>
-                <TableCell>{item.profile?.name || "Систем"}</TableCell>
-                <TableCell>
-                  {format(new Date(item.created_at), "yyyy-MM-dd HH:mm", {
-                    locale: mn,
-                  })}
-                </TableCell>
+    <div>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Статусын урсгал</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <StatusFlow history={history} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Статус өөрчлөлтийн түүх</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Хуучин статус</TableHead>
+                <TableHead>Шинэ статус</TableHead>
+                <TableHead>Шалтгаан</TableHead>
+                <TableHead>Хэн</TableHead>
+                <TableHead>Хэзээ</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {history.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>{getStatusBadge(item.old_status)}</TableCell>
+                  <TableCell>{getStatusBadge(item.new_status)}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    {item.reason || "-"}
+                  </TableCell>
+                  <TableCell>{item.profile?.name || "Систем"}</TableCell>
+                  <TableCell>
+                    {format(new Date(item.created_at), "yyyy-MM-dd HH:mm", {
+                      locale: mn,
+                    })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { revalidatePath } from "next/cache";
+import { getProfileIdFromAuthUserId } from "./review";
 
 export interface OrderProcessFormData {
   name: string;
@@ -54,7 +55,7 @@ interface OrderProcess {
 }
 
 export async function createOrderProcess(
-  formData: OrderProcessFormData
+  formData: OrderProcessFormData,
 ): Promise<OrderProcessResult> {
   const supabase = createClient();
 
@@ -108,7 +109,7 @@ export async function createOrderProcess(
 
 export async function updateOrderProcess(
   id: number,
-  formData: OrderProcessFormData
+  formData: OrderProcessFormData,
 ): Promise<OrderProcessResult> {
   const supabase = createClient();
 
@@ -207,7 +208,7 @@ export async function updateOrderProcess(
 }
 
 export async function getOrderProcess(
-  id: number
+  id: number,
 ): Promise<OrderProcess | null> {
   const supabase = createClient();
 
@@ -236,7 +237,7 @@ export async function getOrderProcess(
             display_name
           )
         )
-      `
+      `,
       )
       .eq("order_process_id", id)
       .order("step_order");
@@ -273,7 +274,7 @@ export async function getOrderProcesses() {
 
     if (error) {
       throw new Error(
-        error.message + "захиалгын төрлүүдийг татах үед алдаа гарлаа"
+        error.message + "захиалгын төрлүүдийг татах үед алдаа гарлаа",
       );
     }
 
@@ -288,7 +289,7 @@ export async function getOrderProcesses() {
 }
 
 export async function deleteOrderProcess(
-  id: number
+  id: number,
 ): Promise<OrderProcessResult> {
   const supabase = createClient();
 
@@ -309,4 +310,49 @@ export async function deleteOrderProcess(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+export async function updateOrderManagementStatus({
+  orderId,
+  newStatus,
+  reason,
+  currentOrderStatus,
+  currentManagementStatus,
+}: {
+  orderId: string;
+  newStatus: string;
+  reason?: string;
+  currentOrderStatus?: string | null;
+  currentManagementStatus?: string | null;
+}) {
+  const supabase = createClient();
+
+  const profileId = await getProfileIdFromAuthUserId();
+
+  const oldStatus = currentManagementStatus ?? currentOrderStatus;
+
+  if (!oldStatus) {
+    throw new Error("Өмнөх статус тодорхойгүй байна");
+  }
+
+  const { error: orderError } = await supabase
+    .from("orders")
+    .update({ management_status: newStatus })
+    .eq("id", orderId);
+
+  if (orderError) throw orderError;
+
+  const { error: historyError } = await supabase
+    .from("order_status_history")
+    .insert({
+      order_id: orderId,
+      old_status: oldStatus,
+      new_status: newStatus,
+      reason: reason?.trim() || null,
+      changed_by: profileId,
+    });
+
+  if (historyError) throw historyError;
+
+  return { success: true };
 }
