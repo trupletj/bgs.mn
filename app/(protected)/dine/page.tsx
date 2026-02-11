@@ -1,60 +1,32 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  FileText,
-  Briefcase,
-  ClipboardList,
-  User2,
-  Users,
-  CookingPot,
-} from "lucide-react";
+import { Briefcase, ClipboardList, ChefHat } from "lucide-react";
 import { hasRole } from "@/actions/rbac";
 
 export default async function Page() {
   // Системүүдийн жагсаалтыг ролуудтай нь хамт тодорхойлох
   const systems = [
     {
-      title: "Журам, үнэлгээ",
-      description: "Бодлого, журмын систем",
-      href: "/t-info",
-      icon: FileText,
-      requiredRoles: ["monitoring_emp", "super_admin"],
-    },
-    {
-      title: "Захиалга",
-      description: "Захиалгын систем",
-      href: "/orders",
-      icon: ClipboardList,
-      requiredRoles: ["hr_emp", "monitoring_emp", "super_admin"], // Бүх хүнд харагдана
-    },
-    {
-      title: "Ажлын байрны тодорхойлолт",
-      description: "Ажлын байрны тодорхойлолт",
-      href: "/dashboard/job-descriptions",
-      icon: Briefcase,
-      requiredRoles: ["hr_emp", "super_admin"],
-    },
-    {
-      title: "Админ",
-      description: "Эрхийн тохиргоо",
-      href: "/admin",
-      icon: User2,
+      title: "Гал тогоо",
+      description: "Гал тогооны жагсаалт",
+      href: "/dine/list",
+      icon: ChefHat,
       requiredRoles: ["super_admin"],
     },
-    {
-      title: "Ажилчид",
-      description: "Ажилчдын мэдээлэл",
-      href: "/employees",
-      icon: Users,
-      requiredRoles: ["super_admin"],
-    },
-    {
-      title: "Гал тогооны систем",
-      description: "Гал тогооны систем",
-      href: "/dine",
-      icon: CookingPot,
-      requiredRoles: ["super_admin"],
-    },
+    // {
+    //   title: "Захиалга",
+    //   description: "Захиалгын систем",
+    //   href: "/orders",
+    //   icon: ClipboardList,
+    //   requiredRoles: ["hr_emp", "monitoring_emp", "super_admin"], // Бүх хүнд харагдана
+    // },
+    // {
+    //   title: "Ажлын байрны тодорхойлолт",
+    //   description: "Ажлын байрны тодорхойлолт",
+    //   href: "/dashboard/job-descriptions",
+    //   icon: Briefcase,
+    //   requiredRoles: ["hr_emp", "super_admin"],
+    // },
   ];
 
   // Хэрэглэгчид хандах эрхтэй системүүдийг шүүх
@@ -80,13 +52,13 @@ export default async function Page() {
         </div>
 
         {accessibleSystems.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-4 justify-center">
+          <div className="grid gap-6 md:grid-cols-3 justify-center">
             {accessibleSystems.map((system) => {
               const Icon = system.icon;
               return (
                 <Link key={system.href} href={system.href} className="group">
                   <Card className="h-full transition-all hover:shadow-lg hover:border-primary">
-                    <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                    <CardContent className="flex flex-col items-center justify-center p-8 text-center">
                       <div className="mb-4 rounded-full bg-primary/10 p-6 transition-colors group-hover:bg-primary/20">
                         <Icon className="h-12 w-12 text-primary" />
                       </div>

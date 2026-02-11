@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { StatusHistory } from "@/components/orders/status-history";
+import { updateOrderManagementStatus } from "@/actions/order-process";
 
 const MANAGEMENT_STATUS_OPTIONS = [
   { value: "pending", label: "Хүлээгдэж байна" },
@@ -30,12 +31,14 @@ export default function OrderManagementPage() {
   const params = useParams();
   const supabase = createClient();
   const orderId = params.id as string;
+  const router = useRouter();
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [newManagementStatus, setNewManagementStatus] = useState("");
   const [reason, setReason] = useState("");
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   useEffect(() => {
     fetchOrder();
@@ -49,7 +52,7 @@ export default function OrderManagementPage() {
           `
           *,
           profile:created_profile(*)
-        `
+        `,
         )
         .eq("id", orderId)
         .single();
@@ -73,41 +76,20 @@ export default function OrderManagementPage() {
 
     setUpdating(true);
     try {
-      const oldStatus = order?.management_status || null;
-
-      // 1. Order-ын management_status өөрчлөх
-      const { error: orderError } = await supabase
-        .from("orders")
-        .update({ management_status: newManagementStatus })
-        .eq("id", orderId);
-
-      if (orderError) throw orderError;
-
-      // 2. Status history хадгалах
-      const { error: historyError } = await supabase
-        .from("status_history")
-        .insert({
-          order_id: orderId,
-          status_type: "management",
-          old_status: oldStatus,
-          new_status: newManagementStatus,
-          reason: reason.trim() || null,
-        });
-
-      if (historyError) throw historyError;
-
-      toast.success("Удирдлагын статус амжилттай шинэчлэгдлээ");
-
-      // 3. State шинэчлэх
-      setOrder({
-        ...order,
-        management_status: newManagementStatus,
+      await updateOrderManagementStatus({
+        orderId,
+        newStatus: newManagementStatus,
+        reason,
+        currentOrderStatus: order?.status,
+        currentManagementStatus: order?.management_status,
       });
 
+      toast.success("Удирдлагын статус амжилттай шинэчлэгдлээ");
+      setHistoryRefreshKey((k) => k + 1);
       setReason("");
     } catch (err: any) {
       console.error(err);
-      toast.error("Статус шинэчлэхөд алдаа гарлаа");
+      toast.error(err.message || "Статус шинэчлэхэд алдаа гарлаа");
     } finally {
       setUpdating(false);
     }
@@ -150,7 +132,7 @@ export default function OrderManagementPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Захиалгын удирдлага</h1>
         <Button asChild variant="outline">
-          <a href={`/orders/${orderId}`}>Ерөнхий мэдээлэл рүү буцах</a>
+          <a href={`/orders/manage`}>Ерөнхий мэдээлэл рүү буцах</a>
         </Button>
       </div>
 
@@ -185,14 +167,14 @@ export default function OrderManagementPage() {
                   order.status === "approved"
                     ? "default"
                     : order.status === "changes_requested"
-                    ? "outline"
-                    : "secondary"
+                      ? "outline"
+                      : "secondary"
                 }>
                 {order.status === "approved"
                   ? "Баталгаажсан"
                   : order.status === "changes_requested"
-                  ? "Өөрчлөгдөж батлагдсан"
-                  : order.status}
+                    ? "Өөрчлөгдөж батлагдсан"
+                    : order.status}
               </Badge>
             </div>
             <div>
@@ -205,13 +187,13 @@ export default function OrderManagementPage() {
                     order.management_status === "completed"
                       ? "default"
                       : order.management_status === "processing"
-                      ? "secondary"
-                      : order.management_status === "cancelled"
-                      ? "destructive"
-                      : "outline"
+                        ? "secondary"
+                        : order.management_status === "cancelled"
+                          ? "destructive"
+                          : "outline"
                   }>
                   {MANAGEMENT_STATUS_OPTIONS.find(
-                    (opt) => opt.value === order.management_status
+                    (opt) => opt.value === order.management_status,
                   )?.label || order.management_status}
                 </Badge>
               ) : (
@@ -279,7 +261,7 @@ export default function OrderManagementPage() {
       </Card>
 
       {/* Статус түүх */}
-      <StatusHistory orderId={orderId} />
+      <StatusHistory orderId={orderId} refreshKey={historyRefreshKey} />
     </div>
   );
 }

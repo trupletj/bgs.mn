@@ -51,7 +51,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const MANAGEMENT_STATUS_LABELS: Record<string, string> = {
-  pending: "Хүлээгдэж байна",
+  pending: "Захиалга хийгдэж байна",
   processing: "Боловсруулж байна",
   completed: "Дууссан",
   cancelled: "Цуцлагдсан",
@@ -129,7 +129,7 @@ export default function AllOrderList() {
             department_name
           )
         `,
-          { count: "exact" }
+          { count: "exact" },
         )
         .ilike("title", `%${debouncedSearch}%`);
 
@@ -186,8 +186,9 @@ export default function AllOrderList() {
           ([status, total]) => ({
             status,
             total,
-          })
+          }),
         );
+        console.log("all status", result);
         setStatusSummary(result);
       }
 
@@ -209,9 +210,10 @@ export default function AllOrderList() {
           ([status, total]) => ({
             status,
             total,
-          })
+          }),
         );
         setManagementStatusSummary(result);
+        console.log("management status", result);
       }
     } catch (err) {
       console.error(err);
@@ -247,13 +249,13 @@ export default function AllOrderList() {
     const statusTotal = statusSummary.reduce((sum, s) => sum + s.total, 0);
     const mgmtTotal = managementStatusSummary.reduce(
       (sum, s) => sum + s.total,
-      0
+      0,
     );
     return statusTotal + mgmtTotal;
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow space-y-6">
+    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg  space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Захиалгын нэгдсэн систем</h1>
         <input
@@ -321,11 +323,19 @@ export default function AllOrderList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Гарчиг</TableHead>
-                  <TableHead>Үүсгэгч</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead>Огноо</TableHead>
-                  <TableHead>Үйлдэл</TableHead>
+                  <TableHead className="font-bold text-center">
+                    Гарчиг
+                  </TableHead>
+                  <TableHead className="font-bold text-center">
+                    Үүсгэгч
+                  </TableHead>
+                  <TableHead className="font-bold text-center">
+                    Статус
+                  </TableHead>
+                  <TableHead className="font-bold text-center">Огноо</TableHead>
+                  <TableHead className="font-bold text-center">
+                    Үйлдэл
+                  </TableHead>
                 </TableRow>
               </TableHeader>
 
