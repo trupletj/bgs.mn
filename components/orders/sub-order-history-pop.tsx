@@ -44,7 +44,7 @@ export function SubOrderHistoryPopover({ history }: Props) {
       </PopoverTrigger>
 
       <PopoverContent className="w-lg p-0 rounded-lg shadow-lg bg-white border border-gray-200">
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="max-h-full">
           <div className="p-4 space-y-6">
             <label className="font-semibold text-lg text-gray-800">
               Санал болгосон өөрчлөлтүүд:

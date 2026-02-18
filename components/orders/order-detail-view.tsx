@@ -13,17 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UNIT_OPTIONS } from "@/types";
 import ImageViewer from "@/components/image-viewer";
 import { OrderWorkflow } from "./order-workflow";
 import { getSparePartLabel } from "@/types/types";
+import { UNIT_OPTIONS } from "@/types";
 
 interface NewOrderDetailViewProps {
   orderDetails: {
     order: any;
     profile: any;
     items: any[];
-    reviewers: any[]; // order_step_reviewers-ийн flat жагсаалт
+    reviewers: any[];
   };
 }
 
@@ -66,10 +66,16 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
       {
         label: string;
         variant: "default" | "secondary" | "destructive" | "outline";
+        className?: string;
       }
     > = {
+      created_step: {
+        label: "Хянагдаж байна",
+        variant: "outline",
+      },
       approved: {
         label: "Батлагдсан",
+        className: "bg-green-200 text-green-800",
         variant: "default",
       },
       changes_requested: {
@@ -87,7 +93,11 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
       variant: "outline",
     };
 
-    return <Badge variant={s.variant}>{s.label}</Badge>;
+    return (
+      <Badge variant={s.variant} className={s.className}>
+        {s.label}
+      </Badge>
+    );
   };
 
   return (
@@ -143,6 +153,7 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
                   <TableRow>
                     <TableHead>Нэр</TableHead>
                     <TableHead>Тоо</TableHead>
+                    <TableHead>Батлагдсан тоо</TableHead>
                     <TableHead>Төрөл</TableHead>
                     <TableHead>Зураг</TableHead>
                   </TableRow>
@@ -160,29 +171,25 @@ export function NewOrderDetailView({ orderDetails }: NewOrderDetailViewProps) {
                           )}
                         </div>
                       </TableCell>
-                      {/* <TableCell>
+                      <TableCell>
                         <Badge variant="outline">
                           {item.quantity}{" "}
                           {UNIT_OPTIONS.find((u) => u.value === item.unit)
                             ?.label || item.unit}
                         </Badge>
-                      </TableCell> */}
+                      </TableCell>
                       <TableCell>
                         {order.status === "approved" ||
                         order.status === "changes_requested" ? (
                           <div className="flex flex-col gap-1">
-                            <Badge variant="default">
-                              Батлагдсан: {item.final_quantity ?? item.quantity}
+                            <Badge
+                              variant="default"
+                              className="bg-green-200 text-green-800">
+                              {item.final_quantity}
                             </Badge>
-
-                            {item.final_quantity !== item.quantity && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                Анх захиалсан: {item.quantity}
-                              </span>
-                            )}
                           </div>
                         ) : (
-                          <Badge variant="outline">{item.quantity}</Badge>
+                          <div></div>
                         )}
                       </TableCell>
 

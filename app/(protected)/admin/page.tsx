@@ -2,13 +2,15 @@ import { AssignRoles } from "@/components/admin/assign-roles";
 import { RolesList } from "@/components/admin/roles-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PermissionsList } from "@/components/admin/permission-list";
+import { hasRole } from "@/actions/rbac";
+import { redirect } from "next/navigation";
 
 export default async function RBACAdminPage() {
-  //   const isAdmin = await hasRole("super_admin");
+  const isAdmin = await hasRole("super_admin");
 
-  //   if (!isAdmin) {
-  //     redirect("/unauthorized");
-  //   }
+  if (!isAdmin) {
+    redirect("/unauthorized");
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -19,7 +21,7 @@ export default async function RBACAdminPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="assign-roles" className="space-y-6">
+      <Tabs defaultValue="assign-roles" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="assign-roles">Role Оноох</TabsTrigger>
           {/* <TabsTrigger value="create-role">Role Үүсгэх</TabsTrigger> */}
@@ -28,7 +30,7 @@ export default async function RBACAdminPage() {
           <TabsTrigger value="permissions-list">Permissions</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="assign-roles" className="space-y-6">
+        <TabsContent value="assign-roles" className="">
           <AssignRoles />
         </TabsContent>
 
@@ -40,11 +42,11 @@ export default async function RBACAdminPage() {
           <CreatePermissionForm />
         </TabsContent> */}
 
-        <TabsContent value="roles-list" className="space-y-6">
+        <TabsContent value="roles-list" className="">
           <RolesList />
         </TabsContent>
 
-        <TabsContent value="permissions-list" className="space-y-6">
+        <TabsContent value="permissions-list" className="">
           <PermissionsList />
         </TabsContent>
       </Tabs>

@@ -9,7 +9,6 @@ interface JobDescriptionDetailPageProps {
 export default async function Page({ params }: JobDescriptionDetailPageProps) {
   const { id } = await params;
   const supabase = createClient();
-  const is_admin = await hasRole("super_admin");
   const is_edit = await hasPermission("job_description", "edit");
 
   // Job description-ийг авах
@@ -71,11 +70,7 @@ export default async function Page({ params }: JobDescriptionDetailPageProps) {
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
-      {is_admin ? (
-        <JobDescriptionDetail data={data} is_edit={true} />
-      ) : (
-        <JobDescriptionDetail data={data} is_edit={is_edit} />
-      )}
+      <JobDescriptionDetail data={data} is_edit={is_edit} />
     </div>
   );
 }

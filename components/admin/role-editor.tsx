@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
-import { getProfileIdFromAuthUserId } from "@/actions/review";
+import { getProfileIdFromAuthUserId } from "@/actions/profile";
 
 interface Permission {
   id: number;
@@ -128,7 +128,7 @@ export function RoleEditor({ roleId, onSuccess, onCancel }: RoleEditorProps) {
     setSelectedPermissions((prev) =>
       prev.includes(permissionId)
         ? prev.filter((p) => p !== permissionId)
-        : [...prev, permissionId]
+        : [...prev, permissionId],
     );
   };
 
@@ -143,10 +143,10 @@ export function RoleEditor({ roleId, onSuccess, onCancel }: RoleEditorProps) {
         return;
       }
 
-      if (selectedPermissions.length === 0) {
-        toast.error("Дор хаяж нэг permission сонгоно уу");
-        return;
-      }
+      // if (selectedPermissions.length === 0) {
+      //   toast.error("Дор хаяж нэг permission сонгоно уу");
+      //   return;
+      // }
 
       const profile_id = await getProfileIdFromAuthUserId();
 
@@ -240,13 +240,16 @@ export function RoleEditor({ roleId, onSuccess, onCancel }: RoleEditorProps) {
   };
 
   // Permissions-г модулаар нь бүлэглэх
-  const permissionsByModule = permissions.reduce((acc, permission) => {
-    if (!acc[permission.module]) {
-      acc[permission.module] = [];
-    }
-    acc[permission.module].push(permission);
-    return acc;
-  }, {} as Record<string, Permission[]>);
+  const permissionsByModule = permissions.reduce(
+    (acc, permission) => {
+      if (!acc[permission.module]) {
+        acc[permission.module] = [];
+      }
+      acc[permission.module].push(permission);
+      return acc;
+    },
+    {} as Record<string, Permission[]>,
+  );
 
   // Сонгогдсон permissions-ын тоо
   const selectedCount = selectedPermissions.length;
@@ -345,7 +348,7 @@ export function RoleEditor({ roleId, onSuccess, onCancel }: RoleEditorProps) {
                               <Checkbox
                                 id={`permission-${permission.id}`}
                                 checked={selectedPermissions.includes(
-                                  permission.id
+                                  permission.id,
                                 )}
                                 onCheckedChange={() =>
                                   handlePermissionToggle(permission.id)
@@ -367,7 +370,7 @@ export function RoleEditor({ roleId, onSuccess, onCancel }: RoleEditorProps) {
                           ))}
                         </div>
                       </div>
-                    )
+                    ),
                   )}
                 </div>
               )}
@@ -377,19 +380,15 @@ export function RoleEditor({ roleId, onSuccess, onCancel }: RoleEditorProps) {
           <div className="gap-2 pt-4 border-t">
             <Button
               type="submit"
-              disabled={
-                isLoading ||
-                loadingPermissions ||
-                selectedPermissions.length === 0
-              }
+              disabled={isLoading || loadingPermissions}
               className="flex-1">
               {isLoading
                 ? isEditing
                   ? "Хадгалж байна..."
                   : "Үүсгэж байна..."
                 : isEditing
-                ? "Хадгалах"
-                : "Role Үүсгэх"}
+                  ? "Хадгалах"
+                  : "Role Үүсгэх"}
             </Button>
 
             {onCancel && (

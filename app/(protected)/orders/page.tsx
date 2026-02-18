@@ -10,21 +10,26 @@ export default async function OrdersPage() {
       description: "Захиалгын процессын төрлийн тохиргоо",
       href: "/order-processes",
       icon: FileText,
-      requiredRoles: ["monitoring_emp", "super_admin"],
+      requiredRoles: ["monitoring_emp", "super_admin", "order_system"],
     },
     {
       title: "Захиалгын жагсаалт",
       description: "Захиалгын систем",
       href: "/orders/list",
       icon: ClipboardList,
-      requiredRoles: ["hr_emp", "monitoring_emp", "super_admin"],
+      requiredRoles: [
+        "hr_emp",
+        "monitoring_emp",
+        "super_admin",
+        "order_system",
+      ],
     },
     {
       title: "Захиалгын ерөнхий мэдээлэл",
       description: "Нэгдсэн захиалгын мэдээлэл",
       href: "/orders/manage",
       icon: Briefcase,
-      requiredRoles: ["hr_emp", "super_admin"],
+      requiredRoles: ["hr_emp", "super_admin", "order_system"],
     },
   ];
 

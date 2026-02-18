@@ -1,5 +1,4 @@
 import AllOrderList from "@/components/orders/all-order-list";
-import { StatusHistory } from "@/components/orders/status-history";
 
 export default async function OrderManagePage() {
   return (

@@ -10,20 +10,13 @@ interface EditJobDescriptionPageProps {
 export default async function EditJobDescriptionPage({
   params,
 }: EditJobDescriptionPageProps) {
-  const is_admin = await hasRole("super_admin");
-  if (!is_admin) {
-    const has_permission = await hasPermission("job_description", "edit");
+  const has_permission = await hasPermission("job_description", "edit");
 
-    if (!has_permission) {
-      redirect("/unauthorized");
-    }
+  if (!has_permission) {
+    redirect("/unauthorized");
   }
-  let is_delete = false;
-  if (!is_admin) {
-    is_delete = await hasPermission("job_description", "delete");
-  } else {
-    is_delete = true;
-  }
+
+  const is_delete = await hasPermission("job_description", "delete");
 
   const { id } = await params;
   const supabase = createClient();

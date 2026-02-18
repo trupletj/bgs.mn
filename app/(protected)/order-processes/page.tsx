@@ -6,10 +6,10 @@ import Link from "next/link";
 
 export default async function OrderProcessesPage() {
   const res = await getOrderProcesses();
-  const processes = Array.isArray(res) ? res : res?.data ?? [];
+  const processes = Array.isArray(res) ? res : (res?.data ?? []);
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Захиалгын төрлүүд</h1>

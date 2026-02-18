@@ -33,7 +33,6 @@ export default function RateOrderForm({
       console.log("order_instance_id", order_instance_id);
       console.log("reviewer_profile_id", profile_id);
 
-      // 1. Өөрийн pending reviewer мэдээлэл + step мэдээлэл авах
       const { data: reviewer, error: reviewerError } = await supabase
         .from("order_step_reviewers")
         .select(
@@ -46,7 +45,7 @@ export default function RateOrderForm({
             step_name,
             required_approval_count
           )
-        `
+        `,
         )
         .eq("order_instance_id", order_instance_id)
         .eq("reviewer_profile_id", profile_id)
@@ -56,7 +55,7 @@ export default function RateOrderForm({
       if (reviewerError || !reviewer) {
         console.error("Reviewer error:", reviewerError);
         setError(
-          "Таны шалгах эрхтэй захиалга олдсонгүй эсвэл аль хэдийн шалгагдсан байна."
+          "Таны шалгах эрхтэй захиалга олдсонгүй эсвэл аль хэдийн шалгагдсан байна.",
         );
         return;
       }
@@ -69,25 +68,25 @@ export default function RateOrderForm({
         .from("order_instances")
         .select(
           `
-    id,
-    status,
-    orders:orders!inner (
-      id,
-      order_number,
-      title,
-      description,
-      status,
-      urgency_level,
-      requested_delivery_date,
-      created_at,
-      order_type,
-      created_profile,
-      profile:profile!inner (
-        name,
-        department_name
-      )
-    )
-  `
+          id,
+          status,
+          orders:orders!inner (
+            id,
+            order_number,
+            title,
+            description,
+            status,
+            urgency_level,
+            requested_delivery_date,
+            created_at,
+            order_type,
+            created_profile,
+            profile:profile!inner (
+              name,
+              department_name
+            )
+          )
+        `,
         )
         .eq("id", order_instance_id)
         .single();
@@ -136,7 +135,7 @@ export default function RateOrderForm({
           notes,
           status,
           part_description
-        `
+        `,
         )
         .eq("order_id", orderData.id);
 
@@ -284,7 +283,6 @@ export default function RateOrderForm({
         currentStep={currentStep}
         order_instance_id={parseInt(order_instance_id)}
         reviewer_profile_id={parseInt(profile_id)}
-        onReviewComplete={fetchOrderDetails}
       />
     </div>
   );

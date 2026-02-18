@@ -1,6 +1,4 @@
-// import { getAllSortedClauses } from "@/action/ClauseService";
 import { getClauses } from "@/actions/clause";
-import React from "react";
 import SingleClause from "./SingleClause";
 import { hasRole } from "@/actions/rbac";
 

@@ -33,7 +33,9 @@ const SingleClause = ({ clause, isRating }: SingleClauseProps) => {
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="text-xs px-3 py-1 h-auto">
+                <Button
+                  variant="outline"
+                  className="text-xs px-3 py-1 h-auto cursor-pointer">
                   Үнэлэх
                 </Button>
               </DialogTrigger>

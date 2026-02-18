@@ -22,9 +22,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface ReviewRequestProp {
   profile_id: string;
+  type: "pending" | "reviewed";
 }
 
-export function RequestedList({ profile_id }: ReviewRequestProp) {
+export function RequestedList({ profile_id, type }: ReviewRequestProp) {
   const [reviewRequests, setReviewRequests] = useState<AwaitingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,14 @@ export function RequestedList({ profile_id }: ReviewRequestProp) {
       setLoading(true);
       setError(null);
       const data = await getAwaitingOrders(profile_id);
-      setReviewRequests(data || []);
+      const filtered = (data || []).filter((request) => {
+        if (type === "pending") {
+          return request.status === "pending" || !request.status;
+        } else {
+          return request.status && request.status !== "pending";
+        }
+      });
+      setReviewRequests(filtered);
     } catch (error) {
       console.error("Error fetching review requests:", error);
       setError("Хүсэлтүүдийг авахад алдаа гарлаа");
@@ -238,13 +246,10 @@ export function RequestedList({ profile_id }: ReviewRequestProp) {
           <Card
             key={`${request.id}-${instance.id}`}
             className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
+            <CardContent className="px-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <h3 className="font-bold text-xl text-gray-900">
-                      {order.order_number || `Захиалга #${order.id}`}
-                    </h3>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     {getUrgencyBadge(order.urgency_level || "")}
                     <Badge
                       variant="secondary"
@@ -258,7 +263,7 @@ export function RequestedList({ profile_id }: ReviewRequestProp) {
                     {order.title || "Гарчиггүй захиалга"}
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <div className="flex items-center text-sm text-gray-600">
                         <User className="h-4 w-4 mr-2" />
@@ -315,8 +320,8 @@ export function RequestedList({ profile_id }: ReviewRequestProp) {
                         {request.status === "approved"
                           ? "Зөвшөөрсөн"
                           : request.status === "rejected"
-                          ? "Татгалзсан"
-                          : "Өөрчлөлт шаардсан"}
+                            ? "Татгалзсан"
+                            : "Өөрчлөлт шаардсан"}
                       </div>
                     </div>
                   )}

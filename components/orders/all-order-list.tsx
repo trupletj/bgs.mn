@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { useDebounce } from "use-debounce";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Order {
   id: string;
@@ -45,6 +44,7 @@ const PAGE_SIZE = 15;
 const STATUS_LABELS: Record<string, string> = {
   pending: "Шинэ захиалга",
   in_progress: "Процесс-д",
+  created_step: "Захиалга үүссэн",
   approved: "Баталгаажсан",
   changes_requested: "Өөрчлөгдөж батлагдсан",
   rejected: "Татгалзсан",
@@ -67,6 +67,7 @@ const STATUS_BADGE: Record<
 > = {
   pending: { label: "Шинэ", variant: "secondary" },
   in_progress: { label: "Процесс-д", variant: "outline" },
+  created_step: { label: "Захиалга үүссэн", variant: "outline" },
   approved: { label: "Баталгаажсан", variant: "default" },
   changes_requested: {
     label: "Өөрчлөгдөж батлагдсан",
@@ -89,8 +90,6 @@ const MANAGEMENT_STATUS_BADGE: Record<
   on_hold: { label: "Түр зогссон", variant: "outline" },
 };
 
-type TabType = "not_approved" | "approved";
-
 export default function AllOrderList() {
   const supabase = createClient();
 
@@ -104,13 +103,12 @@ export default function AllOrderList() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<TabType>("not_approved");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
   useEffect(() => {
     fetchOrders();
     fetchSummaries();
-  }, [page, debouncedSearch, activeTab]);
+  }, [page, debouncedSearch, selectedStatus]);
 
   async function fetchOrders() {
     setLoading(true);
@@ -119,25 +117,22 @@ export default function AllOrderList() {
         .from("orders")
         .select(
           `
-          id,
-          title,
-          status,
-          management_status,
-          created_at,
-          profile:created_profile(
-            name,
-            department_name
-          )
+          id, title, status, management_status, created_at,
+          profile:created_profile(name, department_name)
         `,
           { count: "exact" },
         )
         .ilike("title", `%${debouncedSearch}%`);
 
-      // Tab-ын дагуу шүүх
-      if (activeTab === "approved") {
-        query = query.in("status", ["approved", "changes_requested"]);
-      } else {
-        query = query.not("status", "in", "('approved','changes_requested')");
+      // КАРТААР ШҮҮХ ЛОГИК
+      if (selectedStatus !== "all") {
+        // Хэрэв сонгосон статус нь management_status-д хамааралтай бол
+        if (MANAGEMENT_STATUS_LABELS[selectedStatus]) {
+          query = query.eq("management_status", selectedStatus);
+        } else {
+          // Үгүй бол үндсэн status-аар шүүнэ
+          query = query.eq("status", selectedStatus);
+        }
       }
 
       const { data, count, error } = await query
@@ -147,25 +142,18 @@ export default function AllOrderList() {
       if (error) throw error;
 
       const normalized = (data || []).map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        status: row.status,
-        management_status: row.management_status,
-        created_at: row.created_at,
+        ...row,
         profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
       }));
 
       setOrders(normalized);
-      setTotalCount(count || 0);
       setTotalPages(Math.ceil((count || 0) / PAGE_SIZE));
     } catch (err: any) {
-      console.error(err);
       toast.error("Захиалгын жагсаалт уншиж чадсангүй");
     } finally {
       setLoading(false);
     }
   }
-
   async function fetchSummaries() {
     try {
       // Үндсэн статусын summary
@@ -237,11 +225,9 @@ export default function AllOrderList() {
   };
 
   const getDetailLink = (order: Order) => {
-    // Баталгаажсан эсвэл өөрчлөгдөж батлагдсан бол imp рүү
     if (order.status === "approved" || order.status === "changes_requested") {
       return `/orders/${order.id}/imp`;
     }
-    // Бусад тохиолдолд ерөнхий хуудас руу
     return `/orders/${order.id}`;
   };
 
@@ -255,33 +241,42 @@ export default function AllOrderList() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg  space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-2xl font-bold">Захиалгын нэгдсэн систем</h1>
-        <input
-          className="border px-4 py-2 rounded-md min-w-[400px]"
-          placeholder="Захиалгын гарчиг хайх..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="relative w-full md:w-[400px]">
+          <input
+            className="w-full border px-4 py-2 rounded-md"
+            placeholder="Захиалгын гарчиг хайх..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
       </div>
 
-      {/* Нийт тооны картууд */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <Card className="bg-blue-50 dark:bg-blue-900/20">
-          <CardContent className="flex flex-col items-center justify-center gap-1 h-full p-4">
-            <div className="text-sm text-muted-foreground">Нийт захиалга</div>
+      {/* Статус картууд - Interactive */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <Card
+          onClick={() => setSelectedStatus("all")}
+          className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${selectedStatus === "all" ? "ring-2 ring-blue-600 bg-blue-50/50" : "bg-blue-50/30"}`}>
+          <CardContent className="flex flex-col items-center justify-center p-4">
+            <div className="text-xs text-muted-foreground uppercase font-semibold">
+              Нийт
+            </div>
             <div className="text-3xl font-bold">{totalOrdersCount()}</div>
           </CardContent>
         </Card>
 
-        {/* Үндсэн статусын картууд (management_status-гүй зөвхөн) */}
         {statusSummary.map((s) => (
           <Card
             key={`status-${s.status}`}
-            className="bg-gray-50 dark:bg-gray-800/50">
-            <CardContent className="flex flex-col items-center justify-center gap-1 h-full p-4">
-              <div className="text-sm text-muted-foreground">
+            onClick={() => setSelectedStatus(s.status)}
+            className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${selectedStatus === s.status ? "ring-2 ring-gray-800 bg-gray-100" : "bg-gray-50/50"}`}>
+            <CardContent className="flex flex-col items-center justify-center p-4">
+              <div className="text-xs text-muted-foreground text-center line-clamp-1">
                 {STATUS_LABELS[s.status] ?? s.status}
               </div>
               <div className="text-2xl font-bold">{s.total}</div>
@@ -289,13 +284,13 @@ export default function AllOrderList() {
           </Card>
         ))}
 
-        {/* Management статусын картууд */}
         {managementStatusSummary.map((s) => (
           <Card
             key={`mgmt-${s.status}`}
-            className="bg-purple-50 dark:bg-purple-900/20">
-            <CardContent className="flex flex-col items-center justify-center gap-1 h-full p-4">
-              <div className="text-sm text-muted-foreground">
+            onClick={() => setSelectedStatus(s.status)}
+            className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${selectedStatus === s.status ? "ring-2 ring-purple-600 bg-purple-50" : "bg-purple-50/50"}`}>
+            <CardContent className="flex flex-col items-center justify-center p-4">
+              <div className="text-xs text-muted-foreground text-center line-clamp-1">
                 {MANAGEMENT_STATUS_LABELS[s.status] ?? s.status}
               </div>
               <div className="text-2xl font-bold">{s.total}</div>
@@ -304,157 +299,87 @@ export default function AllOrderList() {
         ))}
       </div>
 
-      <Tabs
-        value={activeTab}
-        onValueChange={(v) => {
-          setActiveTab(v as TabType);
-          setPage(1);
-        }}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="not_approved">
-            Батлагдаагүй захиалгууд
-          </TabsTrigger>
-          <TabsTrigger value="approved">Батлагдсан захиалгууд</TabsTrigger>
-        </TabsList>
+      {/* Шүүлтүүрийн мэдээлэл */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">
+          {selectedStatus === "all"
+            ? "Бүх захиалга"
+            : `Шүүлтүүр: ${STATUS_LABELS[selectedStatus] || MANAGEMENT_STATUS_LABELS[selectedStatus] || selectedStatus}`}
+        </div>
+        {selectedStatus !== "all" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedStatus("all")}>
+            Шүүлтүүр цуцлах
+          </Button>
+        )}
+      </div>
 
-        {/* Батлагдаагүй захиалгууд */}
-        <TabsContent value="not_approved" className="space-y-4">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-bold text-center">
-                    Гарчиг
-                  </TableHead>
-                  <TableHead className="font-bold text-center">
-                    Үүсгэгч
-                  </TableHead>
-                  <TableHead className="font-bold text-center">
-                    Статус
-                  </TableHead>
-                  <TableHead className="font-bold text-center">Огноо</TableHead>
-                  <TableHead className="font-bold text-center">
-                    Үйлдэл
-                  </TableHead>
+      {/* Хүснэгт */}
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead>Гарчиг</TableHead>
+              <TableHead>Үүсгэгч</TableHead>
+              <TableHead>Баталгаажуулалт</TableHead>
+              <TableHead>Удирдлагын статус</TableHead>
+              <TableHead>Огноо</TableHead>
+              <TableHead className="text-right">Үйлдэл</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  Ачаалж байна...
+                </TableCell>
+              </TableRow>
+            ) : orders.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="h-24 text-center text-muted-foreground">
+                  Захиалга олдсонгүй
+                </TableCell>
+              </TableRow>
+            ) : (
+              orders.map((order) => (
+                <TableRow key={order.id} className="hover:bg-muted/30">
+                  <TableCell className="font-medium max-w-[250px] truncate">
+                    {order.title}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">{order.profile?.name}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase">
+                      {order.profile?.department_name}
+                    </div>
+                  </TableCell>
+                  <TableCell>{renderStatusBadge(order.status)}</TableCell>
+                  <TableCell>
+                    {order.management_status ? (
+                      renderManagementStatusBadge(order.management_status)
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {new Date(order.created_at).toLocaleDateString("mn-MN")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link href={getDetailLink(order)}>
+                      <Button size="sm" variant="outline">
+                        Үзэх
+                      </Button>
+                    </Link>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">
-                      Ачаалж байна...
-                    </TableCell>
-                  </TableRow>
-                ) : orders.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-gray-500">
-                      Захиалга олдсонгүй
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="max-w-[300px] truncate">
-                        {order.title}
-                      </TableCell>
-                      <TableCell>
-                        <div>{order.profile?.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {order.profile?.department_name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{renderStatusBadge(order.status)}</TableCell>
-                      <TableCell>
-                        {new Date(order.created_at).toLocaleDateString("mn-MN")}
-                      </TableCell>
-                      <TableCell>
-                        <Link href={getDetailLink(order)}>
-                          <Button size="sm" variant="outline">
-                            Дэлгэрэнгүй
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-
-        {/* Батлагдсан захиалгууд */}
-        <TabsContent value="approved" className="space-y-4">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Гарчиг</TableHead>
-                  <TableHead>Үүсгэгч</TableHead>
-                  <TableHead>Баталгааны статус</TableHead>
-                  <TableHead>Удирдлагын статус</TableHead>
-                  <TableHead>Огноо</TableHead>
-                  <TableHead>Үйлдэл</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      Ачаалж байна...
-                    </TableCell>
-                  </TableRow>
-                ) : orders.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center text-gray-500">
-                      Баталгаажсан захиалга олдсонгүй
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="max-w-[300px] truncate">
-                        {order.title}
-                      </TableCell>
-                      <TableCell>
-                        <div>{order.profile?.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {order.profile?.department_name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{renderStatusBadge(order.status)}</TableCell>
-                      <TableCell>
-                        {order.management_status ? (
-                          renderManagementStatusBadge(order.management_status)
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            Тохируулаагүй
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(order.created_at).toLocaleDateString("mn-MN")}
-                      </TableCell>
-                      <TableCell>
-                        <Link href={getDetailLink(order)}>
-                          <Button size="sm" variant="outline">
-                            Дэлгэрэнгүй
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Pagination */}
       <div className="flex justify-between items-center">

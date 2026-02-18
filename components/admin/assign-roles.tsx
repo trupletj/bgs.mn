@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
-import { getProfileIdFromAuthUserId } from "@/actions/review";
+import { getProfileIdFromAuthUserId } from "@/actions/profile";
 
 interface Profile {
   id: number;
@@ -92,7 +92,7 @@ export function AssignRoles() {
                 name,
                 display_name
               )
-            `
+            `,
             )
             .eq("profile_id", profile.id);
 
@@ -100,7 +100,7 @@ export function AssignRoles() {
             ...profile,
             roles: rolesProfiles?.map((rp) => rp.roles) || [],
           };
-        })
+        }),
       );
 
       setProfiles(profilesWithRoles);
@@ -164,7 +164,7 @@ export function AssignRoles() {
 
   // Хайлт хийсэн profile-ууд
   const filteredProfiles = profiles.filter(
-    (profile) => profile.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (profile) => profile.name.toLowerCase().includes(searchTerm.toLowerCase()),
     // profile.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     // profile.department_name.toLowerCase().includes(searchTerm.toLowerCase())
   );

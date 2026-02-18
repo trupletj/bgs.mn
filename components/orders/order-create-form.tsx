@@ -20,20 +20,16 @@ import {
   ClockIcon,
   PlusIcon,
   TrashIcon,
-  PackageIcon,
   FileTextIcon,
   InfoIcon,
   CalendarIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  createOrder,
   addOrderItem,
-  addTechnicalReviewers,
   deleteImagesFromStorage,
   createOrderWithInstace,
 } from "@/actions/orders";
-import { TechnicalReviewerSelector } from "../reviewer-selector";
 import ImageUploader from "../image-uploader";
 import ImageViewer from "../image-viewer";
 import {
@@ -75,10 +71,10 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
   const [initialLoading, setInitialLoading] = useState(true);
 
   const [pendingImageDeletions, setPendingImageDeletions] = useState<string[]>(
-    []
+    [],
   );
   const [uploadedImages, setUploadedImages] = useState<Record<number, string>>(
-    {}
+    {},
   );
 
   const [formData, setFormData] = useState<OrderFormData>({
@@ -98,6 +94,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
       quantity: 1,
       unit: "piece",
       spare_type: "other",
+      part_number: "",
     },
   ]);
 
@@ -126,7 +123,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
   const handleItemChange = (
     index: number,
     field: keyof OrderItemForm,
-    value: string | number | undefined
+    value: string | number | undefined,
   ) => {
     setOrderItems((prev) =>
       prev.map((item, i) => {
@@ -140,7 +137,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
           return { ...item, [field]: value };
         }
         return item;
-      })
+      }),
     );
   };
 
@@ -152,6 +149,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
         quantity: 1,
         unit: "piece",
         spare_type: "other",
+        part_number: "",
       },
     ]);
   };
@@ -163,6 +161,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
   };
 
   const handleSubmit = async () => {
+    if (loading) return;
     if (!formData.title.trim()) {
       toast.error("Захиалгын гарчиг оруулах шаардлагатай.");
       return;
@@ -170,6 +169,11 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
 
     if (orderItems.some((item) => !item.part_name.trim())) {
       toast.error("Бүх сэлбэгүүд нэртэй байх ёстой.");
+      return;
+    }
+
+    if (orderItems.some((item) => !item.part_number.trim())) {
+      toast.error("Бүх сэлбэгүүд эдийн дугаартай байх ёстой.");
       return;
     }
 
@@ -189,13 +193,12 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
 
       if (orderError || !order) {
         throw new Error(
-          orderError?.message || "Захиалга үүсгэхэд алдаа гарлаа"
+          orderError?.message || "Захиалга үүсгэхэд алдаа гарлаа",
         );
       }
 
       // 2. Сэлбэгүүд нэмэх (зургийн URL-г оруулах)
       for (const [index, item] of orderItems.entries()) {
-        console.log("Uploading item:", item);
         const imageUrl = uploadedImages[index];
 
         const { error: itemError } = await addOrderItem({
@@ -216,20 +219,12 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
         }
       }
 
-      // 3. Устгахаар тэмдэглэгдсэн зургийг устгах
       if (pendingImageDeletions.length > 0) {
         await deleteImagesFromStorage(pendingImageDeletions);
       }
-      console.log("");
-
-      //   await addTechnicalReviewers(
-      //     order.id.toString(),
-      //     selectedTechnicalReviewers,
-      //     order.status
-      //   );
 
       toast.success(
-        `Захиалга #${order.order_number} амжилттай үүсэж хяналтад илгээгдлээ`
+        `Захиалга #${order.order_number} амжилттай үүсэж хяналтад илгээгдлээ`,
       );
       router.push(`/orders/${order.id}`);
     } catch (error) {
@@ -255,7 +250,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
   }
 
   return (
-    <div className="w-full mx-auto space-y-8">
+    <div className="w-full mx-auto space-y-4">
       {/* Захиалгын мэдээлэл */}
       <Card className="shadow-sm border-0 ring-1 ring-gray-200">
         <CardHeader className="bg-gray-50/50 border-b border-gray-200">
@@ -264,12 +259,12 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
             <span>Захиалгын мэдээлэл</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6 space-y-6">
+        <CardContent className=" space-y-4">
           <div className="space-y-2">
             <Label
               htmlFor="title"
               className="text-sm font-medium text-gray-700">
-              Захиалгын гарчиг <span className="text-red-500">*</span>
+              Захиалгын гарчиг<span className="text-red-500">*</span>
             </Label>
             <Input
               id="title"
@@ -279,7 +274,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
               className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
               <Label
                 // htmlFor="urgency"
@@ -294,9 +289,9 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                     | "service"
                     | "major repairs"
                     | "safety reserves"
-                    | "other"
+                    | "other",
                 ) => handleInputChange("order_type", value)}>
-                <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <SelectTrigger className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -352,7 +347,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                 onValueChange={(value) =>
                   handleInputChange("order_process_id", value)
                 }>
-                <SelectTrigger className="h-11 border-gray-300">
+                <SelectTrigger className="h-10 border-gray-300">
                   <SelectValue placeholder="Процесс сонгох" />
                 </SelectTrigger>
 
@@ -364,6 +359,23 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label
+                htmlFor="delivery_date"
+                className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <CalendarIcon className="h-4 w-4" />
+                <span>Хэрэгцээт огноо</span>
+              </Label>
+              <Input
+                id="delivery_date"
+                type="date"
+                value={formData.requested_delivery_date}
+                onChange={(e) =>
+                  handleInputChange("requested_delivery_date", e.target.value)
+                }
+                className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
             </div>
           </div>
 
@@ -382,24 +394,6 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
               placeholder="Захиалгад тавигдах шаардлагуудын дэлгэрэнгүй..."
               rows={4}
               className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label
-              htmlFor="delivery_date"
-              className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-              <CalendarIcon className="h-4 w-4" />
-              <span>Бараа бүтээгдэхүүний хэрэгцээт хязгаар огноо</span>
-            </Label>
-            <Input
-              id="delivery_date"
-              type="date"
-              value={formData.requested_delivery_date}
-              onChange={(e) =>
-                handleInputChange("requested_delivery_date", e.target.value)
-              }
-              className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
         </CardContent>
@@ -434,7 +428,9 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Сэлбэгийн нэр */}
                   <div>
-                    <Label className="mb-1 block">Сэлбэгийн нэр *</Label>
+                    <Label className="mb-1 block">
+                      Сэлбэгийн нэр <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       value={item.part_name}
                       onChange={(e) =>
@@ -446,7 +442,9 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
 
                   {/* Эдийн дугаар */}
                   <div>
-                    <Label className="mb-1 block">Эдийн дугаар</Label>
+                    <Label className="mb-1 block">
+                      Эдийн дугаар<span className="text-red-500"> *</span>
+                    </Label>
                     <Input
                       value={item.part_number || ""}
                       onChange={(e) =>
@@ -470,7 +468,9 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
 
                   {/* Тоо ширхэг */}
                   <div>
-                    <Label className="mb-1">Тоо хэмжээ *</Label>
+                    <Label className="mb-1">
+                      Тоо хэмжээ <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       type="number"
                       min="0"
@@ -484,7 +484,9 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                   </div>
 
                   <div>
-                    <Label className="mb-1">Нэгж *</Label>
+                    <Label className="mb-1">
+                      Нэгж <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={item.unit || "piece"}
                       onValueChange={(value: UnitType) =>
@@ -503,7 +505,9 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                     </Select>
                   </div>
                   <div>
-                    <Label className="mb-1">Сэлбэгийн төрөл *</Label>
+                    <Label className="mb-1">
+                      Сэлбэгийн төрөл <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={item.spare_type}
                       onValueChange={(value: SparePartType) =>
@@ -532,7 +536,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                         handleItemChange(
                           index,
                           "part_description",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                       placeholder="Техникийн үзүүлэлт гэх мэт"
@@ -547,7 +551,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                       onUpload={(url) =>
                         handleImageUpload(
                           index,
-                          Array.isArray(url) ? url[0] : url
+                          Array.isArray(url) ? url[0] : url,
                         )
                       }
                     />
@@ -616,15 +620,11 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
           <Button
             type="button"
             onClick={() => handleSubmit()}
-            className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium">
-            {loading ? (
-              <>
-                <ClockIcon className="h-4 w-4 mr-2 animate-spin" />
-                Захиалга үүсэж байна...
-              </>
-            ) : (
-              "Захиалгыг үүсгэх"
-            )}
+            disabled={loading}
+            className={`h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium ${
+              loading ? "pointer-events-none opacity-50" : ""
+            }`}>
+            {loading ? "Захиалга үүсэж байна..." : "Захиалгыг үүсгэх"}
           </Button>
         </div>
       </div>

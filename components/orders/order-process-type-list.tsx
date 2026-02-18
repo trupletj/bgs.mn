@@ -58,15 +58,15 @@ export default function OrderProcessList({
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [processToDelete, setProcessToDelete] = useState<OrderProcess | null>(
-    null
+    null,
   );
   const router = useRouter();
 
   function formatDate(dateString: string) {
     const date = new Date(dateString);
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padEnd(2, "0");
-    const day = String(date.getDate()).padEnd(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     return `${year} он ${month} сар ${day} өдөр`;
   }
@@ -129,7 +129,7 @@ export default function OrderProcessList({
                   <Button
                     variant="outline"
                     className="mt-4"
-                    onClick={() => router.push("/order-processes/create")}>
+                    onClick={() => router.push("/order-processes/new")}>
                     Эхний төрөл үүсгэх
                   </Button>
                 </TableCell>
