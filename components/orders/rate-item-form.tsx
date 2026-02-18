@@ -22,7 +22,6 @@ interface RateItemFormProps {
   currentStep: OrderStep;
   order_instance_id: number;
   reviewer_profile_id: number;
-  onReviewComplete: () => void;
 }
 
 export function RateItemForm({
@@ -30,12 +29,12 @@ export function RateItemForm({
   currentStep,
   order_instance_id,
   reviewer_profile_id,
-  onReviewComplete,
 }: RateItemFormProps) {
   const [comments, setComments] = useState("");
   const [newQuantities, setNewQuantities] = useState<Record<number, number>>(
-    {}
+    {},
   );
+  const [itemComments, setItemComments] = useState<Record<number, string>>({});
   const [subOrderItems, setSubOrderItems] = useState<
     Record<number, SubOrderItem[]>
   >({});
@@ -45,6 +44,9 @@ export function RateItemForm({
 
   const hasChanges = Object.keys(newQuantities).length > 0;
 
+  const handleItemCommentChange = (itemId: number, value: string) => {
+    setItemComments((prev) => ({ ...prev, [itemId]: value }));
+  };
   useEffect(() => {
     loadSubOrderItems();
   }, [orderItems]);
@@ -63,7 +65,7 @@ export function RateItemForm({
           description, 
           created_at, 
           created_by, 
-          reviewer_profile:profile!sub_order_item_reviewer_profile_id_fkey( name, position_name )`
+          reviewer_profile:profile!sub_order_item_reviewer_profile_id_fkey( name, position_name )`,
         )
         .in("order_item_id", itemIds)
         .order("created_at", { ascending: false });
@@ -99,7 +101,7 @@ export function RateItemForm({
   };
 
   const handleSubmit = async (
-    status: "approved" | "rejected" | "changes_requested"
+    status: "approved" | "rejected" | "changes_requested",
   ) => {
     setIsSubmitting(true);
 
@@ -110,6 +112,7 @@ export function RateItemForm({
       comments: comments.trim(),
       newQuantities: status === "changes_requested" ? newQuantities : undefined,
       reviewer_profile_id,
+      itemComments: status === "changes_requested" ? itemComments : undefined,
     });
 
     if (result.success) {
@@ -117,11 +120,10 @@ export function RateItemForm({
         status === "approved"
           ? "Зөвшөөрлөө"
           : status === "rejected"
-          ? "Татгалзлаа"
-          : "Өөрчлөлт шаардлаа"
+            ? "Татгалзлаа"
+            : "Өөрчлөлт шаардлаа",
       );
-      onReviewComplete();
-      router.push("/dashboard");
+      router.push("/orders/list");
     } else {
       toast.error(result.error || "Алдаа гарлаа");
     }
@@ -218,6 +220,23 @@ export function RateItemForm({
                     </p>
                   </div>
                 )}
+                <div className="mt-3">
+                  <Label
+                    className={`text-xs ${isChanged ? "text-blue-600 font-semibold" : "text-gray-400"}`}>
+                    {isChanged
+                      ? "Өөрчлөлтийн тайлбар (заавал биш)"
+                      : "Тоог өөрчилсөн үед тайлбар бичих боломжтой"}
+                  </Label>
+                  <Textarea
+                    placeholder="Энэхүү тоо хэмжээний өөрчлөлтийн шалтгааныг бичнэ үү..."
+                    className="mt-1 h-20"
+                    value={itemComments[item.id] || ""}
+                    onChange={(e) =>
+                      handleItemCommentChange(item.id, e.target.value)
+                    }
+                    disabled={!isChanged || isSubmitting} // Тоо өөрчлөгдөөгүй бол идэвхгүй
+                  />
+                </div>
               </div>
             );
           })}

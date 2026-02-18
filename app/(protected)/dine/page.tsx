@@ -20,13 +20,13 @@ export default async function Page() {
     //   icon: ClipboardList,
     //   requiredRoles: ["hr_emp", "monitoring_emp", "super_admin"], // Бүх хүнд харагдана
     // },
-    // {
-    //   title: "Ажлын байрны тодорхойлолт",
-    //   description: "Ажлын байрны тодорхойлолт",
-    //   href: "/dashboard/job-descriptions",
-    //   icon: Briefcase,
-    //   requiredRoles: ["hr_emp", "super_admin"],
-    // },
+    {
+      title: "Түр зуурын гал тогоо",
+      description: "Ажилтныг өөр гал тогоонд түр шилжүүлэх",
+      href: "/dine/temp-kitchen",
+      icon: Briefcase,
+      requiredRoles: ["hr_emp", "super_admin"],
+    },
   ];
 
   // Хэрэглэгчид хандах эрхтэй системүүдийг шүүх

@@ -74,7 +74,7 @@ export function RolesList() {
               action
             )
           )
-        `
+        `,
         )
         .order("display_name");
 
@@ -117,7 +117,7 @@ export function RolesList() {
       if (permError) throw permError;
 
       const { error: profError } = await supabase
-        .from("oles_profiles")
+        .from("roles_profiles")
         .delete()
         .eq("role_id", roleId);
       if (profError) throw profError;

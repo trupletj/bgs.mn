@@ -1,4 +1,4 @@
-import { getProfileInfo } from "@/actions/review";
+import { getProfileInfo } from "@/actions/profile";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 

@@ -22,7 +22,6 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-// interface Props { register: string; phone: string }
 const FormSchema = z.object({
   pin: z.string().min(6, {
     message: "Нэвтрэх код 6 оронтой байх ёстой.",

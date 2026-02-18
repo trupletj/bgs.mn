@@ -25,7 +25,12 @@ export default async function Page() {
       description: "Захиалгын систем",
       href: "/orders",
       icon: ClipboardList,
-      requiredRoles: ["hr_emp", "monitoring_emp", "super_admin"], // Бүх хүнд харагдана
+      requiredRoles: [
+        "hr_emp",
+        "monitoring_emp",
+        "super_admin",
+        "order_system",
+      ],
     },
     {
       title: "Ажлын байрны тодорхойлолт",

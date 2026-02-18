@@ -12,7 +12,6 @@ export default async function OrderDetailPage({
   const { id } = await params;
 
   try {
-    // const { data: orderDetails, error } = await getOrderWithDetails(id);
     const { data: orderDetails, error } = await getOrderWithDetail(id);
 
     if (error) {
@@ -25,7 +24,6 @@ export default async function OrderDetailPage({
       notFound();
     }
 
-    // return <OrderDetailView orderDetails={orderDetails} />;
     return <NewOrderDetailView orderDetails={orderDetails} />;
   } catch (error) {
     console.error("Unexpected error fetching order:", error);

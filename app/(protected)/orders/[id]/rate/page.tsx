@@ -1,4 +1,4 @@
-import { getProfileIdFromAuthUserId } from "@/actions/review";
+import { getProfileIdFromAuthUserId } from "@/actions/profile";
 import RateOrderForm from "@/components/orders/rate-order-form";
 import { createClient } from "@/utils/supabase/client";
 import { redirect } from "next/navigation";

@@ -2,12 +2,10 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
-import { getProfileIdFromAuthUserId } from "./review";
+import { getProfileIdFromAuthUserId } from "./profile";
 import { createClient } from "@/utils/supabase/server";
 import { createClient as client } from "@/utils/supabase/client";
-import { getNextStep, StepType } from "@/utils/workflow";
 
-// actions/orders.ts – Засварласан getOrderWithDetails
 export async function getOrderWithDetail(orderId: string) {
   const supabase = client();
 
@@ -24,7 +22,7 @@ export async function getOrderWithDetail(orderId: string) {
         phone,
         position_name
       )
-    `
+    `,
     )
     .eq("id", orderId)
     .single();
@@ -37,7 +35,7 @@ export async function getOrderWithDetail(orderId: string) {
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
     .select(
-      "id, part_name, part_number, quantity, final_quantity, unit, spare_type"
+      "id, part_name, part_number, quantity, final_quantity, unit, spare_type",
     )
     .eq("order_id", orderId)
     .order("id");
@@ -60,6 +58,7 @@ export async function getOrderWithDetail(orderId: string) {
         reviewed_at,
         reviewer_profile_id,
         order_step_id,
+        comment,
         profile:reviewer_profile_id (
           id,
           name,
@@ -73,7 +72,7 @@ export async function getOrderWithDetail(orderId: string) {
           required_approval_count
         )
       )
-    `
+    `,
     )
     .eq("order_id", orderId)
     .order("created_at", { ascending: false })
@@ -86,7 +85,7 @@ export async function getOrderWithDetail(orderId: string) {
   const latestInstance = instances?.[0];
   let reviewers =
     latestInstance?.order_step_reviewers?.filter(
-      (r: any) => r.status !== "skipped"
+      (r: any) => r.status !== "skipped",
     ) || [];
 
   // 4. Sub_order_item-үүдийг тусдаа авч, reviewer-т тааруулах
@@ -102,7 +101,7 @@ export async function getOrderWithDetail(orderId: string) {
         created_at,
         reviewer_profile_id,
         order_step_id
-      `
+      `,
       )
       .eq("order_instance_id", latestInstance.id);
 
@@ -115,7 +114,7 @@ export async function getOrderWithDetail(orderId: string) {
         sub_order_items: subItems.filter(
           (sub: any) =>
             sub.reviewer_profile_id === reviewer.reviewer_profile_id &&
-            sub.order_step_id === reviewer.order_step_id
+            sub.order_step_id === reviewer.order_step_id,
         ),
         step_order: reviewer.order_steps?.step_order,
         step_name: reviewer.order_steps?.step_name,
@@ -200,49 +199,16 @@ export type Order = {
 export type OrderItem = {
   id: number;
   order_id: number;
-  part_id?: number;
   part_number?: string;
   part_name: string;
   part_description?: string;
   manufacturer?: string;
   quantity: number;
-  // unit_price?: number;
   status: string;
   notes?: string;
   unit: string;
   image_url?: string;
   spare_type: string;
-};
-
-export type PartsCatalog = {
-  id: number;
-  part_number: string;
-  name: string;
-  description?: string;
-  category?: string;
-  manufacturer?: string;
-  // unit_price?: number;
-  availability_status: string;
-  lead_time_days?: number;
-  specifications?: any;
-};
-
-export type WorkflowEntry = {
-  id: number;
-  order_id: number;
-  from_status: string | null;
-  to_status: string;
-  changed_by: string;
-  change_reason: string | null;
-  comments: string | null;
-  created_at: string;
-  user?: {
-    id: string;
-    nice_name?: string;
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-  };
 };
 
 export interface OrderReviewers {
@@ -275,42 +241,6 @@ export interface SubOrderItem {
   created_by: number;
   description?: string;
   order_item_id: number;
-  order_reviewer_id: number;
-}
-
-export async function createOrder(orderData: Partial<Order>): Promise<{
-  data: Order | null;
-  error: PostgrestError | null;
-}> {
-  const supabase = await createClient();
-  let status = "";
-  if (orderData.status === "created_step") {
-    status = getNextStep("created_step" as StepType) ?? "created_step";
-  }
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    throw new Error("Хэрэглэгчийн мэдээлэл авах үед алдаа гарлаа.");
-  }
-  const auth_user_id = user?.id;
-  const profile_id = await getProfileIdFromAuthUserId();
-
-  const { data, error } = await supabase
-    .from("orders")
-    .insert({
-      ...orderData,
-      status: status,
-      created_profile: profile_id, // Use the public.users.id instead of auth user ID
-      auth_user_id: auth_user_id,
-    })
-    .select()
-    .single();
-
-  return { data, error };
 }
 
 export async function getOrdersByUser(): Promise<{
@@ -334,111 +264,6 @@ export async function getOrdersByUser(): Promise<{
     .order("created_at", { ascending: false });
 
   return { data: data ?? [], error };
-}
-
-export async function getOrderWithDetails(orderId: string): Promise<{
-  data: {
-    order: Order;
-    items: OrderItem[];
-    order_reviewers: OrderReviewers[];
-    profile: {
-      id: string;
-      name?: string;
-      department_name?: string;
-      phone?: string;
-    };
-  } | null;
-  error: PostgrestError | null;
-}> {
-  const supabase = getSupabaseAdmin();
-
-  try {
-    // Get order details
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", orderId)
-      .single();
-
-    if (orderError) {
-      console.error("Order fetch error:", orderError);
-      return { data: null, error: orderError };
-    }
-
-    if (!order) {
-      return {
-        data: null,
-        error: { message: "Order not found" } as PostgrestError,
-      };
-    }
-
-    // Get order items
-    const { data: items, error: itemsError } = await supabase
-      .from("order_items")
-      .select("*")
-      .eq("order_id", orderId)
-      .order("id");
-
-    // Don't fail if items fetch fails, just log and continue with empty array
-    if (itemsError) {
-      console.error("Order items fetch error:", itemsError);
-    }
-
-    let order_reviewers: any[] = [];
-    try {
-      const { data: order_reviewers_data, error: orderflowError } =
-        await supabase
-          .from("order_reviewers")
-          .select("*, profile:profile_id(*), sub_order_item:sub_order_item(*)")
-          .eq("order_id", orderId)
-          .eq("is_reviewed", true);
-
-      if (orderflowError) {
-        console.error(
-          "order_reviewers_data fetch error:",
-          order_reviewers_data
-        );
-        // Continue with empty workflow instead of failing
-      } else {
-        order_reviewers = order_reviewers_data || [];
-      }
-    } catch (orderflowError) {
-      console.error("Workflow fetch exception:", orderflowError);
-      // Continue with empty workflow
-    }
-
-    // Get profile details
-    const { data: profile, error: profileError } = await supabase
-      .from("profile")
-      .select("id, name, department_name, phone")
-      .eq("id", order.created_profile)
-      .single();
-
-    if (profileError) {
-      console.error("profile fetch error:", profileError);
-      return { data: null, error: profileError };
-    }
-
-    if (!profile) {
-      return {
-        data: null,
-        error: { message: "profile not found" } as PostgrestError,
-      };
-    }
-
-    return {
-      data: {
-        order,
-        items: items || [],
-        profile,
-        order_reviewers,
-      },
-      error: null,
-    };
-  } catch (error) {
-    console.error("Unexpected error in getOrderWithDetails:", error);
-    return { data: null, error: error as PostgrestError };
-  }
 }
 
 export async function addOrderItem(orderItem: Partial<OrderItem>): Promise<{
@@ -482,7 +307,7 @@ export async function updateOrderStatus(
   newStatus: string,
   userId: string,
   comments?: string,
-  reason?: string
+  reason?: string,
 ): Promise<{
   success: boolean;
   error: string | null;
@@ -534,116 +359,8 @@ export async function updateOrderStatus(
   }
 }
 
-export async function updateOrder(
-  orderId: number,
-  updates: Partial<Order>
-): Promise<{
-  data: Order | null;
-  error: PostgrestError | null;
-}> {
-  const supabase = getSupabaseAdmin();
-
-  const { data, error } = await supabase
-    .from("orders")
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", orderId)
-    .select()
-    .single();
-
-  return { data, error };
-}
-
-export async function addOrderNote(
-  orderId: number,
-  note: string,
-  userId: string
-): Promise<{
-  success: boolean;
-  error: string | null;
-}> {
-  const supabase = getSupabaseAdmin();
-
-  try {
-    // Add to workflow history as a note
-    const { error } = await supabase.from("order_workflow").insert({
-      order_id: orderId,
-      old_status: null,
-      new_status: null,
-      // user_id: userId,
-      comments: note,
-      change_reason: "note_added",
-    });
-
-    if (error) throw error;
-
-    return { success: true, error: null };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
-}
-
-export async function addTechnicalReviewers(
-  orderId: string,
-  reviewerIds: string[],
-  status: string
-) {
-  const supabase = getSupabaseAdmin();
-  const profile_id = await getProfileIdFromAuthUserId();
-
-  const reviewersToAdd = reviewerIds.map((userId) => ({
-    order_id: orderId,
-    reviewer_type: status,
-    status: status,
-    sender_id: profile_id,
-    profile_id: userId,
-  }));
-
-  const { error } = await supabase
-    .from("order_reviewers")
-    .insert(reviewersToAdd);
-
-  if (error) {
-    throw new Error(`Шалгуулагч нэмэхэд алдаа гарлаа: ${error.message}`);
-  }
-
-  // await sendReviewNotifications(orderId, reviewerIds);
-}
-
-export async function sendReviewNotifications(
-  orderId: string,
-  reviewerIds: string[]
-) {
-  const supabase = getSupabaseAdmin();
-
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .select("order_number, title")
-    .eq("id", orderId)
-    .single();
-
-  if (orderError) return;
-
-  const notifications = reviewerIds.map((userId) => ({
-    // user_id: userId,
-    type: "review_request",
-    title: "Шинэ захиалга шалгуулалтад ирлээ",
-    message: `Захиалга #${order.order_number}: ${order.title}`,
-    related_id: orderId,
-    is_read: false,
-  }));
-
-  const { error } = await supabase.from("notifications").insert(notifications);
-
-  if (error) {
-    console.error("Мэдэгдэл илгээхэд алдаа гарлаа:", error);
-  }
-}
-
 export async function createOrderWithInstace(
-  orderData: Partial<Order>
+  orderData: Partial<Order>,
 ): Promise<{
   data: Order | null;
   error: PostgrestError | null;
@@ -688,7 +405,7 @@ export async function createOrderWithInstace(
 
     if (instancesError)
       throw new Error(
-        instancesError.message + "захиалгын төрлүүдийг татах үед алдаа гарлаа"
+        instancesError.message + "захиалгын төрлүүдийг татах үед алдаа гарлаа",
       );
 
     const { data: step, error: stepError } = await supabase
@@ -700,7 +417,7 @@ export async function createOrderWithInstace(
 
     if (stepError || !step) {
       throw new Error(
-        "Захиалга үүсгэн хянагчид холбох гэтэл эхний шат олдсонгүй"
+        "Захиалга үүсгэн хянагчид холбох гэтэл эхний шат олдсонгүй",
       );
     }
 
@@ -768,16 +485,15 @@ export async function getAwaitingOrders(profile_id: string) {
           profile(id, name, department_name)
         )
       )
-    `
+    `,
     )
     .eq("reviewer_profile_id", profile_id)
-    .eq("status", "pending")
     .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching awaiting orders:", error);
     throw new Error(
-      "Шалгагдахаар хүлээгдэж буй захиалгуудыг авахад алдаа гарлаа"
+      "Шалгагдахаар хүлээгдэж буй захиалгуудыг авахад алдаа гарлаа",
     );
   }
 

@@ -38,7 +38,9 @@ export default async function PolicyDetailPage({
           </Link>
           {isEditAccess && (
             <Link href={`/policy/${policy_id}/edit`}>
-              <Button variant="secondary" className="ml-2">
+              <Button
+                variant="secondary"
+                className="ml-2 hover:bg-gray-200 cursor-pointer">
                 Засварлах
               </Button>
             </Link>

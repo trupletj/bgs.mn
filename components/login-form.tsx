@@ -33,7 +33,7 @@ export function RequestOtpForm({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, // Таны Anon Key
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         },
         body: JSON.stringify({ phone, register }),
       },

@@ -62,19 +62,19 @@ export default function PolicyEditerForm({
         ...c,
         policyId: c.policyId || initialData.id,
       })),
-    })) || []
+    })) || [],
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const updateClauseNumbers = (
     clauses: Clause[],
-    parentRef: string
+    parentRef: string,
   ): Clause[] => {
     return clauses.map((clause, idx) => ({
       ...clause,
       referenceNumber: `${parentRef}.${idx + 1}`,
       children: updateClauseNumbers(
         clause.children ?? [],
-        `${parentRef}.${idx + 1}`
+        `${parentRef}.${idx + 1}`,
       ),
     }));
   };
@@ -91,7 +91,6 @@ export default function PolicyEditerForm({
         policyId: initialData?.id,
       },
     ]);
-    console.log("New section added:", { totalSections: sections.length + 1 });
     setIsProcessing(false);
   }, [isProcessing, sections.length, initialData?.id]);
 
@@ -112,13 +111,12 @@ export default function PolicyEditerForm({
             ...section,
             referenceNumber: `${idx + 1}`,
             clauses: updateClauseNumbers(section.clauses, `${idx + 1}`),
-          })
+          }),
         );
       });
-      console.log("Section inserted before:", { sectionIndex });
       setIsProcessing(false);
     },
-    [isProcessing, initialData?.id, updateClauseNumbers]
+    [isProcessing, initialData?.id, updateClauseNumbers],
   );
 
   const deleteSection = useCallback((sectionIndex: number) => {
@@ -155,15 +153,12 @@ export default function PolicyEditerForm({
           positions: [],
         };
         section.clauses = [...section.clauses, newClause];
-        console.log("New clause added:", {
-          section: section.referenceNumber,
-          clause: newClause.referenceNumber,
-        });
+
         return newSections;
       });
       setIsProcessing(false);
     },
-    [isProcessing]
+    [isProcessing],
   );
 
   const insertClauseBefore = useCallback(
@@ -181,8 +176,8 @@ export default function PolicyEditerForm({
         const parentRef =
           path.length === 1
             ? section.referenceNumber
-            : current[0]?.referenceNumber.split(".").slice(0, -1).join(".") ??
-              section.referenceNumber;
+            : (current[0]?.referenceNumber.split(".").slice(0, -1).join(".") ??
+              section.referenceNumber);
         const newClause: Clause = {
           text: "",
           referenceNumber: `${parentRef}.${insertIndex + 1}`,
@@ -213,7 +208,7 @@ export default function PolicyEditerForm({
       });
       setIsProcessing(false);
     },
-    [isProcessing]
+    [isProcessing],
   );
 
   const addSubClause = useCallback(
@@ -250,7 +245,7 @@ export default function PolicyEditerForm({
       });
       setIsProcessing(false);
     },
-    [isProcessing]
+    [isProcessing],
   );
 
   const updateSectionText = useCallback(
@@ -265,7 +260,7 @@ export default function PolicyEditerForm({
         return newSections;
       });
     },
-    []
+    [],
   );
 
   const updateClauseText = useCallback(
@@ -289,14 +284,14 @@ export default function PolicyEditerForm({
         return newSections;
       });
     },
-    [isProcessing]
+    [isProcessing],
   );
 
   const updateClausePositions = useCallback(
     (
       sectionIndex: number,
       path: number[],
-      positions: { positionId: string; type: ActionType }[]
+      positions: { positionId: string; type: ActionType }[],
     ) => {
       setSections((prev) => {
         const newSections = JSON.parse(JSON.stringify(prev));
@@ -316,7 +311,7 @@ export default function PolicyEditerForm({
         return newSections;
       });
     },
-    []
+    [],
   );
 
   const deleteClause = useCallback(
@@ -336,8 +331,8 @@ export default function PolicyEditerForm({
           path.length === 1
             ? section.referenceNumber
             : current.length > 0
-            ? current[0].referenceNumber.split(".").slice(0, -1).join(".")
-            : section.referenceNumber;
+              ? current[0].referenceNumber.split(".").slice(0, -1).join(".")
+              : section.referenceNumber;
         if (path.length === 1) {
           section.clauses = updateClauseNumbers(current, parentRef);
         } else {
@@ -359,7 +354,7 @@ export default function PolicyEditerForm({
       });
       setIsProcessing(false);
     },
-    [isProcessing]
+    [isProcessing],
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -403,7 +398,7 @@ export default function PolicyEditerForm({
 
       const deletedSections =
         initialData?.sections.filter(
-          (initSection) => !sections.find((s) => s.id === initSection.id)
+          (initSection) => !sections.find((s) => s.id === initSection.id),
         ) || [];
       const deletedClauses: { sectionId: string; clauseId: string }[] = [];
       initialData?.sections.forEach((initSection) => {
@@ -482,7 +477,7 @@ export default function PolicyEditerForm({
 
         const saveClauses = async (
           clauses: Clause[],
-          parentId: string | null = null
+          parentId: string | null = null,
         ) => {
           for (const clause of clauses) {
             const clauseMethod = clause.id ? "PUT" : "POST";

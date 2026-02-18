@@ -2,7 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { revalidatePath } from "next/cache";
-import { getProfileIdFromAuthUserId } from "./review";
+import { getProfileIdFromAuthUserId } from "./profile";
 
 export interface OrderProcessFormData {
   name: string;
@@ -355,4 +355,76 @@ export async function updateOrderManagementStatus({
   if (historyError) throw historyError;
 
   return { success: true };
+}
+
+export async function updateFulfillmentStatus({
+  fulfillmentId,
+  newStatus,
+  oldStatus,
+  reason,
+}: {
+  fulfillmentId: string;
+  newStatus: string;
+  oldStatus: string;
+  reason?: string;
+}) {
+  const supabase = createClient();
+  const profileId = await getProfileIdFromAuthUserId();
+
+  const { error: updateError } = await supabase
+    .from("order_fulfillment")
+    .update({ status: newStatus })
+    .eq("id", fulfillmentId);
+
+  if (updateError) throw updateError;
+
+  const { error: historyError } = await supabase
+    .from("fulfillment_status_history")
+    .insert({
+      fulfillment_id: fulfillmentId,
+      old_status: oldStatus,
+      new_status: newStatus,
+      reason: reason,
+      changed_by: profileId,
+    });
+
+  if (historyError) throw historyError;
+
+  return { success: true };
+}
+
+export async function getOrderItemsForOrderProcess(orderId: string) {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("order_items")
+    .select(
+      `
+      *,
+      order_fulfillment (
+        id,
+        quantity,
+        status,
+        created_at,
+        notes,
+        fulfillment_status_history (
+          id,
+          old_status,
+          new_status,
+          reason,
+          created_at,
+          changed_by
+        )
+      )
+    `,
+    )
+    .eq("order_id", orderId)
+    .order("id");
+
+  if (error) {
+    console.error(error);
+    throw new Error("Өгөгдөл татахад алдаа гарлаа");
+  }
+
+  return data || [];
 }

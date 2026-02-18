@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Clock,
   User,
-  MessageSquare,
   ArrowRight,
 } from "lucide-react";
 import { UNIT_OPTIONS } from "@/types";
@@ -21,7 +20,7 @@ interface Reviewer {
   id: number;
   status: string;
   reviewed_at?: string;
-  comments?: string;
+  comment?: string;
   profile?: { name: string; position_name?: string };
   sub_order_items?: Array<{
     id: number;
@@ -43,7 +42,7 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
   const sorted = [...reviewers].sort((a, b) =>
     a.order_steps?.step_order && b.order_steps?.step_order
       ? a.order_steps.step_order - b.order_steps.step_order
-      : 0
+      : 0,
   );
 
   const getIcon = (status: string) => {
@@ -131,7 +130,8 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
               const hasChanges =
                 r.sub_order_items && r.sub_order_items.length > 0;
               const isExpanded = expanded.has(r.id);
-              // const hasComments = r.comments?.trim().length > 0;
+              const hasGeneralComment =
+                r.comment && r.comment.trim().length > 0;
 
               return (
                 <div
@@ -141,12 +141,12 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                     isExpanded
                       ? "ring-2 ring-primary/10"
                       : "hover:border-primary/50",
-                    getStatusColor(r.status || "pending")
+                    getStatusColor(r.status || "pending"),
                   )}>
                   <div
                     className={cn(
                       "flex items-start gap-3 p-4 cursor-pointer",
-                      hasChanges && "pb-3"
+                      hasChanges && "pb-3",
                     )}
                     onClick={() => toggleExpanded(r.id)}>
                     <div className="flex-shrink-0 mt-0.5">
@@ -162,7 +162,7 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                             <ChevronDown
                               className={cn(
                                 "h-4 w-4 text-muted-foreground transition-transform flex-shrink-0",
-                                isExpanded && "rotate-180"
+                                isExpanded && "rotate-180",
                               )}
                             />
                           )}
@@ -199,6 +199,17 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                           </>
                         )}
                       </div>
+
+                      {hasGeneralComment && (
+                        <div className="mt-3 p-2 bg-white/50 dark:bg-black/10 rounded-md border border-black/5 text-sm">
+                          <p className="flex gap-2">
+                            <span className="font-semibold not-italic">
+                              Шийдвэрийн тайлбар:
+                            </span>
+                            {r.comment}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -216,7 +227,7 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                           <div className="space-y-2">
                             {r.sub_order_items?.map((sub) => {
                               const orig = items.find(
-                                (it) => it.id === sub.order_item_id
+                                (it) => it.id === sub.order_item_id,
                               );
                               return (
                                 <div
