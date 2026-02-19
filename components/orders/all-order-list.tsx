@@ -176,7 +176,6 @@ export default function AllOrderList() {
             total,
           }),
         );
-        console.log("all status", result);
         setStatusSummary(result);
       }
 
@@ -201,7 +200,6 @@ export default function AllOrderList() {
           }),
         );
         setManagementStatusSummary(result);
-        console.log("management status", result);
       }
     } catch (err) {
       console.error(err);

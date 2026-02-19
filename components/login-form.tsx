@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { set } from "zod";
+import { Loader2 } from "lucide-react";
 
 export function RequestOtpForm({
   className,
@@ -23,10 +24,12 @@ export function RequestOtpForm({
   const [register, setReg] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
 
   const onRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(undefined);
+    setIsLoading(true);
     const response = await fetch(
       "https://ljlywyhpxsutvrdeyyla.supabase.co/functions/v1/verify-user",
       {
@@ -102,8 +105,15 @@ export function RequestOtpForm({
                   />
                 </div>
                 {error && <p className="text-red-500">{error}</p>}
-                <Button type="submit" className="w-full">
-                  Нэвтрэх
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Түр хүлээнэ үү...
+                    </>
+                  ) : (
+                    "Нэвтрэх"
+                  )}
                 </Button>
               </div>
             </form>
