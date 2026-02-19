@@ -23,38 +23,37 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface ReviewRequestProp {
   profile_id: string;
   type: "pending" | "reviewed";
+  initialData: AwaitingOrder[] | null;
 }
 
-export function RequestedList({ profile_id, type }: ReviewRequestProp) {
-  const [reviewRequests, setReviewRequests] = useState<AwaitingOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+export function RequestedList({
+  profile_id,
+  type,
+  initialData,
+}: ReviewRequestProp) {
+  const [reviewRequests, setReviewRequests] = useState<AwaitingOrder[]>(
+    initialData || [],
+  );
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    if (profile_id) {
-      fetchReviewRequests();
-    }
-  }, [profile_id]);
+    setReviewRequests(initialData || []);
+  }, [initialData]);
 
   const fetchReviewRequests = async () => {
     try {
       setLoading(true);
-      setError(null);
       const data = await getAwaitingOrders(profile_id);
       const filtered = (data || []).filter((request) => {
-        if (type === "pending") {
-          return request.status === "pending" || !request.status;
-        } else {
-          return request.status && request.status !== "pending";
-        }
+        return type === "pending"
+          ? request.status === "pending" || !request.status
+          : request.status && request.status !== "pending";
       });
       setReviewRequests(filtered);
     } catch (error) {
-      console.error("Error fetching review requests:", error);
-      setError("Хүсэлтүүдийг авахад алдаа гарлаа");
-      toast.error("Хүсэлтүүдийг авахад алдаа гарлаа");
-      setReviewRequests([]);
+      setError("Алдаа гарлаа");
     } finally {
       setLoading(false);
     }

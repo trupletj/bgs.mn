@@ -271,6 +271,13 @@ export async function addOrderItem(orderItem: Partial<OrderItem>): Promise<{
   error: PostgrestError | null;
 }> {
   const supabase = getSupabaseAdmin();
+  const { data: users, error: userError } =
+    await supabase.auth.admin.listUsers();
+  console.log(
+    "Admin Test (List Users):",
+    users,
+    userError ? "Failed" : "Success",
+  );
 
   const { data, error } = await supabase
     .from("order_items")
@@ -301,63 +308,6 @@ export const deleteImagesFromStorage = async (urls: string[]) => {
     console.error("Зураг устгахад алдаа гарлаа:", error);
   }
 };
-
-export async function updateOrderStatus(
-  orderId: number,
-  newStatus: string,
-  userId: string,
-  comments?: string,
-  reason?: string,
-): Promise<{
-  success: boolean;
-  error: string | null;
-}> {
-  const supabase = getSupabaseAdmin();
-
-  try {
-    // First get the current status
-    const { data: currentOrder, error: fetchError } = await supabase
-      .from("orders")
-      .select("status")
-      .eq("id", orderId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // Update the order status
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", orderId);
-
-    if (updateError) throw updateError;
-
-    // Log the status change in workflow
-    const { error: workflowError } = await supabase
-      .from("order_workflow")
-      .insert({
-        order_id: orderId,
-        from_status: currentOrder.status,
-        to_status: newStatus,
-        changed_by: userId,
-        change_reason: reason,
-        comments: comments,
-      });
-
-    if (workflowError) {
-      console.error("Workflow log error:", workflowError);
-      // Don't fail the entire operation if workflow logging fails
-    }
-
-    return { success: true, error: null };
-  } catch (err) {
-    console.error("Status update error:", err);
-    return { success: false, error: (err as Error).message };
-  }
-}
 
 export async function createOrderWithInstace(
   orderData: Partial<Order>,
