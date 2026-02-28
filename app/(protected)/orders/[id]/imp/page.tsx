@@ -1,7 +1,4 @@
-// components/OrderImplementationPage.tsx гэх мэт
-
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -348,10 +345,11 @@ function OrderItemCard({ item, orderId }: { item: any; orderId: string }) {
                     </label>
                     <Input
                       type="number"
-                      min="1"
+                      min="0"
                       placeholder="Жишээ нь 50"
                       value={qtyInput}
                       onChange={(e) => setQtyInput(e.target.value)}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     />
                   </div>
 
