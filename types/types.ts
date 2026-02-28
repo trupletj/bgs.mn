@@ -3,7 +3,7 @@ export interface OrderItemForm {
   part_name: string;
   part_description?: string;
   manufacturer?: string;
-  quantity: number;
+  quantity: number | string;
   notes?: string;
   image_url?: string;
   unit?: string;

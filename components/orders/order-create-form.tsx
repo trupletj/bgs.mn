@@ -128,12 +128,21 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
     setOrderItems((prev) =>
       prev.map((item, i) => {
         if (i === index) {
-          // Quantity-г бутархай тоо болгон хувиргах
-          if (field === "quantity" && typeof value === "string") {
-            // Бутархай тоог зөвшөөрөх (0.5, 1.25, 2.75 гэх мэт)
-            const numericValue = parseFloat(value);
-            return { ...item, [field]: isNaN(numericValue) ? 0 : numericValue };
+          if (field === "quantity") {
+            if (value === "" || value === undefined) {
+              return { ...item, [field]: "" };
+            }
+            const stringValue = value.toString();
+            if (stringValue.endsWith(".")) {
+              return { ...item, [field]: stringValue };
+            }
+            const numericValue = parseFloat(stringValue);
+            return {
+              ...item,
+              [field]: isNaN(numericValue) ? "" : numericValue,
+            };
           }
+
           return { ...item, [field]: value };
         }
         return item;
@@ -207,7 +216,10 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
           part_name: item.part_name,
           part_description: item.part_description,
           manufacturer: item.manufacturer,
-          quantity: item.quantity,
+          quantity:
+            typeof item.quantity === "string"
+              ? parseFloat(item.quantity) || 0
+              : item.quantity,
           unit: item.unit,
           notes: item.notes,
           image_url: imageUrl || "",
@@ -437,6 +449,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                         handleItemChange(index, "part_name", e.target.value)
                       }
                       placeholder="Сэлбэгийн нэр эсвэл тайлбар"
+                      required
                     />
                   </div>
 
@@ -451,6 +464,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                         handleItemChange(index, "part_number", e.target.value)
                       }
                       placeholder="Үйлдвэрийн эдийн дугаар"
+                      required
                     />
                   </div>
 
@@ -479,6 +493,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                       onChange={(e) =>
                         handleItemChange(index, "quantity", e.target.value)
                       }
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       placeholder="0.00"
                     />
                   </div>
