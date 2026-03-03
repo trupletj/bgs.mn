@@ -8,69 +8,68 @@ import {
   Users,
   CookingPot,
 } from "lucide-react";
-import { hasRole } from "@/actions/rbac";
+import { hasPermission } from "@/actions/rbac"; // hasRole биш hasPermission ашиглана
 
 export default async function Page() {
-  // Системүүдийн жагсаалтыг ролуудтай нь хамт тодорхойлох
   const systems = [
     {
       title: "Журам, үнэлгээ",
       description: "Бодлого, журмын систем",
       href: "/t-info",
       icon: FileText,
-      requiredRoles: ["monitoring_emp", "super_admin"],
+      permission: { module: "policy", action: "access" },
     },
     {
       title: "Захиалга",
       description: "Захиалгын систем",
       href: "/orders",
       icon: ClipboardList,
-      requiredRoles: [
-        "hr_emp",
-        "monitoring_emp",
-        "super_admin",
-        "order_system",
-      ],
+      permission: { module: "orders", action: "access" },
     },
     {
       title: "Ажлын байрны тодорхойлолт",
       description: "Ажлын байрны тодорхойлолт",
       href: "/dashboard/job-descriptions",
       icon: Briefcase,
-      requiredRoles: ["hr_emp", "super_admin"],
+      permission: { module: "job_description", action: "access" },
     },
     {
       title: "Админ",
       description: "Эрхийн тохиргоо",
       href: "/admin",
       icon: User2,
-      requiredRoles: ["super_admin"],
+      permission: { module: "admin_panel", action: "access" },
     },
     {
       title: "Ажилчид",
       description: "Ажилчдын мэдээлэл",
-      href: "/employees",
+      href: "/employees", // Таны засах гэж буй хуудас
       icon: Users,
-      requiredRoles: ["super_admin"],
+      permission: { module: "employee", action: "read" },
     },
     {
       title: "Гал тогооны систем",
       description: "Гал тогооны систем",
       href: "/dine",
       icon: CookingPot,
-      requiredRoles: ["super_admin"],
+      permission: { module: "dining", action: "access" },
     },
   ];
 
-  // Хэрэглэгчид хандах эрхтэй системүүдийг шүүх
-  const accessibleSystems = [];
+  // Promise.all ашиглан бүх эрхийг нэг зэрэг хурдан шалгах
+  const systemAccessResults = await Promise.all(
+    systems.map(async (system) => {
+      const hasAccess = await hasPermission(
+        system.permission.module,
+        system.permission.action,
+      );
+      return hasAccess ? system : null;
+    }),
+  );
 
-  for (const system of systems) {
-    const hasAccess = await hasRole(system.requiredRoles);
-    if (hasAccess) {
-      accessibleSystems.push(system);
-    }
-  }
+  const accessibleSystems = systemAccessResults.filter(
+    (s): s is (typeof systems)[0] => s !== null,
+  );
 
   return (
     <div className="flex mt-3 items-center justify-center bg-background p-4">
@@ -95,10 +94,10 @@ export default async function Page() {
                       <div className="mb-4 rounded-full bg-primary/10 p-6 transition-colors group-hover:bg-primary/20">
                         <Icon className="h-12 w-12 text-primary" />
                       </div>
-                      <h2 className="mb-2 text-2xl font-semibold">
+                      <h2 className="mb-2 text-xl font-semibold">
                         {system.title}
                       </h2>
-                      <p className="text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {system.description}
                       </p>
                     </CardContent>

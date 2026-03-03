@@ -1,9 +1,16 @@
+import { hasPermission } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 import { columns } from "@/components/users/columns";
 import { DataTable } from "@/components/users/data-table";
 import { createClient } from "@/utils/supabase/server";
 
 export default async function UsersPage() {
   const supabase = await createClient();
+  const canAcess = await hasPermission("employee", "read");
+
+  if (!canAcess) {
+    return <UnauthorizedPage />;
+  }
 
   const { data: users, error } = await supabase
     .from("users")
@@ -14,12 +21,27 @@ export default async function UsersPage() {
     .eq("is_active", true)
     .range(0, 10000);
 
+  const canReadDine = await hasPermission("dining", "read");
+  const canEditDine = await hasPermission("dining", "edit");
+  const canReadUserDetail = await hasPermission("users_info", "read");
+
+  const permissions = {
+    canReadDine,
+    canEditDine,
+    canReadUserDetail,
+    canManageActions: false,
+  };
+
   if (error) return <div>Алдаа: {error.message}</div>;
 
   return (
     <div className="p-10">
       <div className="text-3xl font-bold mb-6">Хэрэглэгчийн бүртгэл</div>
-      <DataTable columns={columns} data={users || []} />
+      <DataTable
+        columns={columns}
+        data={users || []}
+        permissions={permissions}
+      />
     </div>
   );
 }
