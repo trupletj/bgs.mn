@@ -41,9 +41,12 @@ const MODULE_OPTIONS = [
   "user",
   "role",
   "permission",
+  "employee",
+  "dining",
+  "users_info",
 ];
 
-const ACTION_OPTIONS = ["read", "create", "edit", "delete"];
+const ACTION_OPTIONS = ["read", "create", "edit", "delete", "access"];
 
 export function PermissionEditor({
   permissionId,
@@ -253,8 +256,8 @@ export function PermissionEditor({
                   ? "Хадгалж байна..."
                   : "Үүсгэж байна..."
                 : isEditing
-                ? "Хадгалах"
-                : "Permission Үүсгэх"}
+                  ? "Хадгалах"
+                  : "Permission Үүсгэх"}
             </Button>
 
             {onCancel && (

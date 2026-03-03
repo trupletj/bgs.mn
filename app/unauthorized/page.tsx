@@ -1,6 +1,6 @@
 export default function UnauthorizedPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="mt-8 flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Эрх хүрэхгүй</h1>
         <p className="text-gray-600 mb-8">Та энэ хуудсыг харах эрхгүй байна.</p>

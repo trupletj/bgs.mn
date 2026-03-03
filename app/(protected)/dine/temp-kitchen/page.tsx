@@ -14,6 +14,8 @@ import OverrideForm from "@/components/dine/override-form";
 import { DeleteOverrideButton } from "@/components/dine/delete-override-button";
 import { DateFilter } from "@/components/dine/date-filter";
 import { EditOverrideDialog } from "@/components/dine/edit-override-dialog";
+import { hasPermission } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 
 const MEAL_TYPES = [
   { id: "breakfast", label: "Ө.Цай" },
@@ -28,6 +30,10 @@ export default async function TempKitchenPage({
 }: {
   searchParams: Promise<{ date?: string }>;
 }) {
+  const is_create = await hasPermission("dining", "access");
+  if (!is_create) {
+    return <UnauthorizedPage />;
+  }
   const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
   const selectedDate =

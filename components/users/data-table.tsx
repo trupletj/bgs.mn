@@ -26,11 +26,18 @@ import { EmployeeDetailDialog } from "./employee-detail-dialog";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  permissions: {
+    canReadUserDetail: boolean; // Шинээр нэмэв
+    canReadDine: boolean;
+    canEditDine: boolean;
+    canManageActions: boolean; // Үйлдэл хэсэгт зориулж нэмэв
+  };
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  permissions,
 }: DataTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
@@ -193,6 +200,7 @@ export function DataTable<TData, TValue>({
         employee={selectedEmployee}
         open={isDialogOpen}
         onOpenChange={setisDialogOpen}
+        permissions={permissions}
       />
     </div>
   );

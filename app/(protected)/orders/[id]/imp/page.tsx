@@ -180,7 +180,7 @@ function OrderItemCard({ item, orderId }: { item: any; orderId: string }) {
                 <div className="font-medium text-lg flex items-center gap-2">
                   {item.part_name}
                   <Badge variant="outline" className="text-xs font-normal">
-                    #{item.part_number || "Код байхгүй"}
+                    {item.part_number || "Код байхгүй"}
                   </Badge>
                 </div>
                 <div className="text-sm text-muted-foreground">
@@ -195,7 +195,7 @@ function OrderItemCard({ item, orderId }: { item: any; orderId: string }) {
                 </div>
                 <Progress
                   value={percent}
-                  className="h-2" // Суурь өнгө болон өндөр
+                  className="h-2"
                   indicatorClassName={
                     percent >= 100
                       ? "bg-emerald-600"
@@ -374,7 +374,7 @@ function OrderItemCard({ item, orderId }: { item: any; orderId: string }) {
                       Тэмдэглэл
                     </label>
                     <Input
-                      placeholder="Хүргэлт №1254 гэх мэт"
+                      placeholder="Хүргэлт гэх мэт"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                     />

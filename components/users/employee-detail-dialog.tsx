@@ -25,18 +25,34 @@ import { toast } from "sonner";
 import { UserMealConfig } from "../dine/user-meal-config";
 import { RiProfileLine } from "react-icons/ri";
 import { DialogDescription } from "@radix-ui/react-dialog";
+import { useEffect, useState } from "react";
 
 interface EmployeeDetailDialogProps {
   employee: any | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  permissions: {
+    canReadUserDetail: boolean; // Шинээр нэмэв
+    canReadDine: boolean;
+    canEditDine: boolean;
+    canManageActions: boolean; // Үйлдэл хэсэгт зориулж нэмэв
+  };
 }
 
 export function EmployeeDetailDialog({
   employee,
   open,
   onOpenChange,
+  permissions,
 }: EmployeeDetailDialogProps) {
+  const [activeTab, setActiveTab] = useState<string>("");
+
+  useEffect(() => {
+    if (!open) {
+      setActiveTab("");
+    }
+  }, [open]);
+
   if (!employee) return null;
   const supabase = createClient();
 
@@ -155,12 +171,19 @@ export function EmployeeDetailDialog({
 
         {/* 2-р мөр: Табууд (Tabs Section) */}
         <div className="flex-1 ">
-          <Tabs defaultValue="overview" className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">Ерөнхий</TabsTrigger>
-              <TabsTrigger value="dining_halls">Гал тогоо</TabsTrigger>
-              <TabsTrigger value="attendance">Ирц / Түүх</TabsTrigger>
-              <TabsTrigger value="actions">Үйлдэл</TabsTrigger>
+              {permissions.canReadUserDetail && (
+                <TabsTrigger value="overview">Ерөнхий</TabsTrigger>
+              )}
+              {permissions.canReadDine && (
+                <TabsTrigger value="dining_halls">Гал тогоо</TabsTrigger>
+              )}
+              {/* <TabsTrigger value="attendance">Ирц / Түүх</TabsTrigger> */}
+              {/* <TabsTrigger value="actions">Үйлдэл</TabsTrigger> */}
             </TabsList>
 
             <TabsContent
@@ -238,18 +261,21 @@ export function EmployeeDetailDialog({
             <TabsContent
               value="dining_halls"
               className="p-4 border rounded-b-md mt-2">
-              <UserMealConfig userId={employee.id} />
+              <UserMealConfig
+                userId={employee.id}
+                canEdit={permissions.canEditDine}
+              />
             </TabsContent>
 
-            <TabsContent
+            {/* <TabsContent
               value="attendance"
               className="p-4 border rounded-b-md mt-2">
               <p className="text-muted-foreground text-sm">
                 Ирцийн бүртгэл энд харагдана...
               </p>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent
+            {/* <TabsContent
               value="actions"
               className="p-4 border rounded-b-md mt-2 space-y-2">
               <Button variant="outline" className="w-full justify-start">
@@ -261,7 +287,7 @@ export function EmployeeDetailDialog({
               <Button variant="destructive" className="w-full justify-start">
                 Ажлаас чөлөөлөх
               </Button>
-            </TabsContent>
+            </TabsContent> */}
           </Tabs>
         </div>
       </DialogContent>

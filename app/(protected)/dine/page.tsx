@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase, ClipboardList, ChefHat } from "lucide-react";
 import { hasRole } from "@/actions/rbac";
+import { hasPermission } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 
 export default async function Page() {
   // Системүүдийн жагсаалтыг ролуудтай нь хамт тодорхойлох
@@ -11,7 +13,7 @@ export default async function Page() {
       description: "Гал тогооны жагсаалт",
       href: "/dine/list",
       icon: ChefHat,
-      requiredRoles: ["super_admin"],
+      permission: { module: "dining", action: "access" },
     },
     // {
     //   title: "Захиалга",
@@ -25,19 +27,23 @@ export default async function Page() {
       description: "Ажилтныг өөр гал тогоонд түр шилжүүлэх",
       href: "/dine/temp-kitchen",
       icon: Briefcase,
-      requiredRoles: ["hr_emp", "super_admin"],
+      permission: { module: "dining", action: "access" },
     },
   ];
+  const systemAccessResults = await Promise.all(
+    systems.map(async (system) => {
+      const hasAccess = await hasPermission(
+        system.permission.module,
+        system.permission.action,
+      );
+      return hasAccess ? system : null;
+    }),
+  );
 
   // Хэрэглэгчид хандах эрхтэй системүүдийг шүүх
-  const accessibleSystems = [];
-
-  for (const system of systems) {
-    const hasAccess = await hasRole(system.requiredRoles);
-    if (hasAccess) {
-      accessibleSystems.push(system);
-    }
-  }
+  const accessibleSystems = systemAccessResults.filter(
+    (s): s is (typeof systems)[0] => s !== null,
+  );
 
   return (
     <div className="flex mt-3 items-center justify-center bg-background p-4">
@@ -75,11 +81,7 @@ export default async function Page() {
             })}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <p className="text-lg text-muted-foreground">
-              Танд хандах эрхтэй систем байхгүй байна.
-            </p>
-          </div>
+          <UnauthorizedPage />
         )}
       </div>
     </div>

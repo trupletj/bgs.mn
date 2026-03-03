@@ -15,9 +15,10 @@ import { Loader2, Edit2, Save, X, Utensils } from "lucide-react";
 
 interface MealConfigProps {
   userId: string;
+  canEdit: boolean;
 }
 
-export function UserMealConfig({ userId }: MealConfigProps) {
+export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -157,12 +158,14 @@ export function UserMealConfig({ userId }: MealConfigProps) {
           <span>Хоолны байршлын тохиргоо</span>
         </h3>
         {!isEditing ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditing(true)}>
-            <Edit2 className="h-4 w-4 mr-2" /> Засварлах
-          </Button>
+          canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(true)}>
+              <Edit2 className="h-4 w-4 mr-2" /> Засварлах
+            </Button>
+          )
         ) : (
           <div className="flex gap-2">
             <Button

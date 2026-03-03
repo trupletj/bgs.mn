@@ -1,9 +1,16 @@
 import { hasPermission } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 import PolicyList from "@/components/policy/PolicyList";
 
 export default async function Page() {
-  const is_create = await hasPermission("policy", "create");
-  const is_delete = await hasPermission("policy", "delete");
+  const [is_create, is_delete, is_access] = await Promise.all([
+    hasPermission("policy", "create"),
+    hasPermission("policy", "delete"),
+    hasPermission("policy", "access"),
+  ]);
+  if (!is_access) {
+    return <UnauthorizedPage />;
+  }
   return (
     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
       <div className="px-4 lg:px-6">

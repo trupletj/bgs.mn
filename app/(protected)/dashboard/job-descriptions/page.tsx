@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import JobDescriptionList from "@/components/job-description/job-description-list";
 import { hasPermission, hasRole } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 
 export default async function Page() {
   const isManagerOrAdmin = await hasRole(["super_admin", "hr_emp"]);
@@ -9,6 +10,10 @@ export default async function Page() {
     redirect("/unauthorized");
   }
 
+  const is_access = await hasPermission("job_description", "access");
+  if (!is_access) {
+    return <UnauthorizedPage />;
+  }
   const is_create = await hasPermission("job_description", "create");
 
   return (
