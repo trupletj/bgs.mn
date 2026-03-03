@@ -8,7 +8,7 @@ import {
   Users,
   CookingPot,
 } from "lucide-react";
-import { hasPermission } from "@/actions/rbac"; // hasRole биш hasPermission ашиглана
+import { hasPermission } from "@/actions/rbac";
 
 export default async function Page() {
   const systems = [
@@ -43,7 +43,7 @@ export default async function Page() {
     {
       title: "Ажилчид",
       description: "Ажилчдын мэдээлэл",
-      href: "/employees", // Таны засах гэж буй хуудас
+      href: "/employees",
       icon: Users,
       permission: { module: "employee", action: "read" },
     },
