@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
 // import { signIn } from 'next-auth/react'
-// import { matchUserInfo } from '@repo/actions'
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/client";
 
@@ -12,7 +11,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
-import { set } from "zod";
 import { Loader2 } from "lucide-react";
 
 export function RequestOtpForm({
@@ -20,54 +18,53 @@ export function RequestOtpForm({
   ...props
 }: React.ComponentProps<"div">) {
   const supabase = createClient();
-  // const { error : otpError } = await supabase.auth.signInWithOtp({ phone: "99135213" });
   const [register, setReg] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const onRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(undefined);
     setIsLoading(true);
-    const response = await fetch(
-      "https://ljlywyhpxsutvrdeyyla.supabase.co/functions/v1/verify-user",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+
+    try {
+      const { data: verifyData, error: verifyError } =
+        await supabase.functions.invoke("verify-user", {
+          body: { phone, register },
+        });
+
+      if (verifyError || (verifyData && verifyData.error)) {
+        const msg =
+          verifyError?.message || verifyData?.error || "Шалгалт амжилтгүй";
+        setError(msg);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("Хэрэглэгч баталгаажлаа, OTP илгээж байна...");
+
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          shouldCreateUser: true,
+          data: { register_number: register },
         },
-        body: JSON.stringify({ phone, register }),
-      },
-    );
+      });
 
-    // Хэрэв HTTP status 200 биш бол (400, 500)
-    if (!response.ok) {
-      const errorData = await response.json();
-      setError(errorData.error || "Шалгалт амжилтгүй");
-      throw new Error(errorData.error || "Шалгалт амжилтгүй");
-    }
+      if (otpError) {
+        setError(`OTP илгээхэд алдаа гарлаа: ${otpError.message}`);
+        setIsLoading(false);
+        return;
+      }
 
-    const data = await response.json();
-
-    if (data && data.error) {
-      setError(data?.error || "Холболтын алдаа гарлаа");
-      return;
+      // Амжилттай бол дараагийн хуудас руу
+      router.push(`/otp?phone=${phone}&register=${register}`);
+    } catch (err: any) {
+      setError(err.message || "Гэнэтийн алдаа гарлаа");
+      setIsLoading(false);
     }
-    console.log("Success:", data);
-    const { error } = await supabase.auth.signInWithOtp({
-      phone,
-      options: {
-        shouldCreateUser: true,
-        data: { register_number: register },
-      },
-    });
-    if (error) {
-      setError(JSON.stringify(error));
-      return;
-    }
-    redirect(`/otp?phone=${phone}&register=${register}`);
   };
 
   return (
