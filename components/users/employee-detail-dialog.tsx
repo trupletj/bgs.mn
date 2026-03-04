@@ -15,7 +15,6 @@ import {
   User,
   LinkIcon,
 } from "lucide-react";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { MdWorkOutline } from "react-icons/md";
 import { RiMoonClearFill } from "react-icons/ri";
@@ -32,10 +31,10 @@ interface EmployeeDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   permissions: {
-    canReadUserDetail: boolean; // Шинээр нэмэв
+    canReadUserDetail: boolean;
     canReadDine: boolean;
     canEditDine: boolean;
-    canManageActions: boolean; // Үйлдэл хэсэгт зориулж нэмэв
+    canManageActions: boolean;
   };
 }
 
@@ -169,7 +168,6 @@ export function EmployeeDetailDialog({
           </Card>
         </div>
 
-        {/* 2-р мөр: Табууд (Tabs Section) */}
         <div className="flex-1 ">
           <Tabs
             value={activeTab}
