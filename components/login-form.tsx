@@ -84,10 +84,11 @@ export function RequestOtpForm({
                   <Label htmlFor="email">Регистрийн дугаар</Label>
                   <Input
                     value={register}
-                    onChange={(e) => setReg(e.target.value)}
+                    onChange={(e) => setReg(e.target.value.toUpperCase())}
                     type="text"
                     placeholder="АА00000000"
                     required
+                    className="uppercase"
                   />
                 </div>
                 <div className="grid gap-2">
