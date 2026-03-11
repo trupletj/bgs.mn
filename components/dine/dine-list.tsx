@@ -10,6 +10,7 @@ import {
   Trash2,
   Loader2,
   MapPin,
+  Settings,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -49,8 +51,9 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
-export default function DineList() {
+export default function DineList({ is_boss }: { is_boss: boolean }) {
   const supabase = createClient();
 
   const [data, setData] = useState<any[]>([]);
@@ -66,6 +69,7 @@ export default function DineList() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
+  const router = useRouter();
 
   const fetchData = async () => {
     try {
@@ -150,6 +154,8 @@ export default function DineList() {
     setIsDialogOpen(true);
   };
 
+  const totalColumns = is_boss ? 5 : 4;
+
   return (
     <div className="mx-auto p-4 space-y-4">
       <div className="flex justify-between items-center mb-6">
@@ -229,70 +235,100 @@ export default function DineList() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border shadow-sm">
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-50/50">
             <TableRow>
-              <TableHead className="w-[50px]">№</TableHead>
-              <TableHead>Танхимын нэр</TableHead>
-              <TableHead>Байршил</TableHead>
-              <TableHead>Огноо</TableHead>
-              <TableHead className="w-[100px] text-right">Үйлдэл</TableHead>
+              <TableHead className="w-[60px] text-center">№</TableHead>
+              <TableHead className="min-w-[200px]">Танхимын нэр</TableHead>
+              <TableHead className="w-[30%]">Байршил</TableHead>
+              <TableHead className="w-[150px]">Огноо</TableHead>
+              {is_boss && (
+                <TableHead className="w-[100px] text-right">Үйлдэл</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {initialLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
-                  Ачаалж байна...
+                <TableCell
+                  colSpan={totalColumns}
+                  className="text-center py-20 text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                    <span>Ачаалж байна...</span>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : filteredData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
-                  className="text-center py-10 text-muted-foreground">
+                  colSpan={totalColumns}
+                  className="text-center py-20 text-muted-foreground">
                   Мэдээлэл олдсонгүй
                 </TableCell>
               </TableRow>
             ) : (
               filteredData.map((item, index) => (
-                <TableRow key={item.id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell className="font-medium">{item.name}</TableCell>
+                <TableRow
+                  key={item.id}
+                  className="hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="text-center font-medium text-slate-500">
+                    {index + 1}
+                  </TableCell>
                   <TableCell>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <MapPin className="mr-1 h-3 w-3" />{" "}
-                      {item.location || "Тэмдэглэгдээгүй"}
+                    <div className="font-semibold text-slate-900">
+                      {item.name}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">
-                    {item.created_at
-                      ? format(new Date(item.created_at), "yyyy-MM-dd")
-                      : "-"}
+                  <TableCell>
+                    <div className="flex items-center text-sm text-slate-600">
+                      <MapPin className="mr-2 h-4 w-4 text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        {item.location || "Тэмдэглэгдээгүй"}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(item)}>
-                          <Edit className="mr-2 h-4 w-4" /> Засах
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => {
-                            setItemToDelete(item);
-                            setDeleteDialogOpen(true);
-                          }}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Устгах
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <TableCell className="text-sm text-slate-600">
+                    <div className="flex items-center">
+                      {item.created_at
+                        ? format(new Date(item.created_at), "yyyy-MM-dd")
+                        : "-"}
+                    </div>
                   </TableCell>
+                  {is_boss && (
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[160px]">
+                          <DropdownMenuItem
+                            onClick={() => openEditDialog(item)}>
+                            <Edit className="mr-2 h-4 w-4" /> Засах
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => router.push("/dine/" + item.id)}>
+                            <Settings className="mr-2 h-4 w-4" /> Тохиргоо
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            onClick={() => {
+                              setItemToDelete(item);
+                              setDeleteDialogOpen(true);
+                            }}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Устгах
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
