@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2, Edit2, Save, X, Utensils } from "lucide-react";
+import { getProfileIdFromAuthUserId } from "@/actions/profile";
 
 interface MealConfigProps {
   userId: string;
@@ -80,6 +81,8 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
 
   const handleSave = async () => {
     setLoading(true);
+
+    const created_by = await getProfileIdFromAuthUserId();
     const payload = {
       user_id: userId,
       breakfast_location: formData.breakfast_location
@@ -97,6 +100,7 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
       morning_meal_location: formData.morning_meal_location
         ? parseInt(formData.morning_meal_location)
         : null,
+      created_by: created_by,
     };
 
     const { error } = await supabase
@@ -183,9 +187,6 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {mealTypes
-          // ЗӨВХӨН ЭНЭ ХЭСГИЙГ ӨӨРЧЛӨВ:
-          // Засварлаж байгаа бол бүгдийг харуулна,
-          // Харах горимд бол зөвхөн 'display' утгатай (оноосон) талбарыг харуулна.
           .filter((meal) => isEditing || meal.display)
           .map((meal) => (
             <div

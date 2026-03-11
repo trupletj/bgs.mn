@@ -124,13 +124,10 @@ export default function AllOrderList() {
         )
         .ilike("title", `%${debouncedSearch}%`);
 
-      // КАРТААР ШҮҮХ ЛОГИК
       if (selectedStatus !== "all") {
-        // Хэрэв сонгосон статус нь management_status-д хамааралтай бол
         if (MANAGEMENT_STATUS_LABELS[selectedStatus]) {
           query = query.eq("management_status", selectedStatus);
         } else {
-          // Үгүй бол үндсэн status-аар шүүнэ
           query = query.eq("status", selectedStatus);
         }
       }
@@ -320,7 +317,7 @@ export default function AllOrderList() {
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead>Гарчиг</TableHead>
-              <TableHead>Үүсгэгч</TableHead>
+              {/* <TableHead>Үүсгэгч</TableHead> */}
               <TableHead>Баталгаажуулалт</TableHead>
               <TableHead>Удирдлагын статус</TableHead>
               <TableHead>Огноо</TableHead>
@@ -348,12 +345,12 @@ export default function AllOrderList() {
                   <TableCell className="font-medium max-w-[250px] truncate">
                     {order.title}
                   </TableCell>
-                  <TableCell>
+                  {/* <TableCell>
                     <div className="text-sm">{order.profile?.name}</div>
                     <div className="text-[10px] text-muted-foreground uppercase">
                       {order.profile?.department_name}
                     </div>
-                  </TableCell>
+                  </TableCell> */}
                   <TableCell>{renderStatusBadge(order.status)}</TableCell>
                   <TableCell>
                     {order.management_status ? (
