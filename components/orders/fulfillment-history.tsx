@@ -31,6 +31,8 @@ const getStatusLabel = (status: string) => {
     delivered: "Хүрсэн",
     completed: "Дууссан",
     rejected: "Татгалзсан",
+    ordered: "Захиалсан",
+    cancelled: "Цуцлагдсан",
   };
   return map[status] || status;
 };
@@ -149,10 +151,10 @@ export function FulfillmentHistory({
               <TableHeader className="bg-slate-50/80">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-[11px] font-bold h-9">
-                    Хуучин
+                    Хуучин төлөв
                   </TableHead>
                   <TableHead className="text-[11px] font-bold h-9">
-                    Шинэ
+                    Шинэ төлөв
                   </TableHead>
                   <TableHead className="text-[11px] font-bold h-9">
                     Шалтгаан

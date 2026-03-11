@@ -7,9 +7,10 @@ export default async function DineListPage() {
   if (!is_create) {
     return <UnauthorizedPage />;
   }
+  const is_boss = await hasPermission("dining", "boss");
   return (
     <div>
-      <DiningHallPage />
+      <DiningHallPage is_boss={is_boss} />
     </div>
   );
 }

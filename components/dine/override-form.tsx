@@ -307,8 +307,8 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
                   <SelectContent>
                     <SelectItem value="breakfast">Өглөөний цай</SelectItem>
                     <SelectItem value="morning_meal">Өглөөний хоол</SelectItem>
-                    <SelectItem value="lunch">Өдөр</SelectItem>
-                    <SelectItem value="dinner">Орой</SelectItem>
+                    <SelectItem value="lunch">Өдрийн хоол</SelectItem>
+                    <SelectItem value="dinner">Оройн хоол</SelectItem>
                     <SelectItem value="nightmeal">Шөнийн хоол</SelectItem>
                   </SelectContent>
                 </Select>
