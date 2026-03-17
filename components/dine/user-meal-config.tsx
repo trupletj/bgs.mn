@@ -33,6 +33,8 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
     dinner_location: "",
     night_meal_location: "",
     morning_meal_location: "",
+    extend_morning_meal_location: "",
+    extend_lunch_location: "",
   });
 
   useEffect(() => {
@@ -55,7 +57,9 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
           lunch:lunch_location(name),
           dinner:dinner_location(name),
           night:night_meal_location(name),
-          morning:morning_meal_location(name)
+          morning:morning_meal_location(name),
+          extend_morning:extend_morning_meal_location(name),
+          extend_lunch:extend_lunch_location(name)
         `,
         )
         .eq("user_id", userId)
@@ -70,6 +74,10 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
           night_meal_location: userConfig.night_meal_location?.toString() || "",
           morning_meal_location:
             userConfig.morning_meal_location?.toString() || "",
+          extend_morning_meal_location:
+            userConfig.extend_morning_meal_location?.toString() || "",
+          extend_lunch_location:
+            userConfig.extend_lunch_location?.toString() || "",
         });
       }
     } catch (error) {
@@ -99,6 +107,12 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
         : null,
       morning_meal_location: formData.morning_meal_location
         ? parseInt(formData.morning_meal_location)
+        : null,
+      extend_morning_meal_location: formData.extend_morning_meal_location
+        ? parseInt(formData.extend_morning_meal_location)
+        : null,
+      extend_lunch_location: formData.extend_lunch_location
+        ? parseInt(formData.extend_lunch_location)
         : null,
       created_by: created_by,
     };
@@ -150,9 +164,24 @@ export function UserMealConfig({ userId, canEdit }: MealConfigProps) {
       label: "Өглөөний хоол",
       display: config?.morning?.name,
     },
+    {
+      key: "extend_morning_meal_location", // Шинэ
+      label: "Өглөөний хоол (сунасан)",
+      display: config?.extend_morning?.name,
+    },
+    {
+      key: "extend_lunch_location", // Шинэ
+      label: "Өдрийн хоол (сунасан)",
+      display: config?.extend_lunch?.name,
+    },
   ];
 
-  // ... (Дээд талын import болон логик хэсэг хэвээрээ)
+  if (loading && !isEditing)
+    return (
+      <div className="flex justify-center p-10">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
 
   return (
     <div className="space-y-4">
