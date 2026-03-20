@@ -15,13 +15,13 @@ export default async function Page() {
       icon: ChefHat,
       permission: { module: "dining", action: "access" },
     },
-    // {
-    //   title: "Захиалга",
-    //   description: "Захиалгын систем",
-    //   href: "/orders",
-    //   icon: ClipboardList,
-    //   requiredRoles: ["hr_emp", "monitoring_emp", "super_admin"], // Бүх хүнд харагдана
-    // },
+    {
+      title: "Хоолны бүртгэл",
+      description: "Ажилчдын хоол бүртгэл",
+      href: "/dine/food-log",
+      icon: ClipboardList,
+      permission: { module: "dining", action: "access" }, // Бүх хүнд харагдана
+    },
     {
       title: "Түр зуурын гал тогоо",
       description: "Ажилтныг өөр гал тогоонд түр шилжүүлэх",
