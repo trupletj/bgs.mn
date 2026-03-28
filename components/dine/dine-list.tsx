@@ -277,7 +277,9 @@ export default function DineList({ is_boss }: { is_boss: boolean }) {
                     {index + 1}
                   </TableCell>
                   <TableCell>
-                    <div className="font-semibold text-slate-900">
+                    <div
+                      className="font-semibold text-slate-900 cursor-pointer hover:text-blue-600 hover:underline transition-all"
+                      onClick={() => router.push(`/dine/${item.id}/employee`)}>
                       {item.name}
                     </div>
                   </TableCell>
