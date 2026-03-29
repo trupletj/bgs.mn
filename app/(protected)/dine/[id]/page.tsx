@@ -33,7 +33,6 @@ export default async function DiningHallSettings({
 
   if (!hall) return notFound();
 
-  // Tab-ын тоог тодорхойлох логик
   const activeTabsCount = is_admin ? 3 : 2;
 
   return (
