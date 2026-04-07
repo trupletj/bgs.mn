@@ -12,7 +12,6 @@ export default async function FoodLogSummaryPage() {
   const supabase = createClient();
   const today = new Date().toISOString().split("T")[0];
 
-  // 2. Анхны датаг сервер талд татах
   const { data: summaryData } = await supabase
     .from("daily_meal_summary")
     .select(`*, dining_hall ( name )`)
