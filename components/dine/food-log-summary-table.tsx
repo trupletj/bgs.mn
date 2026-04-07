@@ -14,11 +14,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { MealLogsDetailModal } from "./meal-logs-detail-modal";
+import { MealBreakdownRow } from "./meal-breakdown-row";
 
 interface Props {
   initialData: any[];
   initialDate: string;
+}
+
+interface BreakdownData {
+  org_name: string;
+  dep_name: string;
+  heltes_name: string;
+  total_count: number;
 }
 
 export default function FoodLogSummaryTable({
@@ -29,6 +38,11 @@ export default function FoodLogSummaryTable({
   const [data, setData] = useState<any[]>(initialData);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(initialDate);
+
+  // Мөр дэлгэхтэй холбоотой төлөвүүд
+  const [expandedHallId, setExpandedHallId] = useState<number | null>(null);
+  const [breakdownData, setBreakdownData] = useState<BreakdownData[]>([]);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
 
   useEffect(() => {
     if (selectedDate === initialDate && data.length === initialData.length)
@@ -44,6 +58,7 @@ export default function FoodLogSummaryTable({
 
       if (!error && summaryData) {
         setData(summaryData);
+        setExpandedHallId(null); // Өдөр солигдоход дэлгэсэн мөрийг хаах
       }
       setLoading(false);
     }
@@ -54,7 +69,7 @@ export default function FoodLogSummaryTable({
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     hallId: number;
-    type: "manual" | "extra";
+    type: "manual" | "extra" | "wrong";
     hallName: string;
   }>({
     isOpen: false,
@@ -64,11 +79,22 @@ export default function FoodLogSummaryTable({
   });
 
   const openModal = (
+    e: React.MouseEvent,
     hallId: number,
-    type: "manual" | "extra",
+    type: "manual" | "extra" | "wrong",
     hallName: string,
   ) => {
+    e.stopPropagation(); // Мөр дэлгэх click-тэй давхардахгүй байх
     setModalConfig({ isOpen: true, hallId, type, hallName });
+  };
+
+  // Мөр дэлгэх функц
+  const toggleRow = (hallId: number) => {
+    if (expandedHallId === hallId) {
+      setExpandedHallId(null);
+    } else {
+      setExpandedHallId(hallId);
+    }
   };
 
   const totalAllHalls = data.reduce(
@@ -109,7 +135,7 @@ export default function FoodLogSummaryTable({
             <Table>
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead className="w-[180px]">Гал тогоо</TableHead>
+                  <TableHead className="w-[200px]">Гал тогоо</TableHead>
                   <TableHead className="text-right">Ө/цай</TableHead>
                   <TableHead className="text-right">Ө/хоол</TableHead>
                   <TableHead className="text-right">Өдөр</TableHead>
@@ -126,6 +152,9 @@ export default function FoodLogSummaryTable({
                   </TableHead>
                   <TableHead className="text-right bg-purple-50">
                     Нэмэлт
+                  </TableHead>
+                  <TableHead className="text-right bg-red-50 text-red-600">
+                    Буруу байршил
                   </TableHead>
                   <TableHead className="text-right font-bold">Нийт</TableHead>
                 </TableRow>
@@ -155,59 +184,96 @@ export default function FoodLogSummaryTable({
                   </TableRow>
                 ) : (
                   data.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">
-                        {row.dining_hall?.name || `Hall #${row.dining_hall_id}`}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.breakfast_count}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.morning_meal_count}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.lunch_count}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.dinner_count}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.night_meal_count}
-                      </TableCell>
-                      <TableCell className="text-right text-orange-600/80">
-                        {row.extend_morning_count}
-                      </TableCell>
-                      <TableCell className="text-right text-orange-600/80">
-                        {row.extend_lunch_count}
-                      </TableCell>
-                      <TableCell
-                        className="text-right bg-blue-500/5 cursor-pointer hover:bg-blue-500/10 hover:font-bold transition-all text-blue-700 underline decoration-dotted"
-                        onClick={() =>
-                          openModal(
-                            row.dining_hall_id,
-                            "manual",
-                            row.dining_hall?.name,
-                          )
-                        }>
-                        {row.manual_override_total}
-                      </TableCell>
+                    <React.Fragment key={row.id}>
+                      {/* ҮНДСЭН МӨР */}
+                      <TableRow
+                        className="cursor-pointer hover:bg-slate-50 group"
+                        onClick={() => toggleRow(row.dining_hall_id)}>
+                        <TableCell className="font-medium flex items-center gap-2">
+                          {expandedHallId === row.dining_hall_id ? (
+                            <ChevronDown className="h-4 w-4 text-slate-400 group-hover:text-slate-700" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-700" />
+                          )}
+                          {row.dining_hall?.name ||
+                            `Hall #${row.dining_hall_id}`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.breakfast_count}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.morning_meal_count}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.lunch_count}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.dinner_count}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.night_meal_count}
+                        </TableCell>
+                        <TableCell className="text-right text-orange-600/80">
+                          {row.extend_morning_count}
+                        </TableCell>
+                        <TableCell className="text-right text-orange-600/80">
+                          {row.extend_lunch_count}
+                        </TableCell>
 
-                      {/* НЭМЭЛТ */}
-                      <TableCell
-                        className="text-right bg-purple-500/5 cursor-pointer hover:bg-purple-500/10 hover:font-bold transition-all text-purple-700 underline decoration-dotted"
-                        onClick={() =>
-                          openModal(
-                            row.dining_hall_id,
-                            "extra",
-                            row.dining_hall?.name,
-                          )
-                        }>
-                        {row.extra_serving_total}
-                      </TableCell>
-                      <TableCell className="text-right font-bold bg-slate-50">
-                        {row.grand_total}
-                      </TableCell>
-                    </TableRow>
+                        <TableCell
+                          className="text-right bg-blue-500/5 hover:bg-blue-500/10 hover:font-bold transition-all text-blue-700 underline decoration-dotted"
+                          onClick={(e) =>
+                            openModal(
+                              e,
+                              row.dining_hall_id,
+                              "manual",
+                              row.dining_hall?.name,
+                            )
+                          }>
+                          {row.manual_override_total}
+                        </TableCell>
+
+                        <TableCell
+                          className="text-right bg-purple-500/5 hover:bg-purple-500/10 hover:font-bold transition-all text-purple-700 underline decoration-dotted"
+                          onClick={(e) =>
+                            openModal(
+                              e,
+                              row.dining_hall_id,
+                              "extra",
+                              row.dining_hall?.name,
+                            )
+                          }>
+                          {row.extra_serving_total}
+                        </TableCell>
+                        <TableCell
+                          className="text-right bg-red-500/5 hover:bg-red-500/10 hover:font-bold transition-all text-red-700 underline decoration-dotted"
+                          onClick={(e) =>
+                            openModal(
+                              e,
+                              row.dining_hall_id,
+                              "wrong",
+                              row.dining_hall?.name,
+                            )
+                          }>
+                          {row.wrong_location_total || 0}
+                        </TableCell>
+                        <TableCell className="text-right font-bold bg-slate-50">
+                          {row.grand_total}
+                        </TableCell>
+                      </TableRow>
+
+                      {/* ДЭЛГЭГДСЭН ДЕТАЛЬ МӨР */}
+                      {expandedHallId === row.dining_hall_id && (
+                        <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+                          <TableCell colSpan={12} className="p-0">
+                            <MealBreakdownRow
+                              date={selectedDate}
+                              hallId={row.dining_hall_id}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))
                 )}
               </TableBody>
