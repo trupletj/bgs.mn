@@ -23,7 +23,7 @@ interface Props {
   onClose: () => void;
   hallId: number;
   date: string;
-  type: "manual" | "extra";
+  type: "manual" | "extra" | "wrong";
   hallName: string;
 }
 
@@ -57,16 +57,19 @@ export function MealLogsDetailModal({
     setLoading(true);
     setDetails([]);
 
-    const query = supabase
+    let query = supabase
       .from("meal_logs")
-      .select("bteg_id, scanned_at, meal_type")
+      .select("*, users(id, last_name, first_name)")
       .eq("dining_hall_id", hallId)
-      .eq("date", date)
-      .order("scanned_at", { ascending: true });
+      .eq("date", date);
 
-    if (type === "manual") query.eq("is_manual_override", true);
-    if (type === "extra") query.eq("is_extra_serving", true);
-
+    if (type === "manual") {
+      query = query.eq("is_manual_override", true);
+    } else if (type === "extra") {
+      query = query.eq("is_extra_serving", true);
+    } else if (type === "wrong") {
+      query = query.eq("is_wrong_location", true);
+    }
     const { data: logs, error: logError } = await query;
 
     if (!logError && logs && logs.length > 0) {
