@@ -142,10 +142,10 @@ export default function FoodLogSummaryTable({
                   <TableHead className="text-right">Орой</TableHead>
                   <TableHead className="text-right">Шөнө</TableHead>
                   <TableHead className="text-right text-orange-600">
-                    Сунасан өглөө
+                    С/ өглөө
                   </TableHead>
                   <TableHead className="text-right text-orange-600">
-                    Сунасан өдөр
+                    С/ өдөр
                   </TableHead>
                   <TableHead className="text-right bg-blue-50">
                     Гараар

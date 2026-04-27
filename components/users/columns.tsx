@@ -12,9 +12,15 @@ export type User = {
   heltes_name: string | null;
   position_name: string | null;
   is_active: boolean | null;
+  organization_name: string | null;
 };
 
 export const columns: ColumnDef<User>[] = [
+  {
+    accessorKey: "organization_name",
+    header: "Байгууллага",
+    cell: ({ row }) => row.original.organization_name || "-",
+  },
   {
     accessorKey: "department_name",
     header: "Алба, хэлтэс",
@@ -22,8 +28,6 @@ export const columns: ColumnDef<User>[] = [
       const searchValue = filterValue.toLowerCase();
       const dept = String(row.original.department_name || "").toLowerCase();
       const heltes = String(row.original.heltes_name || "").toLowerCase();
-
-      // Аль нэгэнд нь л хайлтын үг байвал True буцаана (OR logic)
       return dept.includes(searchValue) || heltes.includes(searchValue);
     },
     cell: ({ row }) => {
@@ -36,13 +40,14 @@ export const columns: ColumnDef<User>[] = [
     },
   },
   {
+    accessorKey: "last_name",
+    header: "Овог",
+    cell: ({ row }) => row.original.last_name || "-",
+  },
+  {
     accessorKey: "first_name",
     header: "Нэр",
-    cell: ({ row }) => {
-      const first = row.original.first_name || "";
-      const last = row.original.last_name || "";
-      return `${last.charAt(0)}. ${first}`;
-    },
+    cell: ({ row }) => row.original.first_name || "-",
   },
   {
     accessorKey: "position_name",
@@ -52,16 +57,4 @@ export const columns: ColumnDef<User>[] = [
     accessorKey: "phone",
     header: "Утас",
   },
-  // {
-  //   accessorKey: "is_active",
-  //   header: "Төлөв",
-  //   cell: ({ row }) => {
-  //     const active = row.getValue("is_active");
-  //     return (
-  //       <Badge variant={active ? "default" : "destructive"}>
-  //         {active ? "Идэвхтэй" : "Идэвхгүй"}
-  //       </Badge>
-  //     );
-  //   },
-  // },
 ];
