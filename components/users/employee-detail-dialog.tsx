@@ -14,10 +14,11 @@ import {
   Building2,
   User,
   LinkIcon,
+  Building,
 } from "lucide-react";
 import { Card } from "../ui/card";
 import { MdWorkOutline } from "react-icons/md";
-import { RiMoonClearFill } from "react-icons/ri";
+import { RiBuilding3Fill, RiMoonClearFill } from "react-icons/ri";
 import { FaHelmetSafety } from "react-icons/fa6";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
@@ -118,11 +119,17 @@ export function EmployeeDetailDialog({
               <p className="text-lg font-semibold">
                 {employee.last_name} {employee.first_name}
               </p>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                <span>
+                  {employee.organization_name || "Байгууллага тодорхойгүй"}
+                </span>
+              </div>
             </div>
 
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
+                <Building className="h-4 w-4" />
                 <span>{employee.department_name || "Хэлтэс тодорхойгүй"}</span>
               </div>
               <div className="flex items-center gap-2 ">
@@ -219,6 +226,10 @@ export function EmployeeDetailDialog({
                       </span>
                     )}
                   </div>
+                </div>
+                <div className="flex gap-2 col-span-2">
+                  <span className="font-semibold">Байгууллага:</span>
+                  <span>{employee.organization_name || "Мэдээлэл алга"}</span>
                 </div>
                 <div className="flex gap-2 col-span-2">
                   <span className="font-semibold ">Алба, Хэлтэс:</span>

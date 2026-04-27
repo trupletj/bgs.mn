@@ -73,6 +73,19 @@ export function DataTable<TData, TValue>({
       <div className=" space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
           <Input
+            placeholder="Байгууллагаар хайх..."
+            value={
+              (table
+                .getColumn("organization_name")
+                ?.getFilterValue() as string) ?? ""
+            }
+            onChange={(event) =>
+              table
+                .getColumn("organization_name")
+                ?.setFilterValue(event.target.value)
+            }
+          />
+          <Input
             placeholder="Алба эсвэл хэлтсээр хайх..."
             value={
               (table
@@ -85,6 +98,15 @@ export function DataTable<TData, TValue>({
                 ?.setFilterValue(event.target.value)
             }
             className="max-w-sm"
+          />
+          <Input
+            placeholder="Овогоор хайх..."
+            value={
+              (table.getColumn("last_name")?.getFilterValue() as string) ?? ""
+            }
+            onChange={(event) =>
+              table.getColumn("last_name")?.setFilterValue(event.target.value)
+            }
           />
           <Input
             placeholder="Нэрээр хайх..."

@@ -101,8 +101,12 @@ export function MealLogsDetailModal({
         <DialogHeader>
           <DialogTitle>
             {hallName} -{" "}
-            {type === "manual" ? "Гараар бүртгэсэн" : "Нэмэлт хооллолт"} (
-            {details.length})
+            {type === "manual"
+              ? "Гараар бүртгэсэн"
+              : type === "wrong"
+                ? "Буруу байршил"
+                : "Нэмэлт хооллолт"}{" "}
+            ({details.length})
           </DialogTitle>
         </DialogHeader>
 
@@ -110,6 +114,7 @@ export function MealLogsDetailModal({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Овог Нэр</TableHead>
                 <TableHead>Хэлтэс/Алба</TableHead>
                 <TableHead>Цаг</TableHead>
@@ -138,6 +143,9 @@ export function MealLogsDetailModal({
               ) : (
                 details.map((item, idx) => (
                   <TableRow key={idx}>
+                    <TableCell className="font-medium">
+                      {item.user ? `${item.user.bteg_id}` : "Тодорхойгүй ID"}
+                    </TableCell>
                     <TableCell className="font-medium">
                       {item.user
                         ? `${item.user.last_name} ${item.user.first_name}`
