@@ -25,13 +25,7 @@ interface Policy {
   reference_code: string | null;
 }
 
-export default function PolicyList({
-  is_create,
-  is_delete,
-}: {
-  is_create?: boolean;
-  is_delete?: boolean;
-}) {
+export default function PolicyList({ is_delete }: { is_delete?: boolean }) {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -73,19 +67,9 @@ export default function PolicyList({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      {is_create && (
-        <div className="flex justify-end mb-2 w-min-content">
-          <Link href="/policy/new" className="flex cursor-pointer">
-            <Button className="items-center flex">
-              <PlusIcon className="h-4 w-4 " />
-              Нэмэх
-            </Button>
-          </Link>
-        </div>
-      )}
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-blue-50">
       <div className="flex justify-between mb-6">
-        <h2 className="text-2xl font-bold">Журмууд</h2>
+        <h2 className="text-2xl font-bold">Бүртгэлтэй журмуудын жагсаалт</h2>
         <div className="relative flex items-center">
           <input
             type="text"
@@ -118,23 +102,25 @@ export default function PolicyList({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[100px]">
+                  <TableHead className="text-center font-bold bg-blue-200/50 dark:bg-gray-700 px-4 py-3 min-w-[100px]">
                     Код
                   </TableHead>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
+                  <TableHead className="text-center font-bold bg-blue-200/50 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
                     Нэр
                   </TableHead>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[120px]">
+                  <TableHead className="text-center font-bold bg-blue-200/50 dark:bg-gray-700 px-4 py-3 min-w-[120px]">
                     Баталсан огноо
                   </TableHead>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[150px]">
+                  <TableHead className="text-center font-bold bg-blue-200/50 dark:bg-gray-700 px-4 py-3 min-w-[150px]">
                     Үйлдэл
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {policies.map((policy) => (
-                  <TableRow key={policy.id}>
+                  <TableRow
+                    key={policy.id}
+                    className="border-blue-50 hover:bg-blue-50/30 transition-colors">
                     <TableCell className="px-4 py-2">
                       {policy.reference_code}
                     </TableCell>
@@ -148,7 +134,7 @@ export default function PolicyList({
                     <TableCell className="px-4 py-2 text-center">
                       {policy.approved_date
                         ? new Date(policy.approved_date).toLocaleDateString(
-                            "mn-MN"
+                            "mn-MN",
                           )
                         : "Огноогүй"}
                     </TableCell>

@@ -77,7 +77,7 @@ export default function PolicyDetailSheet({
   onOpenChange,
 }: PolicyDetailSheetProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "clauses">(
-    "overview"
+    "overview",
   );
 
   if (!policy) return null;
@@ -147,13 +147,13 @@ export default function PolicyDetailSheet({
         {/* ЗӨВХӨН ТАБААС ХАМААРЧ КОНТЕНТ ХАРУУЛНА */}
         <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
           {activeTab === "overview" && (
-            <div className="p-10 space-y-12">
+            <div className="px-10 py-5 space-y-12">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="text-center p-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-3xl border-2 border-blue-200">
                   <p className="text-blue-600 font-bold uppercase tracking-wider mb-4">
                     Нийт заалт
                   </p>
-                  <p className="text-6xl font-bold text-blue-900">
+                  <p className="text-5xl font-bold text-blue-900">
                     {policy.clauses?.length || 0}
                   </p>
                 </div>
@@ -161,7 +161,7 @@ export default function PolicyDetailSheet({
                   <p className="text-emerald-600 font-bold uppercase tracking-wider mb-4">
                     Хэрэгжилт
                   </p>
-                  <p className="text-6xl font-bold text-emerald-900">
+                  <p className="text-5xl font-bold text-emerald-900">
                     {policy.implementationPercent}%
                   </p>
                 </div>
@@ -169,7 +169,7 @@ export default function PolicyDetailSheet({
                   <p className="text-amber-600 font-bold uppercase tracking-wider mb-4">
                     Үнэлгээ
                   </p>
-                  <p className="text-6xl font-bold text-amber-900">
+                  <p className="text-5xl font-bold text-amber-900">
                     {policy.validCount}
                   </p>
                 </div>
@@ -177,7 +177,7 @@ export default function PolicyDetailSheet({
 
               <div>
                 <h3 className="text-xl font-bold mb-6">Хэрэгжилтийн явц</h3>
-                <div className="w-full bg-slate-200 rounded-full h-10 overflow-hidden shadow-inner">
+                <div className="w-full bg-slate-200 rounded-full h-8 overflow-hidden shadow-inner">
                   <div
                     className="h-full rounded-full transition-all duration-1000"
                     style={{
@@ -186,8 +186,8 @@ export default function PolicyDetailSheet({
                         policy.implementationPercent >= 90
                           ? "#10b981"
                           : policy.implementationPercent >= 70
-                          ? "#f59e0b"
-                          : "#ef4444",
+                            ? "#f59e0b"
+                            : "#ef4444",
                     }}
                   />
                 </div>
@@ -199,8 +199,8 @@ export default function PolicyDetailSheet({
           )}
 
           {activeTab === "clauses" && (
-            <div className="p-10 pb-32">
-              <h3 className="text-2xl font-bold mb-10">
+            <div className="px-10 pt-5 pb-32">
+              <h3 className="text-2xl font-bold mb-6">
                 Үнэлгээ хийгдсэн заалтууд
               </h3>
 
@@ -214,10 +214,10 @@ export default function PolicyDetailSheet({
                       <AccordionTrigger className="px-8 py-6 hover:no-underline bg-gradient-to-r from-blue-50 to-indigo-50">
                         <div className="flex w-full items-center justify-between text-left">
                           <div className="flex items-center gap-6">
-                            <span className="font-mono text-2xl font-bold text-blue-700">
+                            <span className="font-mono text-xl font-bold text-blue-700">
                               {clause.reference_number}
                             </span>
-                            <span className="text-lg font-medium text-slate-700">
+                            <span className="text-base font-medium text-slate-700">
                               {clause.text}
                             </span>
                           </div>
@@ -277,8 +277,8 @@ export default function PolicyDetailSheet({
                                               score >= 5
                                                 ? "bg-emerald-500"
                                                 : score >= 3
-                                                ? "bg-amber-500"
-                                                : "bg-red-500"
+                                                  ? "bg-amber-500"
+                                                  : "bg-red-500"
                                             }`}>
                                             {score}
                                           </span>

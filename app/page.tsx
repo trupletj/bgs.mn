@@ -1,18 +1,17 @@
-import { createClient } from '@/utils/supabase/server'
-import { RequestOtpForm } from "@/components/login-form"
+import { createClient } from "@/utils/supabase/server";
+import { RequestOtpForm } from "@/components/login-form";
 import { redirect } from "next/navigation";
 import { Building2, Shield, Users, BarChart3, CheckCircle } from "lucide-react";
 
 export default async function Home() {
-  const supabase = await createClient()
-  const { data: claims } = await supabase.auth.getClaims()
-  if (claims) redirect('/dashboard')
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (claims) redirect("/dashboard");
 
   return (
     <div className="flex min-h-svh">
       {/* ===== Left branding panel ===== */}
       <div className="relative hidden md:flex md:w-[56%] flex-col justify-between overflow-hidden bg-[oklch(0.175_0.038_264)] p-12">
-
         {/* Subtle grid pattern */}
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.035]"
@@ -32,24 +31,33 @@ export default async function Home() {
             <Building2 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-none text-white">BGS систем</p>
-            <p className="mt-0.5 text-xs text-white/40">Байгаль Нурууны Говь</p>
+            <p className="text-lg font-bold leading-none text-white">
+              BGS систем
+            </p>
+            <p className="mt-0.5 text-xs text-white/40">
+              Удирдлагын нэгдсэн платформ
+            </p>
           </div>
         </div>
 
         {/* Hero text */}
         <div className="relative z-10">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 ring-1 ring-white/10">
+          {/* <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 ring-1 ring-white/10">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs font-medium text-white/60">Үйлдлийн систем</span>
-          </div>
+            <span className="text-xs font-medium text-white/60">
+              Үйлдлийн систем
+            </span>
+          </div> */}
 
           <h2 className="mb-4 text-4xl font-bold leading-tight tracking-tight text-white">
-            Удирдлагын<br />нэгдсэн платформ
+            Удирдлагын
+            <br />
+            нэгдсэн платформ
           </h2>
 
           <p className="mb-10 max-w-sm text-base leading-relaxed text-white/50">
-            Захиалга, ажилтан, журам болон хоолны бүртгэлийг нэг дороос удирдах боломжтой дотоод систем.
+            Захиалга, ажилтан, журам болон хоолны бүртгэлийг нэг дороос удирдах
+            боломжтой дотоод систем.
           </p>
 
           {/* Feature pills */}
@@ -62,8 +70,7 @@ export default async function Home() {
             ].map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 ring-1 ring-white/8 backdrop-blur-sm"
-              >
+                className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 ring-1 ring-white/8 backdrop-blur-sm">
                 <Icon className="h-4 w-4 shrink-0 text-white/40" />
                 <span className="text-sm text-white/60">{label}</span>
               </div>
@@ -73,7 +80,7 @@ export default async function Home() {
 
         {/* Footer */}
         <p className="relative z-10 text-xs text-white/20">
-          © 2025 BGS. Бүх эрх хуулиар хамгаалагдсан.
+          © 2026 BGS. Бүх эрх хуулиар хамгаалагдсан.
         </p>
       </div>
 
@@ -90,7 +97,7 @@ export default async function Home() {
         <RequestOtpForm className="w-full max-w-[400px]" />
 
         <p className="mt-10 max-w-xs text-center text-xs leading-relaxed text-muted-foreground">
-          Нэвтрэхэд асуудал гарвал системийн администратортай холбогдоно уу.
+          Нэвтрэхэд асуудал гарвал системийн админтай холбогдоно уу.
         </p>
       </div>
     </div>

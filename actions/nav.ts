@@ -17,6 +17,7 @@ export async function getNavServices(): Promise<NavService[]> {
   const roles = await getUserRoles();
   const hasDiningAccess = await hasPermission("dining", "access");
   const hasEmployeeAccess = await hasPermission("employee", "read");
+  const hasPolicyCreate = await hasPermission("policy", "create");
 
   const services: NavService[] = [];
 
@@ -29,16 +30,30 @@ export async function getNavServices(): Promise<NavService[]> {
   });
 
   const orderItems: NavSubItem[] = [];
-  if (roles.some((r) => ["hr_emp", "monitoring_emp", "super_admin", "order_system"].includes(r))) {
+  if (
+    roles.some((r) =>
+      ["hr_emp", "monitoring_emp", "super_admin", "order_system"].includes(r),
+    )
+  ) {
     orderItems.push({ title: "Миний захиалгууд", url: "/orders/list" });
   }
-  if (roles.some((r) => ["hr_emp", "super_admin", "order_system"].includes(r))) {
+  if (
+    roles.some((r) => ["hr_emp", "super_admin", "order_system"].includes(r))
+  ) {
     orderItems.push({ title: "Худалдан авалт", url: "/orders/purchase" });
   }
-  if (roles.some((r) => ["hr_emp", "monitoring_emp", "super_admin", "order_system"].includes(r))) {
+  if (
+    roles.some((r) =>
+      ["hr_emp", "monitoring_emp", "super_admin", "order_system"].includes(r),
+    )
+  ) {
     orderItems.push({ title: "Хяналт", url: "/orders/review" });
   }
-  if (roles.some((r) => ["monitoring_emp", "super_admin", "order_system"].includes(r))) {
+  if (
+    roles.some((r) =>
+      ["monitoring_emp", "super_admin", "order_system"].includes(r),
+    )
+  ) {
     orderItems.push({ title: "Захиалгын төрөл", url: "/order-processes" });
   }
   if (orderItems.length > 0) {
@@ -59,7 +74,6 @@ export async function getNavServices(): Promise<NavService[]> {
       basePaths: ["/dine"],
       items: [
         { title: "Гал тогоо", url: "/dine/list" },
-        { title: "Хоолны бүртгэл", url: "/dine/food-log" },
         { title: "Түр зуурын гал тогоо", url: "/dine/temp-kitchen" },
       ],
     });
@@ -75,13 +89,23 @@ export async function getNavServices(): Promise<NavService[]> {
     });
   }
 
-  if (roles.some((r) => ["super_admin", "hr_emp", "monitoring_emp"].includes(r))) {
+  if (
+    roles.some((r) => ["super_admin", "hr_emp", "monitoring_emp"].includes(r))
+  ) {
+    const policyItems: NavSubItem[] = [
+      { title: "Журмын жагсаалт", url: "/policy/list" },
+    ];
+
+    if (hasPolicyCreate) {
+      policyItems.push({ title: "Журам нэмэх", url: "/policy/new" });
+    }
+
     services.push({
       key: "policy",
       title: "Журам",
       url: "/policy",
       basePaths: ["/policy"],
-      items: [{ title: "Журамын жагсаалт", url: "/policy" }],
+      items: policyItems,
     });
   }
 
