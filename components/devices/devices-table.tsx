@@ -91,58 +91,36 @@ const columns: ColumnDef<Row>[] = [
         : <span className="text-muted-foreground/40">—</span>,
   },
   {
-    id: "specs_summary",
-    header: "Техник үзүүлэлт",
+    id: "organization",
+    accessorFn: (r) => (r as any).organization?.name ?? "",
+    header: ({ column }) => <SortButton column={column}>Байгуулга</SortButton>,
     cell: ({ row }) => {
-      const d = row.original;
-      const specs = (d.specs ?? {}) as Record<string, any>;
-      const type = d.device_type as DeviceType;
-      if (type === "desktop" || type === "laptop") {
-        const parts = [
-          specs.cpu,
-          specs.ram_gb ? `${specs.ram_gb}GB RAM` : null,
-          specs.ssd_gb ? `${specs.ssd_gb}GB SSD` : null,
-          specs.os,
-        ].filter(Boolean);
-        return parts.length
-          ? <span className="text-xs text-muted-foreground leading-snug">{parts.join(" · ")}</span>
-          : <span className="text-muted-foreground/40">—</span>;
-      }
-      if (type === "monitor") {
-        const parts = [
-          specs.size_inch ? `${specs.size_inch}"` : null,
-          specs.resolution,
-          specs.panel_type,
-        ].filter(Boolean);
-        return parts.length
-          ? <span className="text-xs text-muted-foreground">{parts.join(" · ")}</span>
-          : <span className="text-muted-foreground/40">—</span>;
-      }
-      return <span className="text-muted-foreground/40">—</span>;
+      const name = (row.original as any).organization?.name;
+      return name
+        ? <span className="text-xs text-muted-foreground">{name}</span>
+        : <span className="text-muted-foreground/40">—</span>;
     },
   },
   {
-    id: "location",
-    accessorFn: (r) => {
-      const d = r as any;
-      return [d.organization?.name, d.heltes?.name, d.alba?.name, d.location].filter(Boolean).join(" / ");
-    },
-    header: "Байршил",
+    id: "heltes",
+    accessorFn: (r) => (r as any).heltes?.name ?? "",
+    header: ({ column }) => <SortButton column={column}>Хэлтэс</SortButton>,
     cell: ({ row }) => {
-      const d = row.original as any;
-      const org  = d.organization?.name;
-      const hel  = d.heltes?.name;
-      const alba = d.alba?.name;
-      const loc  = d.location;
-      return (
-        <div className="flex flex-col gap-0.5 text-xs text-muted-foreground max-w-[180px]">
-          {org  && <span>{org}</span>}
-          {hel  && <span>{hel}</span>}
-          {alba && <span className="font-medium text-foreground/80">{alba}</span>}
-          {loc  && !alba && <span>{loc}</span>}
-          {!org && !hel && !alba && !loc && <span className="text-muted-foreground/40">—</span>}
-        </div>
-      );
+      const name = (row.original as any).heltes?.name;
+      return name
+        ? <span className="text-xs text-muted-foreground">{name}</span>
+        : <span className="text-muted-foreground/40">—</span>;
+    },
+  },
+  {
+    id: "alba",
+    accessorFn: (r) => (r as any).alba?.name ?? "",
+    header: ({ column }) => <SortButton column={column}>Алба</SortButton>,
+    cell: ({ row }) => {
+      const name = (row.original as any).alba?.name;
+      return name
+        ? <span className="text-xs font-medium text-foreground/80">{name}</span>
+        : <span className="text-muted-foreground/40">—</span>;
     },
   },
   {
@@ -163,30 +141,6 @@ const columns: ColumnDef<Row>[] = [
         </div>
       );
     },
-  },
-  {
-    id: "warranty_expiry_date",
-    accessorFn: (r) => r.warranty_expiry_date ?? "",
-    header: ({ column }) => <SortButton column={column}>Баталгаа</SortButton>,
-    cell: ({ row }) => {
-      const d = row.original.warranty_expiry_date;
-      if (!d) return <span className="text-muted-foreground/40">—</span>;
-      const expired = new Date(d) < new Date();
-      return (
-        <span className={cn("text-xs", expired ? "text-red-500 font-medium" : "text-muted-foreground")}>
-          {expired ? "Дууссан " : ""}{formatDate(d)}
-        </span>
-      );
-    },
-  },
-  {
-    id: "purchase_date",
-    accessorFn: (r) => r.purchase_date ?? "",
-    header: ({ column }) => <SortButton column={column}>Авсан огноо</SortButton>,
-    cell: ({ row }) =>
-      row.original.purchase_date
-        ? <span className="text-xs text-muted-foreground">{formatDate(row.original.purchase_date)}</span>
-        : <span className="text-muted-foreground/40">—</span>,
   },
   {
     id: "actions",
@@ -222,15 +176,24 @@ export function DevicesTable({ data, orgStructure }: Props) {
   const [heltesId, setHeltesId] = React.useState("");
   const [albaId, setAlbaId]     = React.useState("");
 
+  const selectedOrgBtegId = orgId
+    ? (orgStructure.organizations.find((o) => o.id === orgId)?.bteg_id ?? null)
+    : null;
+  const selectedHeltesBtegId = heltesId
+    ? (orgStructure.heltes.find((h) => h.id === heltesId)?.bteg_id ?? null)
+    : null;
+
   const filteredHeltes = React.useMemo(
-    () => orgId ? orgStructure.heltes.filter((h) => h.organization_id === orgId) : orgStructure.heltes,
-    [orgId, orgStructure.heltes]
+    () => selectedOrgBtegId
+      ? orgStructure.heltes.filter((h) => h.org_bteg_id === selectedOrgBtegId)
+      : orgStructure.heltes,
+    [selectedOrgBtegId, orgStructure.heltes]
   );
   const filteredAlba = React.useMemo(() => {
-    if (heltesId) return orgStructure.alba.filter((a) => a.heltes_id === heltesId);
-    if (orgId)    return orgStructure.alba.filter((a) => a.organization_id === orgId);
+    if (selectedHeltesBtegId) return orgStructure.alba.filter((a) => a.heltes_bteg_id === selectedHeltesBtegId);
+    if (selectedOrgBtegId)    return orgStructure.alba.filter((a) => a.org_bteg_id === selectedOrgBtegId);
     return orgStructure.alba;
-  }, [heltesId, orgId, orgStructure.alba]);
+  }, [selectedHeltesBtegId, selectedOrgBtegId, orgStructure.alba]);
 
   const handleOrgChange = (v: string) => {
     setOrgId(v === NONE ? "" : v);
@@ -375,11 +338,10 @@ export function DevicesTable({ data, orgStructure }: Props) {
       <div className="flex flex-wrap gap-1">
         {[
           { value: "", label: "Төрөл бүгд" },
-          { value: "desktop", label: "Десктоп" },
+          { value: "desktop", label: "Суурин" },
           { value: "laptop", label: "Зөөврийн" },
           { value: "printer", label: "Принтер" },
           { value: "scanner", label: "Сканнер" },
-          { value: "copier", label: "Копи машин" },
           { value: "monitor", label: "Монитор" },
         ].map((opt) => (
           <button
