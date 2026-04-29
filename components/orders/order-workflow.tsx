@@ -2,16 +2,15 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
-  ChevronDown,
-  CheckCircle,
+  CheckCircle2,
   XCircle,
   AlertCircle,
   Clock,
   User,
   ArrowRight,
+  ChevronDown,
+  GitBranch,
 } from "lucide-react";
 import { UNIT_OPTIONS } from "@/types";
 import { cn } from "@/lib/utils";
@@ -31,243 +30,281 @@ interface Reviewer {
   order_steps?: { step_name: string; step_order: number };
 }
 
+interface Step {
+  step_order: number;
+  step_name: string;
+  reviewers: Reviewer[];
+}
+
 interface OrderWorkflowProps {
   reviewers: Reviewer[];
   items: any[];
 }
 
+const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; dot: string; badge: string }> = {
+  approved: {
+    label: "Зөвшөөрсөн",
+    icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
+    dot: "bg-emerald-500",
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  rejected: {
+    label: "Татгалзсан",
+    icon: <XCircle className="h-4 w-4 text-red-600" />,
+    dot: "bg-red-500",
+    badge: "bg-red-50 text-red-700 border-red-200",
+  },
+  changes_requested: {
+    label: "Өөрчлөлт хүссэн",
+    icon: <AlertCircle className="h-4 w-4 text-amber-600" />,
+    dot: "bg-amber-500",
+    badge: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  skipped: {
+    label: "Алгассан",
+    icon: <Clock className="h-4 w-4 text-slate-400" />,
+    dot: "bg-slate-300",
+    badge: "bg-slate-50 text-slate-500 border-slate-200",
+  },
+  pending: {
+    label: "Хүлээгдэж байна",
+    icon: <Clock className="h-4 w-4 text-blue-500" />,
+    dot: "bg-blue-400",
+    badge: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+};
+
+function getStatusCfg(status: string) {
+  return STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
+}
+
+function stepStatus(reviewers: Reviewer[]): string {
+  if (reviewers.every((r) => r.status === "approved")) return "approved";
+  if (reviewers.some((r) => r.status === "rejected")) return "rejected";
+  if (reviewers.some((r) => r.status === "changes_requested")) return "changes_requested";
+  if (reviewers.some((r) => r.status === "approved")) return "approved";
+  return "pending";
+}
+
+function formatDate(d?: string) {
+  if (!d) return null;
+  const dt = new Date(d);
+  return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, "0")}.${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function getUnitLabel(unit: string) {
+  return UNIT_OPTIONS.find((o) => o.value === unit)?.label ?? unit;
+}
+
 export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
-  const sorted = [...reviewers].sort((a, b) =>
-    a.order_steps?.step_order && b.order_steps?.step_order
-      ? a.order_steps.step_order - b.order_steps.step_order
-      : 0,
-  );
-
-  const getIcon = (status: string) => {
-    switch (status) {
-      case "approved":
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case "rejected":
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      case "changes_requested":
-        return <AlertCircle className="h-5 w-5 text-amber-600" />;
-      default:
-        return <Clock className="h-5 w-5 text-blue-600" />;
+  // Group reviewers by step_order
+  const stepsMap = new Map<number, Step>();
+  for (const r of reviewers) {
+    const order = r.order_steps?.step_order ?? 0;
+    if (!stepsMap.has(order)) {
+      stepsMap.set(order, {
+        step_order: order,
+        step_name: r.order_steps?.step_name ?? `Алхам ${order}`,
+        reviewers: [],
+      });
     }
+    stepsMap.get(order)!.reviewers.push(r);
+  }
+  const steps = Array.from(stepsMap.values()).sort((a, b) => a.step_order - b.step_order);
+
+  const toggle = (id: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "text-green-700 bg-green-50 border-green-200";
-      case "rejected":
-        return "text-red-700 bg-red-50 border-red-200";
-      case "changes_requested":
-        return "text-amber-700 bg-amber-50 border-amber-200";
-      default:
-        return "text-blue-700 bg-blue-50 border-blue-200";
-    }
-  };
-
-  const getBadge = (status: string) => {
-    const map: Record<string, { label: string; variant: any }> = {
-      approved: { label: "Зөвшөөрсөн", variant: "default" },
-      rejected: { label: "Татгалзсан", variant: "destructive" },
-      changes_requested: { label: "Өөрчлөлт хүссэн", variant: "secondary" },
-      skipped: { label: "Алгассан", variant: "outline" },
-      default: { label: "Хүлээгдэж байна", variant: "outline" },
-    };
-    const s = map[status] || map.default;
-    return <Badge variant={s.variant}>{s.label}</Badge>;
-  };
-
-  function formatDate(dateString: string) {
-    if (!dateString) return "Оноогдоогүй";
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
+  if (steps.length === 0) {
+    return (
+      <section className="rounded-xl border border-border bg-card">
+        <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3.5">
+          <GitBranch className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Баталгаажуулалтын явц</h2>
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Clock className="mb-2 h-8 w-8 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground">Явцын түүх байхгүй</p>
+        </div>
+      </section>
+    );
   }
 
-  const getUnitLabel = (unit: string) => {
-    const unitOption = UNIT_OPTIONS.find((option) => option.value === unit);
-    return unitOption ? unitOption.label : unit;
-  };
-
-  const toggleExpanded = (id: number) => {
-    const newExpanded = new Set(expanded);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpanded(newExpanded);
-  };
-
   return (
-    <Card className="border shadow-sm">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-semibold">
-          Баталгаажуулалтын явц
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {sorted.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground border rounded-lg">
-            <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>Явцын түүх байхгүй</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {sorted.map((r, i) => {
-              const stepName =
-                r.order_steps?.step_name ||
-                `Алхам ${r.order_steps?.step_order || i + 1}`;
-              const hasChanges =
-                r.sub_order_items && r.sub_order_items.length > 0;
-              const isExpanded = expanded.has(r.id);
-              const hasGeneralComment =
-                r.comment && r.comment.trim().length > 0;
+    <section className="rounded-xl border border-border bg-card">
+      <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3.5">
+        <GitBranch className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">Баталгаажуулалтын явц</h2>
+        <span className="ml-auto rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+          {steps.length} алхам
+        </span>
+      </div>
 
-              return (
-                <div
-                  key={r.id}
-                  className={cn(
-                    "border rounded-lg transition-all duration-200",
-                    isExpanded
-                      ? "ring-2 ring-primary/10"
-                      : "hover:border-primary/50",
-                    getStatusColor(r.status || "pending"),
+      <div className="p-5">
+        <div className="relative flex flex-col gap-0">
+          {steps.map((step, si) => {
+            const overall = stepStatus(step.reviewers);
+            const cfg = getStatusCfg(overall);
+            const isLast = si === steps.length - 1;
+
+            return (
+              <div key={step.step_order} className="relative flex gap-4">
+                {/* Timeline spine */}
+                <div className="flex flex-col items-center">
+                  {/* Step dot */}
+                  <div className={cn(
+                    "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-background shadow-sm",
+                    overall === "approved" ? "bg-emerald-100" :
+                    overall === "rejected"  ? "bg-red-100" :
+                    overall === "changes_requested" ? "bg-amber-100" :
+                    "bg-blue-50"
                   )}>
-                  <div
-                    className={cn(
-                      "flex items-start gap-3 p-4 cursor-pointer",
-                      hasChanges && "pb-3",
-                    )}
-                    onClick={() => toggleExpanded(r.id)}>
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getIcon(r.status || "pending")}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <h3 className="font-medium text-sm">{stepName}</h3>
-                        <div className="flex items-center gap-2">
-                          {getBadge(r.status || "pending")}
-                          {hasChanges && (
-                            <ChevronDown
-                              className={cn(
-                                "h-4 w-4 text-muted-foreground transition-transform flex-shrink-0",
-                                isExpanded && "rotate-180",
-                              )}
-                            />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs  mb-2">
-                        <User className="h-3.5 w-3.5" />
-                        <span>{r.profile?.name || "Нэр байхгүй"}</span>
-                        {r.profile?.position_name && (
-                          <>
-                            <span className="text-muted-foreground/50">•</span>
-                            <span>{r.profile.position_name}</span>
-                          </>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs">
-                        <div className="flex items-center gap-1">
-                          <span className="">Оноосон:</span>
-                          <span className="font-medium">
-                            {formatDate(r.reviewed_at || "")}
-                          </span>
-                        </div>
-                        {r.reviewed_at && (
-                          <>
-                            <div className="w-px h-3 bg-border" />
-                            <div className="flex items-center gap-1">
-                              <span className="">Шалгасан:</span>
-                              <span className="font-medium">
-                                {formatDate(r.reviewed_at)}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {hasGeneralComment && (
-                        <div className="mt-3 p-2 bg-white/50 dark:bg-black/10 rounded-md border border-black/5 text-sm">
-                          <p className="flex gap-2">
-                            <span className="font-semibold not-italic">
-                              Шийдвэрийн тайлбар:
-                            </span>
-                            {r.comment}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    {cfg.icon}
                   </div>
-
-                  {isExpanded && hasChanges && (
-                    <div className="px-4 pb-4 pt-0 space-y-4">
-                      {hasChanges && (
-                        <div className="mt-2">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="h-px flex-1 bg-border" />
-                            <span className="text-xs font-medium px-2">
-                              Өөрчлөлтүүд
-                            </span>
-                            <div className="h-px flex-1 bg-border" />
-                          </div>
-                          <div className="space-y-2">
-                            {r.sub_order_items?.map((sub) => {
-                              const orig = items.find(
-                                (it) => it.id === sub.order_item_id,
-                              );
-                              return (
-                                <div
-                                  key={sub.id}
-                                  className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded border border-yellow-300 dark:border-yellow-800/30">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <p className="font-medium text-sm">
-                                      {orig?.part_name}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm text-muted-foreground">
-                                        {orig?.quantity}{" "}
-                                        {getUnitLabel(orig?.unit || "")}
-                                      </span>
-                                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <span className="font-semibold text-amber-700">
-                                        {sub.quantity}{" "}
-                                        {getUnitLabel(orig?.unit || "")}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {sub.description && (
-                                    <p className="text-xs text-muted-foreground mt-1 pl-1 border-l-2 border-amber-300 dark:border-amber-700">
-                                      {sub.description}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                  {/* Connecting line */}
+                  {!isLast && (
+                    <div className="w-px flex-1 bg-border/60 my-1" />
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+                {/* Step content */}
+                <div className={cn("min-w-0 flex-1", !isLast && "pb-6")}>
+                  {/* Step header */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-mono font-semibold text-muted-foreground">
+                      {step.step_order}
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{step.step_name}</span>
+                    <Badge variant="outline" className={cn("ml-auto text-xs px-2 py-0.5", cfg.badge)}>
+                      {cfg.label}
+                    </Badge>
+                  </div>
+
+                  {/* Reviewers */}
+                  <div className="flex flex-col gap-2">
+                    {step.reviewers.map((r) => {
+                      const rcfg = getStatusCfg(r.status || "pending");
+                      const hasChanges = (r.sub_order_items?.length ?? 0) > 0;
+                      const isOpen = expanded.has(r.id);
+                      const reviewedDate = formatDate(r.reviewed_at);
+
+                      return (
+                        <div
+                          key={r.id}
+                          className="rounded-lg border border-border/60 bg-muted/20 overflow-hidden"
+                        >
+                          <div
+                            className={cn(
+                              "flex items-start gap-3 px-4 py-3",
+                              (hasChanges || r.comment) && "cursor-pointer hover:bg-muted/40 transition-colors"
+                            )}
+                            onClick={() => (hasChanges || r.comment) && toggle(r.id)}
+                          >
+                            {/* Reviewer avatar */}
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                              {r.profile?.name?.split(" ").map((n) => n[0]).slice(0, 2).join("") || "?"}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-sm font-medium text-foreground">
+                                  {r.profile?.name || "Нэр байхгүй"}
+                                </span>
+                                {r.profile?.position_name && (
+                                  <span className="text-xs text-muted-foreground">
+                                    · {r.profile.position_name}
+                                  </span>
+                                )}
+                                <Badge variant="outline" className={cn("ml-auto text-xs px-1.5 py-0", rcfg.badge)}>
+                                  {rcfg.label}
+                                </Badge>
+                              </div>
+
+                              {reviewedDate && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {reviewedDate}
+                                </p>
+                              )}
+                            </div>
+
+                            {(hasChanges || r.comment) && (
+                              <ChevronDown className={cn(
+                                "h-4 w-4 shrink-0 text-muted-foreground transition-transform mt-0.5",
+                                isOpen && "rotate-180"
+                              )} />
+                            )}
+                          </div>
+
+                          {/* Expanded: comment + changes */}
+                          {isOpen && (
+                            <div className="border-t border-border/40 px-4 py-3 space-y-3">
+                              {r.comment && (
+                                <div className="rounded-md bg-background px-3 py-2 text-sm">
+                                  <span className="font-medium text-foreground">Тайлбар: </span>
+                                  <span className="text-muted-foreground">{r.comment}</span>
+                                </div>
+                              )}
+
+                              {hasChanges && (
+                                <div>
+                                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Өөрчилсөн тоо хэмжээ
+                                  </p>
+                                  <div className="flex flex-col gap-1.5">
+                                    {r.sub_order_items!.map((sub) => {
+                                      const orig = items.find((it) => it.id === sub.order_item_id);
+                                      const unit = getUnitLabel(orig?.unit || "");
+                                      return (
+                                        <div
+                                          key={sub.id}
+                                          className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
+                                        >
+                                          <span className="font-medium text-foreground truncate mr-2">
+                                            {orig?.part_name ?? `#${sub.order_item_id}`}
+                                          </span>
+                                          <div className="flex items-center gap-1.5 shrink-0 text-sm">
+                                            <span className="text-muted-foreground line-through">
+                                              {orig?.quantity} {unit}
+                                            </span>
+                                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                            <span className="font-semibold text-amber-700">
+                                              {sub.quantity} {unit}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {r.sub_order_items!.some((s) => items.find((it) => it.id === s.order_item_id)?.description) && (
+                                    <div className="mt-2 space-y-1">
+                                      {r.sub_order_items!.filter((s) => s.description).map((sub) => (
+                                        <p key={sub.id} className="text-xs text-muted-foreground pl-2 border-l-2 border-amber-300">
+                                          {sub.description}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
