@@ -4,23 +4,39 @@ import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CalendarIcon, ClockIcon, SearchIcon } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  Search,
+  Package,
+  ChevronRight,
+  Inbox,
+} from "lucide-react";
 import { type Order } from "@/actions/orders";
 
-const statusColors = {
-  draft: "bg-gray-100 text-gray-800",
-  pending_review: "bg-yellow-100 text-yellow-800",
-  in_review: "bg-blue-100 text-blue-800",
-  pending_approval: "bg-orange-100 text-orange-800",
-  approved: "bg-green-100 text-green-800",
-  final_approved: "bg-emerald-100 text-emerald-800",
-  in_procurement: "bg-purple-100 text-purple-800",
-  completed: "bg-slate-100 text-slate-800",
-  rejected: "bg-red-100 text-red-800",
-  cancelled: "bg-gray-100 text-gray-800",
+const statusConfig: Record<
+  string,
+  { label: string; className: string }
+> = {
+  draft:             { label: "Ноорог",           className: "bg-slate-100 text-slate-600 border-slate-200" },
+  pending:           { label: "Шинэ",             className: "bg-blue-50 text-blue-700 border-blue-200" },
+  pending_review:    { label: "Хянагдана",        className: "bg-amber-50 text-amber-700 border-amber-200" },
+  in_review:         { label: "Хянагдаж байна",   className: "bg-orange-50 text-orange-700 border-orange-200" },
+  created_step:      { label: "Хянагдаж байна",   className: "bg-orange-50 text-orange-700 border-orange-200" },
+  approved:          { label: "Батлагдсан",       className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  changes_requested: { label: "Өөрчлөлттэй",     className: "bg-violet-50 text-violet-700 border-violet-200" },
+  final_approved:    { label: "Эцэст батлагдсан", className: "bg-green-50 text-green-700 border-green-200" },
+  in_procurement:    { label: "Нийлүүлэлт",       className: "bg-purple-50 text-purple-700 border-purple-200" },
+  completed:         { label: "Гүйцэтгэсэн",      className: "bg-slate-100 text-slate-600 border-slate-200" },
+  rejected:          { label: "Татгалзсан",       className: "bg-red-50 text-red-700 border-red-200" },
+  cancelled:         { label: "Цуцлагдсан",       className: "bg-gray-100 text-gray-500 border-gray-200" },
 };
+
+function formatDate(dateString: string) {
+  const d = new Date(dateString);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
 
 interface Props {
   orders: Order[];
@@ -30,129 +46,104 @@ export function OrdersList({ orders }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      !searchQuery ||
-      order.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.order_number.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      order.title.toLowerCase().includes(q) ||
+      order.order_number.toLowerCase().includes(q)
+    );
   });
 
-  function formatDateCustom(dateString: string) {
-    const date = new Date(dateString);
-
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-
-    return `${year} оны ${month} сарын ${day} өдөр`;
-  }
-
-  const formatStatus = (status: string) => {
-    const statusTranslations: { [key: string]: string } = {
-      rejected: "Татгалзсан",
-      changes_requested: "Өөрчлөлттэй батлагдсан",
-      approved: "Батлагдсан",
-      created_step: "Хянагдаж байна",
-    };
-
-    return (
-      statusTranslations[status] ||
-      status
-        .split("_")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ")
-    );
-  };
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Захиалгыг шүүх</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-64">
-              <div className="relative">
-                <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Хайлт хийх ..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Захиалгын нэр эсвэл дугаараар хайх..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-10 bg-card pl-10"
+        />
+      </div>
 
+      {/* Empty state */}
       {filteredOrders.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-6">
-            <p className="text-gray-500 text-lg">Илэрц олдсонгүй</p>
-            <p className="text-gray-400 mt-2">
-              {orders.length === 0
-                ? "Ямарч захиалга үүсгээгүй байна."
-                : "Шүүлтүүрийн тохиргоог өөрчилж дахин оролдоно уу."}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-20 text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+            <Inbox className="h-6 w-6 text-muted-foreground/40" />
+          </div>
+          <p className="font-semibold text-foreground">
+            {orders.length === 0 ? "Захиалга байхгүй байна" : "Илэрц олдсонгүй"}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {orders.length === 0
+              ? "Шинэ захиалга үүсгэхийн тулд дээрх товчийг дарна уу"
+              : "Хайлтын утгаа өөрчилж дахин оролдоно уу"}
+          </p>
+        </div>
       ) : (
-        <div className="space-y-4">
-          {filteredOrders.map((order) => (
-            <Card key={order.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Link
-                        href={`/orders/${order.id}`}
-                        className="text-lg font-semibold text-blue-600 hover:text-blue-800">
-                        {order.title}
-                      </Link>
-                      <Badge
-                        className={
-                          statusColors[
-                            order.status as keyof typeof statusColors
-                          ] || statusColors.draft
-                        }>
-                        {formatStatus(order.status)}
-                      </Badge>
-                    </div>
-                    {order.description && (
-                      <p className="text-gray-700 mb-3 line-clamp-2">
-                        {order.description}
-                      </p>
-                    )}
+        <div className="space-y-2">
+          {filteredOrders.map((order) => {
+            const status = statusConfig[order.status] ?? {
+              label: order.status,
+              className: "bg-gray-100 text-gray-600 border-gray-200",
+            };
 
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <CalendarIcon className="h-4 w-4" />
-                        Үүсгэсэн огноо: {formatDateCustom(order.created_at)}
-                      </div>
-                      {order.requested_delivery_date && (
-                        <div className="flex items-center gap-1">
-                          <ClockIcon className="h-4 w-4" />
-                          Шаардлагатай огноо:{" "}
-                          {formatDateCustom(order.requested_delivery_date)}
-                        </div>
-                      )}
-                    </div>
+            return (
+              <Link
+                key={order.id}
+                href={`/orders/${order.id}`}
+                className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm"
+              >
+                {/* Icon */}
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary transition-colors group-hover:bg-primary/12">
+                  <Package className="h-5 w-5" />
+                </div>
+
+                {/* Content */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-foreground group-hover:text-primary">
+                      {order.title}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`h-5 px-2 text-[11px] font-medium ${status.className}`}
+                    >
+                      {status.label}
+                    </Badge>
                   </div>
 
-                  <div className="text-right">
-                    <Link href={`/orders/${order.id}`}>
-                      <Button variant="outline" size="sm" className="mt-2">
-                        Захиалгын мэдээллийг харах
-                      </Button>
-                    </Link>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="font-mono"># {order.order_number}</span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {formatDate(order.created_at)}
+                    </span>
+                    {order.requested_delivery_date && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDate(order.requested_delivery_date)}
+                      </span>
+                    )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                {/* Arrow */}
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary/60" />
+              </Link>
+            );
+          })}
         </div>
+      )}
+
+      {/* Footer count */}
+      {filteredOrders.length > 0 && (
+        <p className="text-center text-xs text-muted-foreground">
+          Нийт {filteredOrders.length} захиалга
+          {searchQuery && ` (${orders.length}-с шүүсэн)`}
+        </p>
       )}
     </div>
   );

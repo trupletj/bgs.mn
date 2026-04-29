@@ -1,90 +1,32 @@
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Briefcase, ClipboardList } from "lucide-react";
+import { Plus } from "lucide-react";
 import { hasRole } from "@/actions/rbac";
+import { Button } from "@/components/ui/button";
+import AllOrderList from "@/components/orders/all-order-list";
 
 export default async function OrdersPage() {
-  const systems = [
-    {
-      title: "Захиалгын төрөл",
-      description: "Захиалгын процессын төрлийн тохиргоо",
-      href: "/order-processes",
-      icon: FileText,
-      requiredRoles: ["monitoring_emp", "super_admin", "order_system"],
-    },
-    {
-      title: "Захиалгын жагсаалт",
-      description: "Захиалгын систем",
-      href: "/orders/list",
-      icon: ClipboardList,
-      requiredRoles: [
-        "hr_emp",
-        "monitoring_emp",
-        "super_admin",
-        "order_system",
-      ],
-    },
-    {
-      title: "Захиалгын ерөнхий мэдээлэл",
-      description: "Нэгдсэн захиалгын мэдээлэл",
-      href: "/orders/manage",
-      icon: Briefcase,
-      requiredRoles: ["hr_emp", "super_admin", "order_system"],
-    },
-  ];
-
-  const accessibleSystems = [];
-
-  for (const system of systems) {
-    const hasAccess = await hasRole(system.requiredRoles);
-    if (hasAccess) {
-      accessibleSystems.push(system);
-    }
-  }
+  const canCreate = await hasRole(["hr_emp", "super_admin", "order_system"]);
 
   return (
-    <div className="flex mt-3 items-center justify-center bg-background p-4">
-      <div className="w-full max-w-5xl">
-        <div className="mb-12 text-center">
-          <h1 className="mb-3 text-4xl font-bold tracking-tight">
-            Систем сонгох
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Та ашиглах системээ сонгоно уу
+    <div className="flex flex-col gap-6 p-4 lg:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+            Захиалгын модуль
           </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Захиалга</h1>
         </div>
-
-        {accessibleSystems.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-3 justify-center">
-            {accessibleSystems.map((system) => {
-              const Icon = system.icon;
-              return (
-                <Link key={system.href} href={system.href} className="group">
-                  <Card className="h-full transition-all hover:shadow-lg hover:border-primary">
-                    <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-                      <div className="mb-4 rounded-full bg-primary/10 p-6 transition-colors group-hover:bg-primary/20">
-                        <Icon className="h-12 w-12 text-primary" />
-                      </div>
-                      <h2 className="mb-2 text-2xl font-semibold">
-                        {system.title}
-                      </h2>
-                      <p className="text-muted-foreground">
-                        {system.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-lg text-muted-foreground">
-              Танд хандах эрхтэй систем байхгүй байна.
-            </p>
-          </div>
+        {canCreate && (
+          <Button asChild className="h-9 gap-2 self-start sm:self-auto">
+            <Link href="/orders/add">
+              <Plus className="h-4 w-4" />
+              Шинэ захиалга
+            </Link>
+          </Button>
         )}
       </div>
+
+      <AllOrderList />
     </div>
   );
 }
