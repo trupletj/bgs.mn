@@ -93,7 +93,7 @@ const columns: ColumnDef<Row>[] = [
   {
     id: "organization",
     accessorFn: (r) => (r as any).organization?.name ?? "",
-    header: ({ column }) => <SortButton column={column}>Байгуулга</SortButton>,
+    header: ({ column }) => <SortButton column={column}>Байгууллага</SortButton>,
     cell: ({ row }) => {
       const name = (row.original as any).organization?.name;
       return name
@@ -276,10 +276,10 @@ export function DevicesTable({ data, orgStructure }: Props) {
           <Select value={orgId || NONE} onValueChange={handleOrgChange}>
             <SelectTrigger className="h-8 text-xs w-[160px] gap-1">
               <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <SelectValue placeholder="Байгуулга" />
+              <SelectValue placeholder="Байгууллага" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>Байгуулга бүгд</SelectItem>
+              <SelectItem value={NONE}>Байгууллага бүгд</SelectItem>
               {orgStructure.organizations.map((o) => (
                 <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
               ))}

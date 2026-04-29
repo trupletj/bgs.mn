@@ -116,12 +116,12 @@ export function DeviceFilters({ orgStructure }: DeviceFiltersProps) {
         )}
       </div>
 
-      {/* Байгуулга → Хэлтэс → Алба */}
+      {/* Байгууллага → Хэлтэс → Алба */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        {/* Байгуулга */}
+        {/* Байгууллага */}
         <Select value={current.org_id || NONE} onValueChange={handleOrgChange}>
           <SelectTrigger className="h-8 text-sm w-full sm:w-[220px]">
-            <SelectValue placeholder="Байгуулга" />
+            <SelectValue placeholder="Байгууллага" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>Бүх байгуулга</SelectItem>
