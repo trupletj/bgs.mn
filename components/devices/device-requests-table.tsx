@@ -46,10 +46,22 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [reqTypeFilter, setReqTypeFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [statusFilter, setStatusFilter]     = useState<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter]         = useState<Set<string>>(new Set());
+  const [reqTypeFilter, setReqTypeFilter]   = useState<Set<string>>(new Set());
+  const [priorityFilter, setPriorityFilter] = useState<Set<string>>(new Set());
+
+  const makeToggle = (setter: React.Dispatch<React.SetStateAction<Set<string>>>) => (key: string) => {
+    setter(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const toggleStatus   = makeToggle(setStatusFilter);
+  const toggleType     = makeToggle(setTypeFilter);
+  const toggleReqType  = makeToggle(setReqTypeFilter);
+  const togglePriority = makeToggle(setPriorityFilter);
   const [orgFilter, setOrgFilter] = useState("");
   const [heltesFilter, setHeltesFilter] = useState("");
   const [albaFilter, setAlbaFilter] = useState("");
@@ -90,10 +102,10 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
   // Client-side filtering
   const filtered = useMemo(() => {
     return data.filter(r => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (typeFilter !== "all" && r.device_type !== typeFilter) return false;
-      if (reqTypeFilter !== "all" && r.request_type !== reqTypeFilter) return false;
-      if (priorityFilter !== "all" && (r.priority ?? "normal") !== priorityFilter) return false;
+      if (statusFilter.size > 0 && !statusFilter.has(r.status)) return false;
+      if (typeFilter.size > 0 && !typeFilter.has(r.device_type)) return false;
+      if (reqTypeFilter.size > 0 && !reqTypeFilter.has(r.request_type)) return false;
+      if (priorityFilter.size > 0 && !priorityFilter.has(r.priority ?? "normal")) return false;
       if (orgFilter) {
         const org = orgStructure.organizations.find(o => o.id === orgFilter);
         if (org && r.req_org_bteg !== org.bteg_id) return false;
@@ -268,12 +280,13 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
   });
 
   const hasActiveFilters =
-    statusFilter !== "all" || typeFilter !== "all" || reqTypeFilter !== "all" || priorityFilter !== "all" ||
+    statusFilter.size > 0 || typeFilter.size > 0 || reqTypeFilter.size > 0 || priorityFilter.size > 0 ||
     !!orgFilter || !!heltesFilter || !!albaFilter || !!search;
 
   function clearFilters() {
-    setSearch(""); setStatusFilter("all"); setTypeFilter("all");
-    setReqTypeFilter("all"); setPriorityFilter("all");
+    setSearch("");
+    setStatusFilter(new Set()); setTypeFilter(new Set());
+    setReqTypeFilter(new Set()); setPriorityFilter(new Set());
     setOrgFilter(""); setHeltesFilter(""); setAlbaFilter("");
   }
 
@@ -298,31 +311,37 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
           )}
         </div>
 
-        {/* Status */}
+        {/* Status — multi-select */}
         <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => setStatusFilter("all")} className={cn(PILL, statusFilter === "all" ? PILL_ON : PILL_OFF)}>Бүгд</button>
+          <button onClick={() => setStatusFilter(new Set())} className={cn(PILL, statusFilter.size === 0 ? PILL_ON : PILL_OFF)}>
+            Бүгд
+          </button>
           {(Object.entries(STATUS_CONFIG) as [string, { label: string }][]).map(([k, v]) => (
-            <button key={k} onClick={() => setStatusFilter(k)} className={cn(PILL, statusFilter === k ? PILL_ON : PILL_OFF)}>
+            <button key={k} onClick={() => toggleStatus(k)} className={cn(PILL, statusFilter.has(k) ? PILL_ON : PILL_OFF)}>
               {v.label}
             </button>
           ))}
         </div>
 
-        {/* Device type */}
+        {/* Device type — multi-select */}
         <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => setTypeFilter("all")} className={cn(PILL, typeFilter === "all" ? PILL_ON : PILL_OFF)}>Бүх төхөөрөмж</button>
+          <button onClick={() => setTypeFilter(new Set())} className={cn(PILL, typeFilter.size === 0 ? PILL_ON : PILL_OFF)}>
+            Бүх төхөөрөмж
+          </button>
           {Object.entries(DEVICE_TYPE_CONFIG).map(([k, cfg]) => (
-            <button key={k} onClick={() => setTypeFilter(k)} className={cn(PILL, typeFilter === k ? PILL_ON : PILL_OFF)}>
+            <button key={k} onClick={() => toggleType(k)} className={cn(PILL, typeFilter.has(k) ? PILL_ON : PILL_OFF)}>
               {cfg.label}
             </button>
           ))}
         </div>
 
-        {/* Request type */}
+        {/* Request type — multi-select */}
         <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => setReqTypeFilter("all")} className={cn(PILL, reqTypeFilter === "all" ? PILL_ON : PILL_OFF)}>Бүх хүсэлт</button>
+          <button onClick={() => setReqTypeFilter(new Set())} className={cn(PILL, reqTypeFilter.size === 0 ? PILL_ON : PILL_OFF)}>
+            Бүх хүсэлт
+          </button>
           {(Object.entries(REQUEST_TYPE_CONFIG) as [DeviceRequestType, typeof REQUEST_TYPE_CONFIG[DeviceRequestType]][]).map(([k, cfg]) => (
-            <button key={k} onClick={() => setReqTypeFilter(k)} className={cn(PILL, reqTypeFilter === k ? PILL_ON : PILL_OFF)}>
+            <button key={k} onClick={() => toggleReqType(k)} className={cn(PILL, reqTypeFilter.has(k) ? PILL_ON : PILL_OFF)}>
               {cfg.emoji} {cfg.label}
             </button>
           ))}
@@ -331,9 +350,11 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
         {/* Priority + org cascade */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex gap-1.5">
-            <button onClick={() => setPriorityFilter("all")} className={cn(PILL, priorityFilter === "all" ? PILL_ON : PILL_OFF)}>Бүх зэрэглэл</button>
+            <button onClick={() => setPriorityFilter(new Set())} className={cn(PILL, priorityFilter.size === 0 ? PILL_ON : PILL_OFF)}>
+              Бүх зэрэглэл
+            </button>
             {(Object.entries(PRIORITY_CONFIG) as [DeviceRequestPriority, typeof PRIORITY_CONFIG[DeviceRequestPriority]][]).map(([k, cfg]) => (
-              <button key={k} onClick={() => setPriorityFilter(k)} className={cn(PILL, priorityFilter === k ? PILL_ON : PILL_OFF)}>
+              <button key={k} onClick={() => togglePriority(k)} className={cn(PILL, priorityFilter.has(k) ? PILL_ON : PILL_OFF)}>
                 {cfg.label}
               </button>
             ))}
@@ -345,7 +366,7 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
               onValueChange={v => { setOrgFilter(v === ALL ? "" : v); setHeltesFilter(""); setAlbaFilter(""); }}
             >
               <SelectTrigger className="h-8 text-xs w-[160px]">
-                <SelectValue placeholder="Байгуулга" />
+                <SelectValue placeholder="Байгууллага" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Бүгд</SelectItem>

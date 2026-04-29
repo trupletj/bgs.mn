@@ -79,7 +79,7 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
   const needsTransferDest = requestType === "transfer" || (requestType === "replace" && transferOld);
 
   const handleSubmit = () => {
-    if (!reqOrgBteg) { toast.error("Байгуулга сонгоно уу"); return; }
+    if (!reqOrgBteg) { toast.error("Байгууллага сонгоно уу"); return; }
     if (needsNewDevice && !purpose.trim()) { toast.error("Зориулалт / үндэслэл оруулна уу"); return; }
     if (needsSourceDevice && !selectedDevice) {
       toast.error("Холбогдох төхөөрөмжийг сонгоно уу"); return;

@@ -231,11 +231,11 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
           <h2 className="text-sm font-semibold">Харьяалал</h2>
         </div>
         <div className="p-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {/* Байгуулга */}
+          {/* Байгууллага */}
           <div>
-            <Label>Байгуулга</Label>
+            <Label>Байгууллага</Label>
             <Select value={orgId || NONE} onValueChange={handleOrgChange}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Байгуулга сонгох" /></SelectTrigger>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Байгууллага сонгох" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>— Сонгоогүй —</SelectItem>
                 {orgStructure.organizations.map(o => (
