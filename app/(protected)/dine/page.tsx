@@ -1,89 +1,24 @@
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { Briefcase, ClipboardList, ChefHat } from "lucide-react";
-import { hasRole } from "@/actions/rbac";
 import { hasPermission } from "@/actions/rbac";
 import UnauthorizedPage from "@/app/unauthorized/page";
+import FoodLogSummaryTable from "@/components/dine/food-log-summary-table";
+import { createClient } from "@/utils/supabase/client";
 
-export default async function Page() {
-  // Системүүдийн жагсаалтыг ролуудтай нь хамт тодорхойлох
-  const systems = [
-    {
-      title: "Гал тогоо",
-      description: "Гал тогооны жагсаалт",
-      href: "/dine/list",
-      icon: ChefHat,
-      permission: { module: "dining", action: "access" },
-    },
-    {
-      title: "Хоолны бүртгэл",
-      description: "Ажилчдын хоол бүртгэл",
-      href: "/dine/food-log",
-      icon: ClipboardList,
-      permission: { module: "dining", action: "access" }, // Бүх хүнд харагдана
-    },
-    {
-      title: "Түр зуурын гал тогоо",
-      description: "Ажилтныг өөр гал тогоонд түр шилжүүлэх",
-      href: "/dine/temp-kitchen",
-      icon: Briefcase,
-      permission: { module: "dining", action: "access" },
-    },
-  ];
-  const systemAccessResults = await Promise.all(
-    systems.map(async (system) => {
-      const hasAccess = await hasPermission(
-        system.permission.module,
-        system.permission.action,
-      );
-      return hasAccess ? system : null;
-    }),
-  );
+export default async function FoodLogSummaryPage() {
+  const is_access = await hasPermission("dining", "access");
+  if (!is_access) {
+    return <UnauthorizedPage />;
+  }
 
-  // Хэрэглэгчид хандах эрхтэй системүүдийг шүүх
-  const accessibleSystems = systemAccessResults.filter(
-    (s): s is (typeof systems)[0] => s !== null,
-  );
+  const supabase = createClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: summaryData } = await supabase
+    .from("daily_meal_summary")
+    .select(`*, dining_hall ( name )`)
+    .eq("date", today)
+    .order("grand_total", { ascending: false });
 
   return (
-    <div className="flex mt-3 items-center justify-center bg-background p-4">
-      <div className="w-full max-w-5xl">
-        <div className="mb-12 text-center">
-          <h1 className="mb-3 text-4xl font-bold tracking-tight">
-            Систем сонгох
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Та ашиглах системээ сонгоно уу
-          </p>
-        </div>
-
-        {accessibleSystems.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-3 justify-center">
-            {accessibleSystems.map((system) => {
-              const Icon = system.icon;
-              return (
-                <Link key={system.href} href={system.href} className="group">
-                  <Card className="h-full transition-all hover:shadow-lg hover:border-primary">
-                    <CardContent className="flex flex-col items-center justify-center p-8 text-center">
-                      <div className="mb-4 rounded-full bg-primary/10 p-6 transition-colors group-hover:bg-primary/20">
-                        <Icon className="h-12 w-12 text-primary" />
-                      </div>
-                      <h2 className="mb-2 text-2xl font-semibold">
-                        {system.title}
-                      </h2>
-                      <p className="text-muted-foreground">
-                        {system.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <UnauthorizedPage />
-        )}
-      </div>
-    </div>
+    <FoodLogSummaryTable initialData={summaryData || []} initialDate={today} />
   );
 }
