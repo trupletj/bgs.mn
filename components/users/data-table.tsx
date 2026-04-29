@@ -62,7 +62,8 @@ const AVATAR_COLORS = [
 
 function avatarColor(name: string) {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
@@ -71,16 +72,22 @@ export function DataTable<TData, TValue>({
   data,
   permissions,
 }: DataTableProps<TData, TValue>) {
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
   const [globalSearch, setGlobalSearch] = React.useState("");
   const [deptFilter, setDeptFilter] = React.useState("");
-  const [selectedEmployee, setSelectedEmployee] = React.useState<any | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = React.useState<any | null>(
+    null,
+  );
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
   // Derive unique departments for suggestions
   const departments = React.useMemo(() => {
     const set = new Set<string>();
-    (data as any[]).forEach((u) => { if (u.department_name) set.add(u.department_name); });
+    (data as any[]).forEach((u) => {
+      if (u.department_name) set.add(u.department_name);
+    });
     return Array.from(set).sort();
   }, [data]);
 
@@ -99,14 +106,15 @@ export function DataTable<TData, TValue>({
           u.phone,
           u.register_number,
           u.organization_name,
-        ].some((v) => v?.toLowerCase().includes(q))
+        ].some((v) => v?.toLowerCase().includes(q)),
       );
     }
     if (deptFilter) {
       const q = deptFilter.toLowerCase();
-      rows = rows.filter((u) =>
-        u.department_name?.toLowerCase().includes(q) ||
-        u.heltes_name?.toLowerCase().includes(q)
+      rows = rows.filter(
+        (u) =>
+          u.department_name?.toLowerCase().includes(q) ||
+          u.heltes_name?.toLowerCase().includes(q),
       );
     }
     return rows as TData[];
@@ -124,7 +132,10 @@ export function DataTable<TData, TValue>({
   });
 
   const hasFilters = globalSearch || deptFilter;
-  const clearFilters = () => { setGlobalSearch(""); setDeptFilter(""); };
+  const clearFilters = () => {
+    setGlobalSearch("");
+    setDeptFilter("");
+  };
 
   const { pageIndex, pageSize } = table.getState().pagination;
   const totalFiltered = table.getFilteredRowModel().rows.length;
@@ -146,8 +157,7 @@ export function DataTable<TData, TValue>({
           {globalSearch && (
             <button
               onClick={() => setGlobalSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
               <X className="h-3.5 w-3.5" />
             </button>
           )}
@@ -162,19 +172,24 @@ export function DataTable<TData, TValue>({
             list="dept-list"
           />
           <datalist id="dept-list">
-            {departments.map((d) => <option key={d} value={d} />)}
+            {departments.map((d) => (
+              <option key={d} value={d} />
+            ))}
           </datalist>
           {deptFilter && (
             <button
               onClick={() => setDeptFilter("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
         {hasFilters && (
-          <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-xs text-muted-foreground" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 gap-1.5 text-xs text-muted-foreground"
+            onClick={clearFilters}>
             <X className="h-3.5 w-3.5" />
             Цуцлах
           </Button>
@@ -184,8 +199,14 @@ export function DataTable<TData, TValue>({
       {/* Result count */}
       <div className="flex items-center gap-2">
         <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{totalFiltered}</span> ажилтан
-          {hasFilters && <span className="text-muted-foreground/60"> ({(data as any[]).length}-с шүүсэн)</span>}
+          <span className="font-semibold text-foreground">{totalFiltered}</span>{" "}
+          ажилтан
+          {hasFilters && (
+            <span className="text-muted-foreground/60">
+              {" "}
+              ({(data as any[]).length}-с шүүсэн)
+            </span>
+          )}
         </p>
       </div>
 
@@ -195,7 +216,7 @@ export function DataTable<TData, TValue>({
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="w-10 pl-4" />
-              <TableHead className="font-semibold">Ажилтан</TableHead>
+              <TableHead className="font-semibold">Овог нэр</TableHead>
               <TableHead className="font-semibold">Алба, хэлтэс</TableHead>
               <TableHead className="font-semibold">Албан тушаал</TableHead>
               <TableHead className="font-semibold">Утас</TableHead>
@@ -211,7 +232,9 @@ export function DataTable<TData, TValue>({
                       <Users className="h-5 w-5 text-muted-foreground/40" />
                     </div>
                     <p className="font-medium">Ажилтан олдсонгүй</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Хайлтын утгаа өөрчилж дахин оролдоно уу</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Хайлтын утгаа өөрчилж дахин оролдоно уу
+                    </p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -224,13 +247,16 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     className="group cursor-pointer transition-colors hover:bg-muted/30"
-                    onClick={() => { setSelectedEmployee(u); setIsDialogOpen(true); }}
-                  >
+                    onClick={() => {
+                      setSelectedEmployee(u);
+                      setIsDialogOpen(true);
+                    }}>
                     <TableCell className="pl-4">
-                      <div className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold",
-                        colorClass
-                      )}>
+                      <div
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold",
+                          colorClass,
+                        )}>
                         {initials}
                       </div>
                     </TableCell>
@@ -275,12 +301,15 @@ export function DataTable<TData, TValue>({
               <button
                 key={row.id}
                 className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
-                onClick={() => { setSelectedEmployee(u); setIsDialogOpen(true); }}
-              >
-                <div className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                  colorClass
-                )}>
+                onClick={() => {
+                  setSelectedEmployee(u);
+                  setIsDialogOpen(true);
+                }}>
+                <div
+                  className={cn(
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+                    colorClass,
+                  )}>
                   {initials}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -304,26 +333,66 @@ export function DataTable<TData, TValue>({
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             {from}–{to}
-            <span className="text-muted-foreground/60"> / {totalFiltered} ажилтан</span>
+            <span className="text-muted-foreground/60">
+              {" "}
+              / {totalFiltered} ажилтан
+            </span>
           </p>
           <div className="flex items-center gap-1">
             {[
-              { icon: ChevronsLeft, label: "Эхний", action: () => table.setPageIndex(0), disabled: !table.getCanPreviousPage() },
-              { icon: ChevronLeft, label: "Өмнөх", action: () => table.previousPage(), disabled: !table.getCanPreviousPage() },
+              {
+                icon: ChevronsLeft,
+                label: "Эхний",
+                action: () => table.setPageIndex(0),
+                disabled: !table.getCanPreviousPage(),
+              },
+              {
+                icon: ChevronLeft,
+                label: "Өмнөх",
+                action: () => table.previousPage(),
+                disabled: !table.getCanPreviousPage(),
+              },
             ].map(({ icon: Icon, label, action, disabled }) => (
-              <Button key={label} variant="outline" size="icon" className="h-8 w-8" onClick={action} disabled={disabled} aria-label={label}>
+              <Button
+                key={label}
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={action}
+                disabled={disabled}
+                aria-label={label}>
                 <Icon className="h-3.5 w-3.5" />
               </Button>
             ))}
             <span className="px-3 text-sm font-medium tabular-nums">
               {pageIndex + 1}
-              <span className="text-muted-foreground"> / {table.getPageCount()}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                / {table.getPageCount()}
+              </span>
             </span>
             {[
-              { icon: ChevronRight, label: "Дараагийн", action: () => table.nextPage(), disabled: !table.getCanNextPage() },
-              { icon: ChevronsRight, label: "Сүүлийн", action: () => table.setPageIndex(table.getPageCount() - 1), disabled: !table.getCanNextPage() },
+              {
+                icon: ChevronRight,
+                label: "Дараагийн",
+                action: () => table.nextPage(),
+                disabled: !table.getCanNextPage(),
+              },
+              {
+                icon: ChevronsRight,
+                label: "Сүүлийн",
+                action: () => table.setPageIndex(table.getPageCount() - 1),
+                disabled: !table.getCanNextPage(),
+              },
             ].map(({ icon: Icon, label, action, disabled }) => (
-              <Button key={label} variant="outline" size="icon" className="h-8 w-8" onClick={action} disabled={disabled} aria-label={label}>
+              <Button
+                key={label}
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={action}
+                disabled={disabled}
+                aria-label={label}>
                 <Icon className="h-3.5 w-3.5" />
               </Button>
             ))}

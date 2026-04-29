@@ -21,13 +21,6 @@ import Link from "next/link";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
-// const actionTypes = [
-//   { value: "IMPLEMENTATION", label: "Хэрэгжүүлэлт" },
-//   { value: "MONITORING", label: "Хяналт" },
-//   { value: "VERIFICATION", label: "Баталгаажуулалт" },
-//   { value: "DEPLOYMENT", label: "Нэвтрүүлэлт" },
-// ] as const;
-
 const sortByReferenceNumber = (clauses: any[]) => {
   return [...clauses].sort((a, b) => {
     const partsA = (a.reference_number || "").split(".").map(Number);
@@ -43,31 +36,6 @@ const sortByReferenceNumber = (clauses: any[]) => {
   });
 };
 
-// function TabButton({
-//   active,
-//   onClick,
-//   children,
-//   icon: Icon,
-// }: {
-//   active: boolean;
-//   onClick: () => void;
-//   children: React.ReactNode;
-//   icon: React.ComponentType<{ className: string }>;
-// }) {
-//   return (
-//     <button
-//       onClick={onClick}
-//       className={`flex items-center gap-2 px-4 py-3 font-medium transition-all duration-200 border-b-2 whitespace-nowrap ${
-//         active
-//           ? "border-blue-500 text-blue-600 bg-blue-50"
-//           : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-//       }`}>
-//       <Icon className="w-4 h-4" />
-//       {children}
-//     </button>
-//   );
-// }
-
 export default function ClientPolicyDashboard({
   policies,
 }: {
@@ -78,7 +46,7 @@ export default function ClientPolicyDashboard({
   const [showUnrated, setShowUnrated] = useState(true);
   const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "clauses">(
-    "overview"
+    "overview",
   );
 
   const formatDate = (dateString: string) => {
@@ -108,7 +76,7 @@ export default function ClientPolicyDashboard({
     ratedPolicies.length > 0
       ? Math.round(
           ratedPolicies.reduce((s, p) => s + p.implementationPercent, 0) /
-            ratedPolicies.length
+            ratedPolicies.length,
         )
       : 0;
 
@@ -138,11 +106,6 @@ export default function ClientPolicyDashboard({
             <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
               Журмын хэрэгжилтийн хяналт
             </h1>
-            <Link
-              className="text-blue-600 hover:text-blue-800 ml-auto"
-              href="/policy">
-              <Button>Журмын жагсаалт</Button>
-            </Link>
           </div>
           <p className="text-slate-600 ml-14">
             Бүх журмын хэрэгжилтийн үнэлгээ ба аудит тайлан
@@ -244,7 +207,7 @@ export default function ClientPolicyDashboard({
                         <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${getPercentBadgeColor(
-                              p.implementationPercent
+                              p.implementationPercent,
                             )}`}
                             style={{
                               width: `${p.implementationPercent}%`,
@@ -262,7 +225,7 @@ export default function ClientPolicyDashboard({
                     <td className="px-6 py-4">
                       <Badge
                         className={`${getStatusColor(
-                          p.implementationPercent
+                          p.implementationPercent,
                         )} border transition-all duration-200`}>
                         {p.validCount > 0 ? "Үнэлгээ ✓" : "Хүлээлтэнд"}
                       </Badge>
