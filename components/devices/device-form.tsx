@@ -9,8 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { createClient } from "@/utils/supabase/client";
-import { createDevice, updateDevice } from "@/actions/devices";
+import { createDevice, updateDevice, searchAssignableUsers } from "@/actions/devices";
 import {
   DEVICE_TYPE_CONFIG,
   type DeviceType, type DeviceStatus, type Device, type OrgStructure,
@@ -50,15 +49,24 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
   const [albaId, setAlbaId]       = useState(device?.alba_id ?? "");
 
   // Cascading filter
+  const selectedOrgBtegId = orgId
+    ? (orgStructure.organizations.find((o) => o.id === orgId)?.bteg_id ?? null)
+    : null;
+  const selectedHeltesBtegId = heltesId
+    ? (orgStructure.heltes.find((h) => h.id === heltesId)?.bteg_id ?? null)
+    : null;
+
   const filteredHeltes = useMemo(
-    () => orgId ? orgStructure.heltes.filter(h => h.organization_id === orgId) : orgStructure.heltes,
-    [orgId, orgStructure.heltes]
+    () => selectedOrgBtegId
+      ? orgStructure.heltes.filter(h => h.org_bteg_id === selectedOrgBtegId)
+      : orgStructure.heltes,
+    [selectedOrgBtegId, orgStructure.heltes]
   );
   const filteredAlba = useMemo(() => {
-    if (heltesId) return orgStructure.alba.filter(a => a.heltes_id === heltesId);
-    if (orgId)    return orgStructure.alba.filter(a => a.organization_id === orgId);
+    if (selectedHeltesBtegId) return orgStructure.alba.filter(a => a.heltes_bteg_id === selectedHeltesBtegId);
+    if (selectedOrgBtegId)    return orgStructure.alba.filter(a => a.org_bteg_id === selectedOrgBtegId);
     return orgStructure.alba;
-  }, [heltesId, orgId, orgStructure.alba]);
+  }, [selectedHeltesBtegId, selectedOrgBtegId, orgStructure.alba]);
 
   const handleOrgChange = (v: string) => {
     setOrgId(v === NONE ? "" : v);
@@ -96,15 +104,8 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
   useEffect(() => {
     if (!userSearch.trim()) { setUserResults([]); return; }
     const timer = setTimeout(async () => {
-      const supabase = createClient();
-      const q = userSearch.trim();
-      const { data } = await supabase
-        .from("users")
-        .select("id, first_name, last_name, position_name, department_name")
-        .eq("is_active", true)
-        .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
-        .limit(8);
-      setUserResults((data ?? []) as UserOption[]);
+      const results = await searchAssignableUsers(userSearch);
+      setUserResults(results);
     }, 300);
     return () => clearTimeout(timer);
   }, [userSearch]);
@@ -122,7 +123,7 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
       return { cpu, ram_gb: ram ? Number(ram) : undefined, ssd_gb: ssd ? Number(ssd) : undefined, hdd_gb: hdd ? Number(hdd) : undefined, gpu, os };
     if (type === "monitor")
       return { size_inch: monSize ? Number(monSize) : undefined, resolution, panel_type: panelType };
-    if (type === "printer" || type === "scanner" || type === "copier")
+    if (type === "printer" || type === "scanner")
       return { connection, color_capable: colorCapable };
     return {};
   };
@@ -300,7 +301,7 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
           </div>
         </section>
       )}
-      {(type === "printer" || type === "scanner" || type === "copier") && (
+      {(type === "printer" || type === "scanner") && (
         <section className="rounded-xl border border-border bg-card">
           <div className="border-b border-border/60 px-5 py-3.5"><h2 className="text-sm font-semibold">Техникийн үзүүлэлт</h2></div>
           <div className="p-5 grid grid-cols-1 gap-4 sm:grid-cols-2">

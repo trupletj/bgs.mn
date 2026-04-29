@@ -12,6 +12,7 @@ import {
 import {
   ArrowLeft, Edit, Monitor, Laptop2, Printer, Package2,
 } from "lucide-react";
+import { DeleteDeviceButton } from "@/components/devices/delete-device-button";
 import { DEVICE_TYPE_CONFIG, type DeviceType } from "@/types/device";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ function formatDate(d?: string) {
 
 const TYPE_ICON: Partial<Record<DeviceType, React.ElementType>> = {
   desktop: Monitor, laptop: Laptop2, printer: Printer,
-  scanner: Printer, copier: Printer, monitor: Monitor,
+  scanner: Printer, monitor: Monitor,
 };
 
 function SpecRow({ label, value }: { label: string; value?: string | number | boolean }) {
@@ -84,6 +85,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
             <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
               <Link href={`/devices/${id}/edit`}><Edit className="h-3.5 w-3.5" />Засварлах</Link>
             </Button>
+            <DeleteDeviceButton deviceId={device.id} deviceName={device.name} />
           </div>
         </div>
       </div>

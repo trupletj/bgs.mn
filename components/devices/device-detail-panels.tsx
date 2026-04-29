@@ -19,8 +19,8 @@ import {
 import {
   addDeviceAssignment, removeDeviceAssignment,
   addDeviceMaintenance, deleteDeviceMaintenance, changeDeviceStatus,
+  searchAssignableUsers,
 } from "@/actions/devices";
-import { createClient } from "@/utils/supabase/client";
 import {
   DEVICE_STATUS_CONFIG, type DeviceStatus, type DeviceAssignment,
   type DeviceHistory, type DeviceMaintenance,
@@ -48,17 +48,14 @@ export function AssignmentPanel({ deviceId, assignments }: { deviceId: string; a
   const [results, setResults] = useState<UserOption[]>([]);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const handleSearch = async (q: string) => {
+  const handleSearch = (q: string) => {
     setSearch(q);
     if (!q.trim()) { setResults([]); return; }
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("users")
-      .select("id, first_name, last_name, position_name, department_name")
-      .eq("is_active", true)
-      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
-      .limit(6);
-    setResults((data ?? []).filter((u: any) => !assignments.find((a) => a.user_id === u.id)) as UserOption[]);
+    const timer = setTimeout(async () => {
+      const data = await searchAssignableUsers(q);
+      setResults(data.filter((u) => !assignments.find((a) => a.user_id === u.id)));
+    }, 250);
+    return () => clearTimeout(timer);
   };
 
   const handleAdd = (u: UserOption) => {
