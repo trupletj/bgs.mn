@@ -61,9 +61,9 @@ export function OrgCascade({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div>
-        <FieldLabel>Байгуулга</FieldLabel>
+        <FieldLabel>Байгууллага</FieldLabel>
         <Select value={orgId || NONE} onValueChange={onOrgChange}>
-          <SelectTrigger><SelectValue placeholder="Байгуулга сонгох" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Байгууллага сонгох" /></SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— Сонгоогүй —</SelectItem>
             {orgStructure.organizations.map((o) => (
@@ -221,7 +221,7 @@ export function DevicePicker({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-xs text-muted-foreground">Байгуулга / хэлтэс / албаар шүүж төхөөрөмжөө сонгоно уу.</p>
+      <p className="text-xs text-muted-foreground">Байгууллага / хэлтэс / албаар шүүж төхөөрөмжөө сонгоно уу.</p>
 
       <OrgCascade
         orgStructure={orgStructure}
