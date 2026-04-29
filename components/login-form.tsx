@@ -1,17 +1,13 @@
 "use client";
+
 import { useState } from "react";
-// import { signIn } from 'next-auth/react'
 import { useRouter } from "next/navigation";
-
 import { createClient } from "@/utils/supabase/client";
-
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Image from "next/image";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 
 export function RequestOtpForm({
   className,
@@ -36,14 +32,10 @@ export function RequestOtpForm({
         });
 
       if (verifyError || (verifyData && verifyData.error)) {
-        const msg =
-          verifyError?.message || verifyData?.error || "Шалгалт амжилтгүй";
-        setError(msg);
+        setError(verifyError?.message || verifyData?.error || "Шалгалт амжилтгүй");
         setIsLoading(false);
         return;
       }
-
-      console.log("Хэрэглэгч баталгаажлаа, OTP илгээж байна...");
 
       const { error: otpError } = await supabase.auth.signInWithOtp({
         phone,
@@ -59,7 +51,6 @@ export function RequestOtpForm({
         return;
       }
 
-      // Амжилттай бол дараагийн хуудас руу
       router.push(`/otp?phone=${phone}&register=${register}`);
     } catch (err: any) {
       setError(err.message || "Гэнэтийн алдаа гарлаа");
@@ -68,70 +59,69 @@ export function RequestOtpForm({
   };
 
   return (
-    <>
-      <div className={cn("flex flex-col gap-6", className)} {...props}>
-        <Card className="overflow-hidden">
-          <CardContent className="grid p-0 md:grid-cols-2">
-            <form className="p-6 md:p-8" onSubmit={onRequest}>
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col items-center text-center">
-                  <h1 className="text-2xl font-bold mb-2">Тавтай морил</h1>
-                  <p className="text-balance text-sm text-muted-foreground">
-                    Регистрийн дугаар болон утасны дугаараа ашиглан нэвтэрнэ үү
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Регистрийн дугаар</Label>
-                  <Input
-                    value={register}
-                    onChange={(e) => setReg(e.target.value.toUpperCase())}
-                    type="text"
-                    placeholder="АА00000000"
-                    required
-                    className="uppercase"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="phone">Утасны дугаар</Label>
-                  </div>
-                  <Input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    type="text"
-                    required
-                  />
-                </div>
-                {error && <p className="text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Түр хүлээнэ үү...
-                    </>
-                  ) : (
-                    "Нэвтрэх"
-                  )}
-                </Button>
-              </div>
-            </form>
-            <div className="flex p-5">
-              <div className="relative w-full hidden md:block ">
-                <Image
-                  src="/building.svg"
-                  alt="Image"
-                  style={{ objectFit: "contain" }}
-                  fill
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
-          By clicking continue, you agree to our{" "}
-          <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
-        </div>
+    <div className={cn("w-full", className)} {...props}>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Тавтай морил
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Регистрийн дугаар болон утасны дугаараа оруулна уу
+        </p>
       </div>
-    </>
+
+      <form onSubmit={onRequest} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="register" className="text-sm font-medium">
+            Регистрийн дугаар
+          </Label>
+          <Input
+            id="register"
+            value={register}
+            onChange={(e) => setReg(e.target.value.toUpperCase())}
+            type="text"
+            placeholder="АА00000000"
+            required
+            className="h-11 font-mono tracking-widest uppercase"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phone" className="text-sm font-medium">
+            Утасны дугаар
+          </Label>
+          <Input
+            id="phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            type="tel"
+            placeholder="99001234"
+            required
+            className="h-11"
+          />
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-3 rounded-lg border border-destructive/20 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          className="h-11 w-full text-sm font-semibold"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Шалгаж байна...
+            </>
+          ) : (
+            "Нэвтрэх"
+          )}
+        </Button>
+      </form>
+    </div>
   );
 }

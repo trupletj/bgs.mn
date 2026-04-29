@@ -1,29 +1,40 @@
 import { getProfileInfo } from "@/actions/profile";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export async function SiteHeader() {
   const profile = await getProfileInfo();
+
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <SidebarTrigger className="-ml-1" />
+    <header className="sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border/60 bg-background/95 backdrop-blur-sm transition-[width,height] ease-linear">
+      <div className="flex w-full items-center gap-2 px-4 lg:px-6">
+        <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground" />
         <Separator
           orientation="vertical"
-          className="mx-2 data-[orientation=vertical]:h-4"
+          className="mx-1 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-base font-medium">Сайн байна уу? {profile.name}</h1>
-        {/* <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-            <a
-              href="https://github.com/shadcn-ui/ui/tree/main/apps/v4/app/(examples)/dashboard"
-              rel="noopener noreferrer"
-              target="_blank"
-              className="dark:text-foreground">
-              GitHub
-            </a>
+
+        {/* Greeting */}
+        <div className="flex-1 min-w-0">
+          <p className="truncate text-sm font-medium text-foreground">
+            Сайн байна уу,{" "}
+            <span className="text-primary">{profile.name}</span>
+          </p>
+        </div>
+
+        {/* Right actions */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="sr-only">Мэдэгдэл</span>
           </Button>
-        </div> */}
+        </div>
       </div>
     </header>
   );

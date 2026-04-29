@@ -8,18 +8,12 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  MapPin,
   Phone,
   Briefcase,
   Building2,
-  User,
   LinkIcon,
   Building,
 } from "lucide-react";
-import { Card } from "../ui/card";
-import { MdWorkOutline } from "react-icons/md";
-import { RiBuilding3Fill, RiMoonClearFill } from "react-icons/ri";
-import { FaHelmetSafety } from "react-icons/fa6";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { UserMealConfig } from "../dine/user-meal-config";
@@ -100,79 +94,62 @@ export function EmployeeDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[60vw] h-[80vh] flex flex-col overflow-y-auto [scrollbar-gutter:stable]">
-        <div className="my-2 shrink-0">
+      <DialogContent className="flex h-[85vh] flex-col overflow-y-auto sm:max-w-[56vw] [scrollbar-gutter:stable]">
+        <div className="shrink-0">
           <DialogHeader>
-            <DialogTitle className="mb-4 flex items-center gap-2 text-2xl">
-              <User className="h-6 w-6" />
-              Ажилтны мэдээлэл
-            </DialogTitle>
+            <DialogTitle className="sr-only">Ажилтны мэдээлэл</DialogTitle>
           </DialogHeader>
           <DialogDescription className="sr-only">
             Ажилтны талаарх мэдээллүүд агуулагдана
           </DialogDescription>
-          <Card className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
-            <div className="space-y-2">
-              <label className="text- text-muted-foreground uppercase font-bold">
-                Овог нэр
-              </label>
-              <p className="text-lg font-semibold">
-                {employee.last_name} {employee.first_name}
-              </p>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                <span>
+
+          {/* Employee card header */}
+          <div className="rounded-xl border border-border bg-muted/30 p-5">
+            <div className="flex items-start gap-4">
+              {/* Avatar */}
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary">
+                {(employee.last_name?.[0] ?? "") + (employee.first_name?.[0] ?? "")}
+              </div>
+
+              {/* Name + status */}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl font-bold text-foreground">
+                    {employee.last_name} {employee.first_name}
+                  </h2>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Идэвхтэй
+                  </span>
+                </div>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {employee.position_name || "Албан тушаал тодорхойгүй"}
+                </p>
+              </div>
+            </div>
+
+            {/* Info grid */}
+            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-border/60 pt-4 sm:grid-cols-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-muted-foreground">
                   {employee.organization_name || "Байгууллага тодорхойгүй"}
                 </span>
               </div>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                <span>{employee.department_name || "Хэлтэс тодорхойгүй"}</span>
+              <div className="flex items-center gap-2 text-sm">
+                <Building className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-muted-foreground">
+                  {employee.department_name || employee.heltes_name || "Хэлтэс тодорхойгүй"}
+                </span>
               </div>
-              <div className="flex items-center gap-2 ">
-                <Briefcase className="h-4 w-4" />
-                <span>
-                  {employee.position_name || "Албан тушаал тодорхойгүй"}
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 shrink-0 text-primary" />
+                <span className="font-mono text-muted-foreground">
+                  {employee.phone || "—"}
                 </span>
               </div>
             </div>
-
-            <div className="space-y-3 text-sm border-l md:pl-6">
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-primary" />
-                <span>{employee.phone || "Мэдээлэл алга"}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                <span className="truncate">
-                  {employee.location || "Мэдээлэл алга"}
-                </span>
-              </div>
-            </div>
-
-            <div
-              className="inline-flex items-center gap-2 px-3 py-1 
-                    rounded-full bg-green-200 text-green-700 
-                    text-xs font-medium">
-              <MdWorkOutline className="w-4 h-4 text-green-600" />
-              Ажиллаж байгаа
-            </div>
-            <div
-              className="inline-flex items-center gap-2 px-3 py-1
-                    rounded-full bg-blue-600 text-white 
-                    text-xs font-medium">
-              <RiMoonClearFill className="w-6 h-6" />
-              Шөнийн ээлж
-            </div>
-
-            <div className="inline-flex gap-2 text-xs items-center  bg-amber-300 rounded-full py-1 font-medium px-3">
-              <FaHelmetSafety className="w-6 h-6" />
-              BTEG-B2
-            </div>
-          </Card>
+          </div>
         </div>
 
         <div className="flex-1 ">
