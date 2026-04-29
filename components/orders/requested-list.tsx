@@ -1,220 +1,108 @@
-// components/review-requests-list.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getAwaitingOrders, AwaitingOrder } from "@/actions/orders";
 import {
   Clock,
   User,
-  Building,
-  FileText,
-  CheckCircle,
+  Building2,
+  Calendar,
+  ArrowRight,
+  CheckCircle2,
   XCircle,
   AlertCircle,
+  FileText,
+  ExternalLink,
+  Hash,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
-interface ReviewRequestProp {
+// ─── Configs ──────────────────────────────────────────────────────────────────
+
+const ORDER_TYPE: Record<string, { label: string; className: string }> = {
+  emergency:        { label: "Яаралтай",        className: "bg-red-50 text-red-700 border-red-200" },
+  service:          { label: "Үйлчилгээний",    className: "bg-amber-50 text-amber-700 border-amber-200" },
+  "major repairs":  { label: "Их засвар",        className: "bg-orange-50 text-orange-700 border-orange-200" },
+  "safety reserves":{ label: "Аюулгүйн нөөц",   className: "bg-green-50 text-green-700 border-green-200" },
+  other:            { label: "Бусад",            className: "bg-slate-100 text-slate-600 border-slate-200" },
+};
+
+const REVIEW_STATUS: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
+  approved:          { label: "Зөвшөөрсөн",      icon: <CheckCircle2 className="h-3 w-3" />, className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  rejected:          { label: "Татгалзсан",       icon: <XCircle className="h-3 w-3" />,      className: "bg-red-50 text-red-700 border-red-200" },
+  changes_requested: { label: "Өөрчлөлт шаардсан", icon: <AlertCircle className="h-3 w-3" />, className: "bg-violet-50 text-violet-700 border-violet-200" },
+  skipped:           { label: "Алгассан",         icon: <Clock className="h-3 w-3" />,        className: "bg-slate-100 text-slate-500 border-slate-200" },
+};
+
+function formatDate(d?: string) {
+  if (!d) return null;
+  const dt = new Date(d);
+  return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, "0")}.${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+// ─── Helper to normalise the dual shape of AwaitingOrder ─────────────────────
+
+function parseAwaiting(r: AwaitingOrder) {
+  const instance = (r.order_instances ?? r.order_instance) as any;
+  if (!instance) return null;
+  const order = instance.orders ?? instance.order;
+  if (!order) return null;
+  const profile = order.profile ?? order.created_profile ?? null;
+  return { instance, order, profile };
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface Props {
   profile_id: string;
   type: "pending" | "reviewed";
   initialData: AwaitingOrder[] | null;
 }
 
-export function RequestedList({
-  profile_id,
-  type,
-  initialData,
-}: ReviewRequestProp) {
-  const [reviewRequests, setReviewRequests] = useState<AwaitingOrder[]>(
-    initialData || [],
-  );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function RequestedList({ profile_id, type, initialData }: Props) {
   const router = useRouter();
+  const [items, setItems] = useState<AwaitingOrder[]>(initialData ?? []);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setReviewRequests(initialData || []);
-  }, [initialData]);
-
-  const fetchReviewRequests = async () => {
+  const refresh = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const data = await getAwaitingOrders(profile_id);
-      const filtered = (data || []).filter((request) => {
-        return type === "pending"
-          ? request.status === "pending" || !request.status
-          : request.status && request.status !== "pending";
-      });
-      setReviewRequests(filtered);
-    } catch (error) {
-      setError("Алдаа гарлаа");
+      const filtered = (data ?? []).filter((r) =>
+        type === "pending"
+          ? r.status === "pending" || !r.status
+          : r.status && r.status !== "pending"
+      );
+      setItems(filtered);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReview = (orderId: number) => {
-    router.push(`/orders/${orderId}/rate`);
-  };
+  if (loading) return <ListSkeleton />;
 
-  const getUrgencyBadge = (urgency: string) => {
-    const urgencyConfig: Record<
-      string,
-      {
-        label: string;
-        variant: "secondary" | "outline" | "destructive";
-        color: string;
-      }
-    > = {
-      service: {
-        label: "Үйлчилгээний",
-        variant: "outline",
-        color: "bg-green-100 text-green-800",
-      },
-      "major repairs": {
-        label: "Их засвар",
-        variant: "outline",
-        color: "bg-yellow-100 text-yellow-800",
-      },
-      "safety reserves": {
-        label: "Аюулгүйн нөөц",
-        variant: "outline",
-        color: "bg-orange-100 text-orange-800",
-      },
-      emergency: {
-        label: "Нэн яаралтай",
-        variant: "destructive",
-        color: "bg-red-100 text-red-800",
-      },
-      other: {
-        label: "Бусад",
-        variant: "outline",
-        color: "bg-gray-100 text-gray-800",
-      },
-    };
-
-    // Safely access the urgencyConfig with a fallback
-    const config = urgencyConfig[urgency] || urgencyConfig["other"];
-
+  if (items.length === 0) {
     return (
-      <Badge variant={config.variant} className={config.color}>
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<
-      string,
-      {
-        label: string;
-        variant: "default" | "secondary" | "destructive" | "outline";
-        icon: React.ReactNode;
-      }
-    > = {
-      pending: {
-        label: "Хүлээгдэж байна",
-        variant: "outline",
-        icon: <Clock className="h-3 w-3 mr-1" />,
-      },
-      approved: {
-        label: "Зөвшөөрсөн",
-        variant: "default",
-        icon: <CheckCircle className="h-3 w-3 mr-1" />,
-      },
-      rejected: {
-        label: "Татгалзсан",
-        variant: "destructive",
-        icon: <XCircle className="h-3 w-3 mr-1" />,
-      },
-      changes_requested: {
-        label: "Өөрчлөлт шаардсан",
-        variant: "secondary",
-        icon: <FileText className="h-3 w-3 mr-1" />,
-      },
-    };
-
-    const config = statusConfig[status] || statusConfig.pending;
-    return (
-      <Badge variant={config.variant} className="flex items-center">
-        {config.icon}
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "Тодорхойгүй";
-
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-
-    return `${year} оны ${month} сарын ${day}-нд`;
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <Skeleton className="h-6 w-1/3" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-                <div className="flex justify-between">
-                  <Skeleton className="h-10 w-24" />
-                  <Skeleton className="h-10 w-24" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <div className="mx-auto w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-4">
-          <AlertCircle className="h-12 w-12 text-red-400" />
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+          {type === "pending"
+            ? <Clock className="h-5 w-5 text-muted-foreground/40" />
+            : <CheckCircle2 className="h-5 w-5 text-muted-foreground/40" />}
         </div>
-        <h3 className="text-lg font-semibold text-gray-600 mb-2">
-          Алдаа гарлаа
-        </h3>
-        <p className="text-gray-500 max-w-md mx-auto mb-4">{error}</p>
-        <Button onClick={fetchReviewRequests} variant="outline">
-          Дахин оролдох
-        </Button>
-      </div>
-    );
-  }
-
-  if (!reviewRequests || reviewRequests.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <FileText className="h-12 w-12 text-gray-400" />
-        </div>
-        <h3 className="text-lg font-semibold text-gray-600 mb-2">
-          Шалгагдах хүсэлт олдсонгүй
-        </h3>
-        <p className="text-gray-500 max-w-md mx-auto">
-          Одоогоор танд шалгагдахаар илгээгдсэн захиалгын хүсэлт байхгүй байна.
+        <p className="font-medium text-foreground">
+          {type === "pending" ? "Хянах захиалга байхгүй" : "Хянасан захиалга байхгүй"}
         </p>
-        <Button
-          onClick={fetchReviewRequests}
-          variant="outline"
-          className="mt-4">
+        <p className="mt-1 text-sm text-muted-foreground">
+          {type === "pending"
+            ? "Одоогоор танд хянах шаардлагатай захиалга байхгүй байна"
+            : "Та одоогоор ямар нэгэн захиалга хянаагүй байна"}
+        </p>
+        <Button variant="ghost" size="sm" className="mt-4" onClick={refresh}>
           Шинэчлэх
         </Button>
       </div>
@@ -222,120 +110,144 @@ export function RequestedList({
   }
 
   return (
-    <div className="space-y-4">
-      {reviewRequests.map((request) => {
-        // Суурь өгөгдөл авах
-        const instance = request.order_instances || request.order_instance;
-
-        if (!instance) {
-          console.warn("No instance found for request:", request);
-          return null;
-        }
-
-        const order = (instance as any).orders || (instance as any).order;
-        if (!order) {
-          console.warn("No order found for instance:", instance);
-          return null;
-        }
-
-        // Profile мэдээлэл авах
-        const profile = order.profile || (order as any).created_profile;
+    <div className="flex flex-col gap-3">
+      {items.map((r) => {
+        const parsed = parseAwaiting(r);
+        if (!parsed) return null;
+        const { instance, order, profile } = parsed;
+        const typeKey = order.urgency_level || order.order_type || "other";
+        const typeCfg = ORDER_TYPE[typeKey] ?? ORDER_TYPE.other;
+        const reviewCfg = REVIEW_STATUS[r.status] ?? null;
+        const createdDate = formatDate(r.created_at);
+        const deliveryDate = formatDate(order.requested_delivery_date);
 
         return (
-          <Card
-            key={`${request.id}-${instance.id}`}
-            className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500">
-            <CardContent className="px-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    {getUrgencyBadge(order.urgency_level || "")}
-                    <Badge
-                      variant="secondary"
-                      className="bg-blue-50 text-blue-700">
-                      {instance.current_step_order || 1}-р шат
+          <div
+            key={r.id}
+            className={cn(
+              "group relative rounded-xl border bg-card transition-shadow hover:shadow-sm",
+              type === "pending" ? "border-border" : "border-border/60"
+            )}
+          >
+            {/* Left accent for pending */}
+            {type === "pending" && (
+              <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-primary/60" />
+            )}
+
+            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
+              {/* ── Main info ── */}
+              <div className="min-w-0 flex-1">
+                {/* Badges row */}
+                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                  {order.order_number && (
+                    <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                      <Hash className="h-3 w-3" />
+                      {order.order_number}
+                    </span>
+                  )}
+                  <Badge variant="outline" className={cn("text-xs px-2 py-0", typeCfg.className)}>
+                    {typeCfg.label}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs px-2 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                    {instance.current_step_order}-р шат
+                  </Badge>
+                  {type === "reviewed" && reviewCfg && (
+                    <Badge variant="outline" className={cn("flex items-center gap-1 text-xs px-2 py-0", reviewCfg.className)}>
+                      {reviewCfg.icon}
+                      {reviewCfg.label}
                     </Badge>
-                    {getStatusBadge(request.status || "pending")}
-                  </div>
-
-                  <h4 className="font-semibold text-lg text-gray-800 mb-2">
-                    {order.title || "Гарчиггүй захиалга"}
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <User className="h-4 w-4 mr-2" />
-                        <span className="font-medium">Хүсэлт гаргасан: </span>
-                        <span className="ml-2">
-                          {profile?.name || "Тодорхойгүй"}
-                        </span>
-                      </div>
-                      {profile?.department_name && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Building className="h-4 w-4 mr-2" />
-                          <span className="font-medium">Хэлтэс: </span>
-                          <span className="ml-2">
-                            {profile.department_name}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Clock className="h-4 w-4 mr-2" />
-                        <span className="font-medium">Хүсэлт илгээсэн: </span>
-                        <span className="ml-2">
-                          {formatDate(request.created_at)}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">
-                          Захиалгын хэрэгцээт хязгаар огноо:{" "}
-                        </span>
-                        {order.requested_delivery_date
-                          ? formatDate(order.requested_delivery_date)
-                          : "Тодорхойгүй"}
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row md:flex-col gap-2 min-w-[180px]">
-                  {request.status === "pending" || !request.status ? (
-                    <Button
-                      onClick={() => handleReview(order.id)}
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                      size="lg">
-                      Шалгах
-                    </Button>
-                  ) : (
-                    <div className="w-full p-3 bg-gray-50 rounded-lg border text-center">
-                      <div className="font-medium text-gray-700 mb-1">
-                        Та аль хэдийн шалгасан
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Статус:{" "}
-                        {request.status === "approved"
-                          ? "Зөвшөөрсөн"
-                          : request.status === "rejected"
-                            ? "Татгалзсан"
-                            : "Өөрчлөлт шаардсан"}
-                      </div>
-                    </div>
-                  )}
+                {/* Title */}
+                <p className="font-semibold leading-snug text-foreground">
+                  {order.title || "Гарчиггүй захиалга"}
+                </p>
 
-                  <Link href={`/orders/${order.id}`} className="w-full">
-                    <Button variant="outline" className="w-full" size="lg">
-                      Дэлгэрэнгүй харах
-                    </Button>
-                  </Link>
+                {/* Meta row */}
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {profile?.name && (
+                    <span className="flex items-center gap-1">
+                      <User className="h-3 w-3 shrink-0" />
+                      {profile.name}
+                    </span>
+                  )}
+                  {profile?.department_name && (
+                    <span className="flex items-center gap-1">
+                      <Building2 className="h-3 w-3 shrink-0" />
+                      {profile.department_name}
+                    </span>
+                  )}
+                  {createdDate && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3 shrink-0" />
+                      {createdDate}
+                    </span>
+                  )}
+                  {deliveryDate && (
+                    <span className="flex items-center gap-1 text-amber-600">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      Хүргэлт: {deliveryDate}
+                    </span>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* ── Actions ── */}
+              <div className="flex shrink-0 flex-row gap-2 sm:flex-col sm:items-end">
+                {type === "pending" ? (
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => router.push(`/orders/${order.id}/rate`)}
+                  >
+                    Шалгах
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground">
+                    {reviewCfg?.icon}
+                    <span>Шалгасан</span>
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  asChild
+                >
+                  <Link href={`/orders/${order.id}`}>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Дэлгэрэнгүй
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function ListSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
+          <Skeleton className="h-5 w-2/3" />
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-28" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
