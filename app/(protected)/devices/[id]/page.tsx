@@ -103,7 +103,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
             <div className="px-5 py-2">
               <SpecRow label="Серийн дугаар" value={device.serial_number} />
               <SpecRow label="Байршил" value={device.location} />
-              <SpecRow label="Байгуулга" value={(device as any).organization?.name ?? undefined} />
+              <SpecRow label="Байгууллага" value={(device as any).organization?.name ?? undefined} />
               <SpecRow label="Хэлтэс" value={(device as any).heltes?.name ?? device.heltes_name ?? undefined} />
               <SpecRow label="Алба" value={(device as any).alba?.name ?? device.department_name ?? undefined} />
               <SpecRow label="Худалдан авсан огноо" value={formatDate(device.purchase_date)} />

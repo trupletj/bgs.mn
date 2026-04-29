@@ -16,6 +16,7 @@ import {
   Package2, Users, Clock, AlertTriangle, BarChart3, PieChart as PieIcon,
   TrendingUp, Layers, Building2,
 } from "lucide-react";
+import { RequestFlowAnalytics } from "@/components/devices/device-report-requests";
 
 const ALL = "__all__";
 
@@ -227,7 +228,7 @@ export function DeviceReportDashboard({ devices, requests, orgStructure }: Props
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
         <Building2 className="h-4 w-4 text-muted-foreground ml-1" />
         <Select value={orgFilter || ALL} onValueChange={v => { setOrgFilter(v === ALL ? "" : v); setHeltesFilter(""); setAlbaFilter(""); }}>
-          <SelectTrigger className="h-8 text-xs w-[180px]"><SelectValue placeholder="Байгуулга" /></SelectTrigger>
+          <SelectTrigger className="h-8 text-xs w-[180px]"><SelectValue placeholder="Байгууллага" /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Бүх байгуулга</SelectItem>
             {orgStructure.organizations.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
@@ -295,7 +296,7 @@ export function DeviceReportDashboard({ devices, requests, orgStructure }: Props
             <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
               <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="organization">Байгуулга</SelectItem>
+                <SelectItem value="organization">Байгууллага</SelectItem>
                 <SelectItem value="heltes">Хэлтэс</SelectItem>
                 <SelectItem value="alba">Алба</SelectItem>
               </SelectContent>
@@ -398,6 +399,13 @@ export function DeviceReportDashboard({ devices, requests, orgStructure }: Props
           </ResponsiveContainer>
         </ChartCard>
       )}
+
+      {/* ── Request flow analytics ── */}
+      <RequestFlowAnalytics
+        devices={filteredDevices}
+        requests={filteredRequests}
+        orgStructure={orgStructure}
+      />
     </div>
   );
 }
