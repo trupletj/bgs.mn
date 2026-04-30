@@ -116,8 +116,10 @@ export async function getNavServices(): Promise<NavService[]> {
       url: "/devices",
       basePaths: ["/devices"],
       items: [
-        { title: "Бүртгэл", url: "/devices" },
-        { title: "Тайлан", url: "/devices/report" },
+        { title: "Бүртгэл",       url: "/devices" },
+        { title: "Хүсэлт гаргах", url: "/devices/request" },
+        { title: "Хүсэлтүүд",     url: "/devices/requests" },
+        { title: "Тайлан",         url: "/devices/report" },
       ],
     });
   }
