@@ -3,7 +3,6 @@ export type DeviceType =
   | "laptop"
   | "printer"
   | "scanner"
-  | "copier"
   | "monitor";
 
 export type DeviceStatus = "active";
@@ -56,16 +55,20 @@ export interface Device {
   created_by?: number;
   created_at: string;
   updated_at: string;
+  // pairing
+  paired_with_device_id?: string | null;
   // joined
   organization?: { id: string; name: string } | null;
   heltes?: { id: string; name: string } | null;
   alba?: { id: string; name: string } | null;
   device_assignments?: DeviceAssignment[];
+  paired_with?: { id: string; name: string; model?: string; serial_number?: string; device_type: string } | null;
+  paired_monitors?: { id: string; name: string; model?: string; serial_number?: string; device_type: string }[];
 }
 
-export interface OrgOption { id: string; name: string }
-export interface HeltesOption { id: string; name: string; organization_id: string | null }
-export interface AlbaOption { id: string; name: string; heltes_id: string | null; organization_id: string | null }
+export interface OrgOption { id: string; name: string; bteg_id: string }
+export interface HeltesOption { id: string; name: string; bteg_id: string; org_bteg_id: string | null }
+export interface AlbaOption { id: string; name: string; bteg_id: string; heltes_bteg_id: string | null; org_bteg_id: string | null }
 export interface OrgStructure {
   organizations: OrgOption[];
   heltes: HeltesOption[];
@@ -116,11 +119,10 @@ export interface DeviceMaintenance {
 // ─── UI label / style maps ────────────────────────────────────────────────────
 
 export const DEVICE_TYPE_CONFIG: Record<DeviceType, { label: string; group: string }> = {
-  desktop: { label: "Десктоп компьютер",  group: "Компьютер" },
+  desktop: { label: "Суурин компьютер",   group: "Компьютер" },
   laptop:  { label: "Зөөврийн компьютер", group: "Компьютер" },
   printer: { label: "Принтер",            group: "Принтер / Сканнер" },
   scanner: { label: "Сканнер",            group: "Принтер / Сканнер" },
-  copier:  { label: "Копи машин",         group: "Принтер / Сканнер" },
   monitor: { label: "Монитор",            group: "Монитор" },
 };
 
@@ -128,4 +130,4 @@ export const DEVICE_STATUS_CONFIG: Record<DeviceStatus, { label: string; classNa
   active: { label: "Идэвхтэй", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
-export const DEVICE_TYPES_WITH_SPECS: DeviceType[] = ["desktop", "laptop", "printer", "scanner", "copier", "monitor"];
+export const DEVICE_TYPES_WITH_SPECS: DeviceType[] = ["desktop", "laptop", "printer", "scanner", "monitor"];

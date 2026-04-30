@@ -33,18 +33,20 @@ export function DeviceFilters({ orgStructure }: DeviceFiltersProps) {
 
   const hasFilters = Object.values(current).some(Boolean);
 
+  const selectedOrg = orgStructure.organizations.find(o => o.id === current.org_id);
   const filteredHeltes = useMemo(
-    () => current.org_id
-      ? orgStructure.heltes.filter(h => h.organization_id === current.org_id)
+    () => selectedOrg
+      ? orgStructure.heltes.filter(h => h.org_bteg_id === selectedOrg.bteg_id)
       : orgStructure.heltes,
-    [current.org_id, orgStructure.heltes]
+    [selectedOrg, orgStructure.heltes]
   );
 
+  const selectedHeltes = orgStructure.heltes.find(h => h.id === current.heltes_id);
   const filteredAlba = useMemo(() => {
-    if (current.heltes_id) return orgStructure.alba.filter(a => a.heltes_id === current.heltes_id);
-    if (current.org_id)    return orgStructure.alba.filter(a => a.organization_id === current.org_id);
+    if (selectedHeltes) return orgStructure.alba.filter(a => a.heltes_bteg_id === selectedHeltes.bteg_id);
+    if (selectedOrg)    return orgStructure.alba.filter(a => a.org_bteg_id === selectedOrg.bteg_id);
     return orgStructure.alba;
-  }, [current.heltes_id, current.org_id, orgStructure.alba]);
+  }, [selectedHeltes, selectedOrg, orgStructure.alba]);
 
   const update = useCallback((updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -114,12 +116,12 @@ export function DeviceFilters({ orgStructure }: DeviceFiltersProps) {
         )}
       </div>
 
-      {/* Байгуулга → Хэлтэс → Алба */}
+      {/* Байгууллага → Хэлтэс → Алба */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        {/* Байгуулга */}
+        {/* Байгууллага */}
         <Select value={current.org_id || NONE} onValueChange={handleOrgChange}>
           <SelectTrigger className="h-8 text-sm w-full sm:w-[220px]">
-            <SelectValue placeholder="Байгуулга" />
+            <SelectValue placeholder="Байгууллага" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>Бүх байгуулга</SelectItem>

@@ -12,6 +12,7 @@ import {
 import {
   ArrowLeft, Edit, Monitor, Laptop2, Printer, Package2,
 } from "lucide-react";
+import { DeleteDeviceButton } from "@/components/devices/delete-device-button";
 import { DEVICE_TYPE_CONFIG, type DeviceType } from "@/types/device";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,7 @@ function formatDate(d?: string) {
 
 const TYPE_ICON: Partial<Record<DeviceType, React.ElementType>> = {
   desktop: Monitor, laptop: Laptop2, printer: Printer,
-  scanner: Printer, copier: Printer, monitor: Monitor,
+  scanner: Printer, monitor: Monitor,
 };
 
 function SpecRow({ label, value }: { label: string; value?: string | number | boolean }) {
@@ -84,6 +85,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
             <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
               <Link href={`/devices/${id}/edit`}><Edit className="h-3.5 w-3.5" />Засварлах</Link>
             </Button>
+            <DeleteDeviceButton deviceId={device.id} deviceName={device.name} />
           </div>
         </div>
       </div>
@@ -101,7 +103,7 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
             <div className="px-5 py-2">
               <SpecRow label="Серийн дугаар" value={device.serial_number} />
               <SpecRow label="Байршил" value={device.location} />
-              <SpecRow label="Байгуулга" value={(device as any).organization?.name ?? undefined} />
+              <SpecRow label="Байгууллага" value={(device as any).organization?.name ?? undefined} />
               <SpecRow label="Хэлтэс" value={(device as any).heltes?.name ?? device.heltes_name ?? undefined} />
               <SpecRow label="Алба" value={(device as any).alba?.name ?? device.department_name ?? undefined} />
               <SpecRow label="Худалдан авсан огноо" value={formatDate(device.purchase_date)} />
@@ -168,6 +170,78 @@ export default async function DeviceDetailPage({ params }: { params: Promise<{ i
               <AssignmentPanel deviceId={device.id} assignments={device.device_assignments as any ?? []} />
             </div>
           </div>
+
+          {/* Pairing: monitor → its computer */}
+          {device.device_type === "monitor" && (
+            <div className="rounded-xl border border-border bg-card">
+              <div className="border-b border-border/60 px-5 py-3.5">
+                <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                  <Laptop2 className="h-4 w-4" /> Хамт ашиглагдаж буй компьютер
+                </h2>
+              </div>
+              <div className="p-4">
+                {(device as any).paired_with ? (
+                  <Link
+                    href={`/devices/${(device as any).paired_with.id}`}
+                    className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Laptop2 className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{(device as any).paired_with.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {DEVICE_TYPE_CONFIG[(device as any).paired_with.device_type as DeviceType]?.label}
+                        {(device as any).paired_with.serial_number ? ` · ${(device as any).paired_with.serial_number}` : ""}
+                      </p>
+                    </div>
+                  </Link>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Тохиргоогүй</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pairing: computer → its monitors */}
+          {(device.device_type === "desktop" || device.device_type === "laptop") && (
+            <div className="rounded-xl border border-border bg-card">
+              <div className="border-b border-border/60 px-5 py-3.5 flex items-center justify-between">
+                <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                  <Monitor className="h-4 w-4" /> Холбогдсон дэлгэцүүд
+                </h2>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {((device as any).paired_monitors ?? []).length}
+                </span>
+              </div>
+              <div className="p-4 flex flex-col gap-2">
+                {((device as any).paired_monitors ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Тохиргоогүй</p>
+                ) : (
+                  ((device as any).paired_monitors as any[]).map((m) => (
+                    <Link
+                      key={m.id}
+                      href={`/devices/${m.id}`}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Monitor className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate text-sm">{m.name}</p>
+                        {(m.model || m.serial_number) && (
+                          <p className="text-xs text-muted-foreground">
+                            {m.model ?? ""}
+                            {m.serial_number ? ` · ${m.serial_number}` : ""}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
           {/* History */}
           <div className="rounded-xl border border-border bg-card">
