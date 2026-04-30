@@ -55,11 +55,15 @@ export interface Device {
   created_by?: number;
   created_at: string;
   updated_at: string;
+  // pairing
+  paired_with_device_id?: string | null;
   // joined
   organization?: { id: string; name: string } | null;
   heltes?: { id: string; name: string } | null;
   alba?: { id: string; name: string } | null;
   device_assignments?: DeviceAssignment[];
+  paired_with?: { id: string; name: string; model?: string; serial_number?: string; device_type: string } | null;
+  paired_monitors?: { id: string; name: string; model?: string; serial_number?: string; device_type: string }[];
 }
 
 export interface OrgOption { id: string; name: string; bteg_id: string }

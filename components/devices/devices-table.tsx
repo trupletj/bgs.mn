@@ -25,11 +25,12 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { DeviceTypeBadge } from "./device-status-badge";
 import {
   ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Search, X, ExternalLink, Building2,
+  Cpu, Laptop2, Monitor as MonitorIcon, Printer as PrinterIcon, ScanLine,
 } from "lucide-react";
+import { DEVICE_TYPE_CONFIG } from "@/types/device";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Device, DeviceType, OrgStructure } from "@/types/device";
@@ -46,6 +47,34 @@ function formatDate(d?: string | null) {
   return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, "0")}.${String(dt.getDate()).padStart(2, "0")}`;
 }
 
+const TYPE_ICONS: Record<string, React.ElementType> = {
+  desktop: Cpu,
+  laptop:  Laptop2,
+  monitor: MonitorIcon,
+  printer: PrinterIcon,
+  scanner: ScanLine,
+};
+const TYPE_COLORS: Record<string, string> = {
+  desktop: "text-indigo-600 bg-indigo-50 border-indigo-200",
+  laptop:  "text-cyan-600 bg-cyan-50 border-cyan-200",
+  monitor: "text-emerald-600 bg-emerald-50 border-emerald-200",
+  printer: "text-amber-600 bg-amber-50 border-amber-200",
+  scanner: "text-orange-600 bg-orange-50 border-orange-200",
+};
+
+function TypeIcon({ type, size = "md" }: { type: string; size?: "sm" | "md" }) {
+  const Icon = TYPE_ICONS[type] ?? Cpu;
+  const label = DEVICE_TYPE_CONFIG[type as DeviceType]?.label ?? type;
+  const cls = TYPE_COLORS[type] ?? "text-muted-foreground bg-muted/40 border-border";
+  const dim = size === "sm" ? "h-6 w-6" : "h-8 w-8";
+  const iconDim = size === "sm" ? "h-3 w-3" : "h-4 w-4";
+  return (
+    <div title={label} className={cn("inline-flex items-center justify-center rounded-md border", dim, cls)}>
+      <Icon className={iconDim} />
+    </div>
+  );
+}
+
 function SortButton({ column, children }: { column: any; children: React.ReactNode }) {
   return (
     <button
@@ -58,7 +87,8 @@ function SortButton({ column, children }: { column: any; children: React.ReactNo
   );
 }
 
-const columns: ColumnDef<Row>[] = [
+function buildColumns(pairedChildren: Map<string, Row[]>): ColumnDef<Row>[] {
+ return [
   {
     id: "name",
     accessorFn: (r) => r.name,
@@ -78,7 +108,25 @@ const columns: ColumnDef<Row>[] = [
     id: "device_type",
     accessorFn: (r) => r.device_type,
     header: "Төрөл",
-    cell: ({ row }) => <DeviceTypeBadge type={row.original.device_type} />,
+    cell: ({ row }) => {
+      const d = row.original;
+      const children = pairedChildren.get(d.id) ?? [];
+      return (
+        <div className="flex items-center gap-1.5">
+          <TypeIcon type={d.device_type} />
+          {children.length > 0 && (
+            <div title={`${children.length} холбогдсон төхөөрөмж`} className="flex items-center gap-0.5 ml-1 pl-1.5 border-l border-border/60">
+              {children.slice(0, 4).map((c) => (
+                <TypeIcon key={c.id} type={c.device_type} size="sm" />
+              ))}
+              {children.length > 4 && (
+                <span className="text-[10px] font-semibold text-muted-foreground ml-0.5">+{children.length - 4}</span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    },
     filterFn: (row, _id, value) => !value || row.original.device_type === value,
   },
   {
@@ -156,6 +204,7 @@ const columns: ColumnDef<Row>[] = [
     ),
   },
 ];
+}
 
 const NONE = "__none__";
 
@@ -216,6 +265,20 @@ export function DevicesTable({ data, orgStructure }: Props) {
   }, [data, orgId, heltesId, albaId]);
 
   const hasOrgFilter = orgId || heltesId || albaId;
+
+  // Build parent → children map (e.g., desktop → its monitors)
+  const pairedChildren = React.useMemo(() => {
+    const m = new Map<string, Row[]>();
+    for (const d of data) {
+      const parent = (d as any).paired_with_device_id as string | null | undefined;
+      if (!parent) continue;
+      if (!m.has(parent)) m.set(parent, []);
+      m.get(parent)!.push(d);
+    }
+    return m;
+  }, [data]);
+
+  const columns = React.useMemo(() => buildColumns(pairedChildren), [pairedChildren]);
 
   const table = useReactTable({
     data: filteredData,
@@ -335,33 +398,44 @@ export function DevicesTable({ data, orgStructure }: Props) {
       </div>
 
       {/* Toolbar row 2: type filter pills */}
-      <div className="flex flex-wrap gap-1">
-        {[
-          { value: "", label: "Төрөл бүгд" },
-          { value: "desktop", label: "Суурин" },
-          { value: "laptop", label: "Зөөврийн" },
-          { value: "printer", label: "Принтер" },
-          { value: "scanner", label: "Сканнер" },
-          { value: "monitor", label: "Монитор" },
-        ].map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() =>
-              setColumnFilters((prev) => [
-                ...prev.filter((f) => f.id !== "device_type"),
-                ...(opt.value ? [{ id: "device_type", value: opt.value }] : []),
-              ])
-            }
-            className={cn(
-              "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
-              currentTypeFilter === opt.value
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          onClick={() => setColumnFilters((prev) => prev.filter((f) => f.id !== "device_type"))}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            currentTypeFilter === ""
+              ? "border-foreground bg-foreground text-background"
+              : "border-border bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+          )}
+        >
+          Төрөл бүгд
+        </button>
+        {(["desktop", "laptop", "monitor", "printer", "scanner"] as const).map((value) => {
+          const Icon = TYPE_ICONS[value];
+          const label = DEVICE_TYPE_CONFIG[value]?.label ?? value;
+          const colorClass = TYPE_COLORS[value];
+          const active = currentTypeFilter === value;
+          return (
+            <button
+              key={value}
+              onClick={() =>
+                setColumnFilters((prev) => [
+                  ...prev.filter((f) => f.id !== "device_type"),
+                  { id: "device_type", value },
+                ])
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                active
+                  ? cn("border-current shadow-sm", colorClass)
+                  : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}
