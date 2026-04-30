@@ -9,12 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { createDevice, updateDevice, searchAssignableUsers } from "@/actions/devices";
+import {
+  createDevice, updateDevice, searchAssignableUsers,
+  searchDevicesForPairing, setMonitorPairings, createPairedMonitors,
+} from "@/actions/devices";
 import {
   DEVICE_TYPE_CONFIG,
   type DeviceType, type DeviceStatus, type Device, type OrgStructure,
 } from "@/types/device";
-import { Search, X } from "lucide-react";
+import { Search, X, Monitor as MonitorIcon, Laptop2, Plus, Sparkles } from "lucide-react";
 
 const DEVICE_TYPES = Object.entries(DEVICE_TYPE_CONFIG) as [DeviceType, { label: string; group: string }][];
 const NONE = "__none__";
@@ -95,6 +98,68 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
   const [connection, setConn] = useState(specs.connection ?? "");
   const [colorCapable, setClr]= useState<boolean>(specs.color_capable ?? false);
 
+  // ── Pairing ──
+  type PairDevice = { id: string; name: string; model?: string; serial_number?: string; device_type: string; paired_with_device_id?: string | null };
+
+  // For monitor → pick one computer
+  const initialPairedComputer: PairDevice | null = device?.paired_with
+    ? { id: device.paired_with.id, name: device.paired_with.name, model: device.paired_with.model, serial_number: device.paired_with.serial_number, device_type: device.paired_with.device_type }
+    : null;
+  const [pairedComputer, setPairedComputer] = useState<PairDevice | null>(initialPairedComputer);
+  const [computerSearch, setComputerSearch] = useState("");
+  const [computerResults, setComputerResults] = useState<PairDevice[]>([]);
+
+  useEffect(() => {
+    if (type !== "monitor") return;
+    if (!computerSearch.trim()) { setComputerResults([]); return; }
+    const t = setTimeout(async () => {
+      const res = await searchDevicesForPairing({ query: computerSearch, types: ["desktop", "laptop"], excludeId: device?.id });
+      setComputerResults(res);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [computerSearch, type, device?.id]);
+
+  // For computer → multi-pick monitors
+  const initialPairedMonitors: PairDevice[] = (device?.paired_monitors ?? []) as PairDevice[];
+  const [pairedMonitors, setPairedMonitors] = useState<PairDevice[]>(initialPairedMonitors);
+  const [monitorSearch, setMonitorSearch] = useState("");
+  const [monitorResults, setMonitorResults] = useState<PairDevice[]>([]);
+
+  // Inline new-monitor entries (created on submit)
+  type NewMonitor = { localId: string; name: string; model: string; serial_number: string; manufacturer: string; size_inch: string };
+  const blankNewMonitor = (): NewMonitor => ({
+    localId: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: "", model: "", serial_number: "", manufacturer: "", size_inch: "",
+  });
+  const [newMonitors, setNewMonitors] = useState<NewMonitor[]>([]);
+  const [draftMonitor, setDraftMonitor] = useState<NewMonitor>(blankNewMonitor());
+  const [draftOpen, setDraftOpen] = useState(false);
+
+  const addDraftMonitor = () => {
+    if (!draftMonitor.name.trim()) {
+      toast.error("Дэлгэцийн нэр оруулна уу");
+      return;
+    }
+    setNewMonitors(p => [...p, draftMonitor]);
+    setDraftMonitor(blankNewMonitor());
+    setDraftOpen(false);
+  };
+  const removeNewMonitor = (localId: string) =>
+    setNewMonitors(p => p.filter(m => m.localId !== localId));
+
+  useEffect(() => {
+    if (type !== "desktop" && type !== "laptop") return;
+    if (!monitorSearch.trim()) { setMonitorResults([]); return; }
+    const t = setTimeout(async () => {
+      const res = await searchDevicesForPairing({ query: monitorSearch, types: ["monitor"], excludeId: device?.id });
+      // Hide already-selected monitors
+      const selectedIds = new Set(pairedMonitors.map(m => m.id));
+      const filtered = res.filter(m => !selectedIds.has(m.id));
+      setMonitorResults(filtered);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [monitorSearch, type, device?.id, pairedMonitors]);
+
   // ── Хариуцагчид ──
   const existingUsers = device?.device_assignments?.map((a) => a.user).filter(Boolean) as UserOption[] ?? [];
   const [selectedUsers, setSelectedUsers] = useState<UserOption[]>(existingUsers);
@@ -155,12 +220,37 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
           department_name: albaName || undefined,
           heltes_name: heltesName || undefined,
         };
+        const pairedWithId = type === "monitor" ? (pairedComputer?.id ?? null) : null;
+
+        const newMonitorPayload = newMonitors.map(m => ({
+          name: m.name,
+          model: m.model || undefined,
+          serial_number: m.serial_number || undefined,
+          manufacturer: m.manufacturer || undefined,
+          size_inch: m.size_inch ? Number(m.size_inch) : undefined,
+        }));
+        const isComputer = type === "desktop" || type === "laptop";
+
         if (mode === "create") {
-          const id = await createDevice({ ...base, user_ids: selectedUsers.map((u) => u.id) });
+          const id = await createDevice({
+            ...base,
+            user_ids: selectedUsers.map((u) => u.id),
+            paired_with_device_id: pairedWithId,
+            paired_monitor_ids: isComputer ? pairedMonitors.map(m => m.id) : undefined,
+          });
+          if (isComputer && newMonitorPayload.length) {
+            await createPairedMonitors(id, newMonitorPayload);
+          }
           toast.success("Тоног төхөөрөмж бүртгэгдлээ");
           router.push(`/devices/${id}`);
         } else {
-          await updateDevice(device!.id, base, "Мэдээлэл засварлагдлаа");
+          await updateDevice(device!.id, { ...base, paired_with_device_id: pairedWithId }, "Мэдээлэл засварлагдлаа");
+          if (isComputer) {
+            await setMonitorPairings(device!.id, pairedMonitors.map(m => m.id));
+            if (newMonitorPayload.length) {
+              await createPairedMonitors(device!.id, newMonitorPayload);
+            }
+          }
           toast.success("Хадгалагдлаа");
           router.push(`/devices/${device!.id}`);
         }
@@ -358,6 +448,244 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Pairing: Monitor → Computer ── */}
+      {type === "monitor" && (
+        <section className="rounded-xl border border-border bg-card">
+          <div className="border-b border-border/60 px-5 py-3.5">
+            <h2 className="text-sm font-semibold flex items-center gap-1.5">
+              <Laptop2 className="h-4 w-4" />
+              Хамт ашиглах компьютер
+            </h2>
+          </div>
+          <div className="p-5">
+            {pairedComputer ? (
+              <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm">
+                <Laptop2 className="h-4 w-4 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-primary">{pairedComputer.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {DEVICE_TYPE_CONFIG[pairedComputer.device_type as DeviceType]?.label ?? pairedComputer.device_type}
+                    {pairedComputer.model ? ` · ${pairedComputer.model}` : ""}
+                    {pairedComputer.serial_number ? ` · ${pairedComputer.serial_number}` : ""}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setPairedComputer(null)} className="text-muted-foreground hover:text-destructive">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Компьютерийн нэр, загвар, серийн дугаараар хайх..."
+                  value={computerSearch}
+                  onChange={(e) => setComputerSearch(e.target.value)}
+                  className="pl-9"
+                />
+                {computerResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-md max-h-64 overflow-y-auto">
+                    {computerResults.map((c) => (
+                      <button
+                        key={c.id} type="button"
+                        onClick={() => { setPairedComputer(c); setComputerSearch(""); setComputerResults([]); }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/50"
+                      >
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Laptop2 className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{c.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {DEVICE_TYPE_CONFIG[c.device_type as DeviceType]?.label}
+                            {c.model ? ` · ${c.model}` : ""}
+                            {c.serial_number ? ` · ${c.serial_number}` : ""}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Pairing: Computer → Monitors (multi) ── */}
+      {(type === "desktop" || type === "laptop") && (
+        <section className="rounded-xl border border-border bg-card">
+          <div className="border-b border-border/60 px-5 py-3.5 flex items-center justify-between">
+            <h2 className="text-sm font-semibold flex items-center gap-1.5">
+              <MonitorIcon className="h-4 w-4" />
+              Хамт ашиглах дэлгэцүүд
+            </h2>
+            <span className="text-xs text-muted-foreground">{pairedMonitors.length} ширхэг</span>
+          </div>
+          <div className="p-5 space-y-3">
+            {pairedMonitors.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pairedMonitors.map((m) => (
+                  <div key={m.id} className="flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1 text-sm">
+                    <MonitorIcon className="h-3 w-3 text-muted-foreground" />
+                    <span>{m.name}</span>
+                    {m.serial_number && <span className="text-xs text-muted-foreground font-mono">({m.serial_number})</span>}
+                    <button type="button" onClick={() => setPairedMonitors(p => p.filter(x => x.id !== m.id))} className="text-muted-foreground hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Дэлгэцийн нэр, загвар, серийн дугаараар хайх..."
+                value={monitorSearch}
+                onChange={(e) => setMonitorSearch(e.target.value)}
+                className="pl-9"
+              />
+              {monitorResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-md max-h-64 overflow-y-auto">
+                  {monitorResults.map((m) => (
+                    <button
+                      key={m.id} type="button"
+                      onClick={() => {
+                        setPairedMonitors(p => [...p, m]);
+                        setMonitorSearch(""); setMonitorResults([]);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/50"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <MonitorIcon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{m.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {m.model ? `${m.model} · ` : ""}
+                          {m.serial_number ?? ""}
+                        </p>
+                      </div>
+                      {m.paired_with_device_id && (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                          Өөр компьютертэй
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Хайж олоод сонгоход эндээс ширхэг бүрийг арилгах боломжтой. Аль хэдийн өөр компьютертэй холбогдсон дэлгэцийг сонговол тэр холбоо нь шинэчлэгдэн энэ компьютерт шилжинэ.
+            </p>
+
+            {/* New monitors to be created on submit */}
+            {newMonitors.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {newMonitors.map((m) => (
+                  <div key={m.localId} className="flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm text-emerald-800">
+                    <Sparkles className="h-3 w-3" />
+                    <span className="font-medium">{m.name}</span>
+                    {m.serial_number && <span className="text-xs font-mono opacity-70">({m.serial_number})</span>}
+                    <span className="text-[10px] uppercase tracking-wide font-semibold opacity-80">шинэ</span>
+                    <button type="button" onClick={() => removeNewMonitor(m.localId)} className="text-emerald-700/70 hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Inline create new monitor */}
+            <div className="rounded-lg border border-dashed border-border/80 bg-muted/10">
+              {!draftOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setDraftOpen(true)}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors rounded-lg"
+                >
+                  <Plus className="h-4 w-4" />
+                  Шинэ дэлгэц нэмж бүртгэх
+                </button>
+              ) : (
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Шинэ дэлгэц</p>
+                    <button
+                      type="button"
+                      onClick={() => { setDraftMonitor(blankNewMonitor()); setDraftOpen(false); }}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-2">
+                      <Label>Нэр *</Label>
+                      <Input
+                        value={draftMonitor.name}
+                        onChange={(e) => setDraftMonitor(p => ({ ...p, name: e.target.value }))}
+                        placeholder="Жишээ нь: Dell P2419H"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Үйлдвэрлэгч</Label>
+                      <Input
+                        value={draftMonitor.manufacturer}
+                        onChange={(e) => setDraftMonitor(p => ({ ...p, manufacturer: e.target.value }))}
+                        placeholder="Dell, HP..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Загвар</Label>
+                      <Input
+                        value={draftMonitor.model}
+                        onChange={(e) => setDraftMonitor(p => ({ ...p, model: e.target.value }))}
+                        placeholder="Загвар"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Серийн дугаар</Label>
+                      <Input
+                        value={draftMonitor.serial_number}
+                        onChange={(e) => setDraftMonitor(p => ({ ...p, serial_number: e.target.value }))}
+                        placeholder="SN-XXXXX"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Хэмжээ (inch)</Label>
+                      <Input
+                        type="number"
+                        value={draftMonitor.size_inch}
+                        onChange={(e) => setDraftMonitor(p => ({ ...p, size_inch: e.target.value }))}
+                        placeholder="24"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={addDraftMonitor} className="gap-1.5">
+                      <Plus className="h-3.5 w-3.5" /> Нэмэх
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setDraftMonitor(blankNewMonitor()); setDraftOpen(false); }}>
+                      Болих
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Үйлдвэрлэгч / Загвар / Серийн дугаар нь заавал биш — үндсэн нь "Нэр". Бусад мэдээллийг дараа дэлгэрэнгүй хуудаснаас засаж болно.
+                    Хадгалах товч дарах үед энэ компьютертэй автоматаар холбогдоно.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       )}

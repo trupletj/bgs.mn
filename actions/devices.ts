@@ -50,7 +50,7 @@ export async function getDevices(filters?: {
     .select(`
       id, name, model, serial_number, manufacturer, device_type, status,
       location, purchase_date, warranty_expiry_date, department_name, heltes_name,
-      organization_id, heltes_id, alba_id, created_at, specs,
+      organization_id, heltes_id, alba_id, paired_with_device_id, created_at, specs,
       organization:organization_id ( id, name ),
       heltes!devices_heltes_id_fkey ( id, name ),
       alba!devices_alba_id_fkey ( id, name ),
@@ -117,12 +117,128 @@ export async function getDevice(id: string) {
       device_assignments (
         id, is_primary, assigned_at, notes, user_id,
         user:user_id ( id, first_name, last_name, position_name, department_name, phone )
-      )
+      ),
+      paired_with:paired_with_device_id ( id, name, model, serial_number, device_type )
     `)
     .eq("id", id)
     .single();
 
+  if (data) {
+    const { data: paired_monitors } = await supabase
+      .from("devices")
+      .select("id, name, model, serial_number, device_type")
+      .eq("paired_with_device_id", id)
+      .order("name");
+    (data as any).paired_monitors = paired_monitors ?? [];
+  }
+
   return { data, error };
+}
+
+export async function searchDevicesForPairing(opts: {
+  query?: string;
+  types: string[];
+  excludeId?: string;
+  unpairedOnly?: boolean;
+}) {
+  const supabase = await createClient();
+  let q = supabase
+    .from("devices")
+    .select("id, name, model, serial_number, device_type, paired_with_device_id")
+    .in("device_type", opts.types)
+    .limit(20);
+  if (opts.excludeId) q = q.neq("id", opts.excludeId);
+  if (opts.query?.trim()) {
+    q = q.or(`name.ilike.%${opts.query}%,model.ilike.%${opts.query}%,serial_number.ilike.%${opts.query}%`);
+  }
+  if (opts.unpairedOnly) q = q.is("paired_with_device_id", null);
+  const { data } = await q.order("name");
+  return (data ?? []) as { id: string; name: string; model?: string; serial_number?: string; device_type: string; paired_with_device_id?: string | null }[];
+}
+
+export async function createPairedMonitors(
+  computerId: string,
+  monitors: { name: string; model?: string; serial_number?: string; manufacturer?: string; size_inch?: number }[]
+) {
+  if (!monitors.length) return [];
+  const supabase = await createClient();
+  const profileId = await getProfileIdFromAuthUserId();
+
+  // Inherit org/heltes/alba from the parent computer so the new monitor
+  // is automatically scoped under the same department.
+  const { data: parent } = await supabase
+    .from("devices")
+    .select("organization_id, heltes_id, alba_id, department_name, heltes_name, location")
+    .eq("id", computerId)
+    .single();
+
+  const rows = monitors.map(m => ({
+    name: m.name.trim(),
+    model: m.model?.trim() || null,
+    serial_number: m.serial_number?.trim() || null,
+    manufacturer: m.manufacturer?.trim() || null,
+    device_type: "monitor",
+    status: "active",
+    location: parent?.location ?? null,
+    organization_id: parent?.organization_id ?? null,
+    heltes_id: parent?.heltes_id ?? null,
+    alba_id: parent?.alba_id ?? null,
+    department_name: parent?.department_name ?? null,
+    heltes_name: parent?.heltes_name ?? null,
+    paired_with_device_id: computerId,
+    specs: m.size_inch ? { size_inch: m.size_inch } : {},
+    created_by: profileId ? Number(profileId) : null,
+  }));
+
+  const { data, error } = await supabase.from("devices").insert(rows).select("id");
+  if (error) throw new Error(error.message);
+
+  for (const d of data ?? []) {
+    await supabase.from("device_history").insert({
+      device_id: d.id, action_type: "created",
+      description: "Компьютертэй хамт бүртгэгдлээ",
+      changed_by: profileId ? Number(profileId) : null,
+    });
+  }
+  revalidatePath(`/devices/${computerId}`);
+  revalidatePath("/devices");
+  return (data ?? []).map(d => d.id as string);
+}
+
+export async function setMonitorPairings(computerId: string, monitorIds: string[]) {
+  const supabase = await createClient();
+  const profileId = await getProfileIdFromAuthUserId();
+
+  // Current monitors paired with this computer
+  const { data: current } = await supabase
+    .from("devices")
+    .select("id")
+    .eq("paired_with_device_id", computerId);
+  const currentIds = new Set((current ?? []).map((d: any) => d.id));
+  const targetIds  = new Set(monitorIds);
+
+  const toUnpair = [...currentIds].filter(id => !targetIds.has(id));
+  const toPair   = [...targetIds].filter(id => !currentIds.has(id));
+
+  if (toUnpair.length) {
+    await supabase.from("devices").update({ paired_with_device_id: null }).in("id", toUnpair);
+    for (const id of toUnpair) {
+      await supabase.from("device_history").insert({
+        device_id: id, action_type: "unpaired",
+        description: "Компьютероос салгагдлаа", changed_by: profileId ? Number(profileId) : null,
+      });
+    }
+  }
+  if (toPair.length) {
+    await supabase.from("devices").update({ paired_with_device_id: computerId }).in("id", toPair);
+    for (const id of toPair) {
+      await supabase.from("device_history").insert({
+        device_id: id, action_type: "paired",
+        description: "Компьютертэй холбогдлоо", changed_by: profileId ? Number(profileId) : null,
+      });
+    }
+  }
+  revalidatePath(`/devices/${computerId}`);
 }
 
 export async function getDeviceHistory(deviceId: string) {
@@ -178,6 +294,8 @@ export async function createDevice(input: {
   department_name?: string;
   heltes_name?: string;
   user_ids?: string[];
+  paired_with_device_id?: string | null;
+  paired_monitor_ids?: string[];
 }) {
   const supabase = await createClient();
   const profileId = await getProfileIdFromAuthUserId();
@@ -201,12 +319,21 @@ export async function createDevice(input: {
       alba_id: input.alba_id || null,
       department_name: input.department_name || null,
       heltes_name: input.heltes_name || null,
+      paired_with_device_id: input.paired_with_device_id || null,
       created_by: profileId ? Number(profileId) : null,
     })
     .select("id")
     .single();
 
   if (error || !device) throw new Error(error?.message ?? "Бүртгэл үүсгэж чадсангүй");
+
+  // Pair monitors to this newly-created computer
+  if (input.paired_monitor_ids?.length) {
+    await supabase
+      .from("devices")
+      .update({ paired_with_device_id: device.id })
+      .in("id", input.paired_monitor_ids);
+  }
 
   // Add assignments
   if (input.user_ids?.length) {
@@ -251,6 +378,7 @@ export async function updateDevice(
     alba_id?: string | null;
     department_name?: string;
     heltes_name?: string;
+    paired_with_device_id?: string | null;
   },
   changeDescription?: string
 ) {
