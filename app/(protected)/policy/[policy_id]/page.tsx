@@ -1,61 +1,103 @@
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
-// import { policy } from "@repo/database/generated/prisma/client/client";
-import { createClient } from "@/utils/supabase/client";
-import SectionList from "@/components/policy/SectionList";
-import { hasPermission } from "@/actions/rbac";
-// import { hasAccess } from "@/action/PermissionService";
+import { ArrowLeft, FileText, Pencil } from "lucide-react";
+import { hasPermission, hasRole } from "@/actions/rbac";
+import { getPolicyDetail } from "@/actions/policy-detail";
+import { PolicyDetailContent } from "@/components/policy/policy-detail-content";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { formatPolicyDate } from "@/lib/policy-utils";
 
 interface PolicyDetailPageProps {
   params: Promise<{ policy_id: string }>;
 }
 
+export const revalidate = 0;
+
 export default async function PolicyDetailPage({
   params,
 }: PolicyDetailPageProps) {
   const { policy_id } = await params;
-  const isEditAccess = await hasPermission("policy", "edit");
-  //   const isEditAccess = await hasAccess("/dashboard/policy/edit", "UPDATE");
-  const supabase = createClient();
-  const { data: policy, error } = await supabase
-    .from("policy")
-    .select("*")
-    .eq("id", policy_id)
-    .eq("is_deleted", false)
-    .single();
 
-  if (error) throw new Error("Журам олдсонгүй");
+  const [policy, isEditAccess, isRating] = await Promise.all([
+    getPolicyDetail(policy_id),
+    hasPermission("policy", "edit"),
+    hasRole(["super_admin", "monitoring_emp"]),
+  ]);
+
+  if (!policy) {
+    return (
+      <div className="flex flex-col gap-6 p-4 lg:p-6">
+        <Button asChild variant="outline" size="sm" className="self-start">
+          <Link href="/policy">
+            <ArrowLeft className="h-4 w-4" />
+            Буцах
+          </Link>
+        </Button>
+        <Card className="items-center gap-2 px-4 py-16 text-center">
+          <FileText className="h-8 w-8 text-muted-foreground/50" />
+          <p className="font-semibold text-foreground">Журам олдсонгүй</p>
+          <p className="text-sm text-muted-foreground">
+            Та буруу холбоосоор орсон эсвэл журам устсан байж магадгүй
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-6xl">
-      <div className="flex justify-between mb-4">
-        <h1 className="text-2xl font-bold">{policy?.name}</h1>
-        <div className="flex-shrink-0 ml-4">
-          <Link href="/policy">
-            <Button variant="outline" className="mr-2">
-              Буцах
-            </Button>
-          </Link>
-          {isEditAccess && (
-            <Link href={`/policy/${policy_id}/edit`}>
-              <Button
-                variant="secondary"
-                className="ml-2 hover:bg-gray-200 cursor-pointer">
-                Засварлах
-              </Button>
+    <div className="flex flex-col gap-6 p-4 lg:p-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="icon-sm">
+            <Link href="/policy">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Буцах</span>
             </Link>
+          </Button>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+            Журам / Дэлгэрэнгүй
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {policy.name}
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              {policy.reference_code && (
+                <Badge variant="outline" className="font-mono text-xs">
+                  {policy.reference_code}
+                </Badge>
+              )}
+              <span className="text-muted-foreground">
+                Баталсан:{" "}
+                <span className="text-foreground tabular-nums">
+                  {formatPolicyDate(policy.approved_date)}
+                </span>
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground">
+                {policy.sections.length} бүлэг
+              </span>
+            </div>
+          </div>
+
+          {isEditAccess && (
+            <Button asChild>
+              <Link href={`/policy/${policy.id}/edit`}>
+                <Pencil className="h-4 w-4" />
+                Засварлах
+              </Link>
+            </Button>
           )}
         </div>
       </div>
 
-      <p className="font-semibold">Код: {policy?.referenceCode}</p>
-      <p className="font-semibold mb-4">
-        Баталсан огноо:{" "}
-        {policy?.approved_date
-          ? new Date(policy.approved_date).toLocaleDateString("mn-MN")
-          : "Огноогүй"}
-      </p>
-      <SectionList policy_id={policy_id} />
+      {/* Sections + Clauses */}
+      <PolicyDetailContent policy={policy} isRating={isRating} />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import {
   IconUsers,
   IconFileText,
   IconShield,
+  IconClockHour4,
+  IconBus,
   type Icon,
 } from "@tabler/icons-react";
 import { usePathname } from "next/navigation";
@@ -31,6 +33,8 @@ import Link from "next/link";
 
 const serviceIcons: Record<string, Icon> = {
   dashboard: IconLayoutDashboard,
+  attendance: IconClockHour4,
+  eelj: IconBus,
   orders: IconClipboardList,
   dine: IconToolsKitchen2,
   employees: IconUsers,

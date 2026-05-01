@@ -19,8 +19,9 @@ import {
 import {
   addDeviceAssignment, removeDeviceAssignment,
   addDeviceMaintenance, deleteDeviceMaintenance, changeDeviceStatus,
-  searchAssignableUsers,
 } from "@/actions/devices";
+import { UserSearchPicker } from "@/components/users/user-search-picker";
+import type { UserSearchResult } from "@/actions/users";
 import {
   DEVICE_STATUS_CONFIG, type DeviceStatus, type DeviceAssignment,
   type DeviceHistory, type DeviceMaintenance,
@@ -39,31 +40,16 @@ function formatDate(d?: string) {
 
 // ─── Assignment panel ─────────────────────────────────────────────────────────
 
-interface UserOption { id: string; first_name: string; last_name: string; position_name?: string; department_name?: string; }
-
 export function AssignmentPanel({ deviceId, assignments }: { deviceId: string; assignments: DeviceAssignment[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<UserOption[]>([]);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const handleSearch = (q: string) => {
-    setSearch(q);
-    if (!q.trim()) { setResults([]); return; }
-    const timer = setTimeout(async () => {
-      const data = await searchAssignableUsers(q);
-      setResults(data.filter((u) => !assignments.find((a) => a.user_id === u.id)));
-    }, 250);
-    return () => clearTimeout(timer);
-  };
-
-  const handleAdd = (u: UserOption) => {
+  const handleAdd = (u: UserSearchResult) => {
     startTransition(async () => {
       try {
         await addDeviceAssignment(deviceId, u.id);
-        toast.success(`${u.last_name} ${u.first_name} нэмэгдлээ`);
-        setSearch(""); setResults([]);
+        toast.success(`${u.last_name ?? ""} ${u.first_name ?? ""} нэмэгдлээ`);
         router.refresh();
       } catch (e: any) { toast.error(e.message); }
     });
@@ -85,32 +71,12 @@ export function AssignmentPanel({ deviceId, assignments }: { deviceId: string; a
     <>
       <div className="space-y-4">
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Хариуцагч нэмэх..."
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-9 h-9"
-          />
-          {results.length > 0 && (
-            <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
-              {results.map((u) => (
-                <button key={u.id} type="button" onClick={() => handleAdd(u)}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/50">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    {(u.last_name?.[0] ?? "") + (u.first_name?.[0] ?? "")}
-                  </div>
-                  <div>
-                    <p className="font-medium">{u.last_name} {u.first_name}</p>
-                    <p className="text-xs text-muted-foreground">{u.position_name} · {u.department_name}</p>
-                  </div>
-                  <Plus className="ml-auto h-4 w-4 text-primary" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <UserSearchPicker
+          placeholder="Хариуцагч нэмэх (нэр, овог, утас, албан тушаал...)"
+          excludeIds={assignments.map((a) => a.user_id)}
+          onSelect={handleAdd}
+          disabled={pending}
+        />
 
         {/* Current assignees */}
         {assignments.length === 0 ? (

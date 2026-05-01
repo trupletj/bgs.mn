@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { createClient } from "@/utils/supabase/server";
 
 export async function getProfileInfo() {
@@ -22,7 +23,7 @@ export async function getProfileInfo() {
   return profile;
 }
 
-export async function getProfileIdFromAuthUserId() {
+const getProfileIdCached = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -30,15 +31,17 @@ export async function getProfileIdFromAuthUserId() {
   if (!user) {
     throw new Error("Хэрэглэгч олдсонгүй");
   }
-  return supabase
+  const { data, error } = await supabase
     .from("profile")
     .select("id")
     .eq("auth_user_id", user.id)
-    .single()
-    .then(({ data, error }) => {
-      if (error) {
-        throw new Error("Профайл олдсонгүй");
-      }
-      return data?.id;
-    });
+    .single();
+  if (error || !data) {
+    throw new Error("Профайл олдсонгүй");
+  }
+  return data.id;
+});
+
+export async function getProfileIdFromAuthUserId() {
+  return getProfileIdCached();
 }
