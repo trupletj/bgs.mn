@@ -69,7 +69,7 @@ const formSchema = z.object({
     "morning_meal",
     "lunch",
     "dinner",
-    "nightmeal",
+    "night_meal",
   ]),
   dining_hall_id: z.string().min(1, "Гал тогоо сонгоно уу"),
   note: z.string().optional(),
@@ -309,7 +309,7 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
                     <SelectItem value="morning_meal">Өглөөний хоол</SelectItem>
                     <SelectItem value="lunch">Өдрийн хоол</SelectItem>
                     <SelectItem value="dinner">Оройн хоол</SelectItem>
-                    <SelectItem value="nightmeal">Шөнийн хоол</SelectItem>
+                    <SelectItem value="night_meal">Шөнийн хоол</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

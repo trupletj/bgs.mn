@@ -76,7 +76,7 @@ export function EditOverrideDialog({
                 <SelectItem value="morning_meal">Өглөөний хоол</SelectItem>
                 <SelectItem value="lunch">Өдөр</SelectItem>
                 <SelectItem value="dinner">Орой</SelectItem>
-                <SelectItem value="nightmeal">Шөнийн хоол</SelectItem>
+                <SelectItem value="night_meal">Шөнийн хоол</SelectItem>
               </SelectContent>
             </Select>
           </div>
