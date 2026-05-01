@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Loader2, ArrowLeft, Users, Utensils } from "lucide-react";
+import { Loader2, ArrowLeft, Users } from "lucide-react";
 import { EmployeeModal } from "./employee-modal";
+import { SubEmployeeMealDetailModal } from "./sub-employee-meal-detail-modal";
 
 interface BreakdownData {
   org_name: string;
@@ -244,16 +245,27 @@ export function MealBreakdownRow({ date, hallId }: Props) {
         </div>
       )}
       {modalDetail && (
-        <EmployeeModal
-          isOpen={!!modalDetail}
-          onClose={() => setModalDetail(null)}
-          date={date}
-          hallId={hallId}
-          orgName={selectedOrg!}
-          groupName={modalDetail.name}
-          groupType={modalDetail.type}
-          mealType={activeMeal}
-        />
+        modalDetail.name === "Гэрээт" ? (
+          <SubEmployeeMealDetailModal
+            isOpen={!!modalDetail}
+            onClose={() => setModalDetail(null)}
+            date={date}
+            hallId={hallId}
+            orgName={selectedOrg!}
+            mealType={activeMeal}
+          />
+        ) : (
+          <EmployeeModal
+            isOpen={!!modalDetail}
+            onClose={() => setModalDetail(null)}
+            date={date}
+            hallId={hallId}
+            orgName={selectedOrg!}
+            groupName={modalDetail.name}
+            groupType={modalDetail.type}
+            mealType={activeMeal}
+          />
+        )
       )}
     </div>
   );
