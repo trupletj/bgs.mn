@@ -2,13 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+
+## Холбогдох төслүүд
+
+- `../bgs-mobile-app` — энэ вэбийн mobile хувилбар, ижил business logic
+- `../shared-context` — нийтлэг pattern, Supabase schema
+
 ## What This Is
 
-BGS.MN — a Next.js 15 + Supabase internal management platform for a Mongolian company. It covers three main subsystems:
+BGS.MN — a Next.js 15 + Supabase internal management platform for a Mongolian company. It covers four main subsystems:
 
 - **Orders** (`/orders`, `/order-processes`): Multi-step equipment spare-parts ordering with a configurable approval workflow.
 - **Dine** (`/dine`): Dining hall / canteen management including food logs and meal overrides.
 - **Policy** (`/policy`): Policy document management — policies contain sections which contain clauses; clauses are linked to job positions for compliance tracking and rating.
+- **IT Devices** (`/devices`): IT equipment registry with monitor↔computer pairing, multi-type request workflow, and an interactive analytics dashboard.
 
 Supporting modules: Employees (`/employees`), Admin RBAC (`/admin`), Dashboard (`/dashboard`), Job Descriptions (`/dashboard/job-descriptions`).
 
@@ -72,7 +79,7 @@ Use `createClient()` from `server.ts` in Server Actions marked `"use server"`. D
 
 Two complementary mechanisms:
 
-1. **Role-based** — `actions/rbac.ts` → `getUserRoles()` returns an array of role name strings (e.g., `hr_emp`, `monitoring_emp`, `super_admin`, `order_system`). Use `hasRole(roleOrArray)` for coarse-grained guards.
+1. **Role-based** — `actions/rbac.ts` → `getUserRoles()` returns an array of role name strings (e.g., `hr_emp`, `monitoring_emp`, `super_admin`, `order_system`, `it_engineer`). Use `hasRole(roleOrArray)` for coarse-grained guards. `getUserRoles` is wrapped in React `cache()`, so a logged-in user must re-enter the layout (or sign out/in) to see role changes.
 2. **Permission-based** — `hasPermission(module, action)` calls the Supabase RPC `has_permission`. Used for finer control (e.g., `hasPermission("dining", "access")`).
 
 Sidebar navigation (`actions/nav.ts`) is built dynamically at render time by combining role and permission checks. Add new top-level sections there.
@@ -103,6 +110,29 @@ When an order is created (`createOrderWithInstace` in `actions/orders.ts`):
 ### Policy Workflow
 
 `policy` → `section[]` → `clause[]` → `clause_job_position[]` (links clauses to `job_position` rows with an `ActionType`: IMPLEMENTATION | MONITORING | VERIFICATION | DEPLOYMENT). Ratings are stored per `clause_job_position`.
+
+### IT Devices Subsystem (`/devices`)
+
+Restricted to `super_admin` and `it_engineer` roles. Three concerns sit in this subtree:
+
+**1. Device registry** (`devices` table)
+- `device_type`: `desktop | laptop | monitor | printer | scanner` (no `copier`; the `desktop` label is "Суурин компьютер").
+- `status`: `active | in_repair | in_storage | decommissioned`. DB has no CHECK on this column — the union is enforced in TS only.
+- **Pairing** — `paired_with_device_id` is a self-referential FK on `devices`. A monitor can point to a desktop/laptop; a computer's "paired monitors" are queried in reverse. The pairing UI lives in `device-form.tsx` (search-pick existing OR inline-create new monitors when registering a computer). On submit, computer-side updates flow through `setMonitorPairings` (diff add/remove) and `createPairedMonitors` (insert and inherit org/heltes/alba/location from parent).
+- **Org cascade** — `devices.organization_id`/`heltes_id`/`alba_id` are real UUID FKs, but `heltes.organization_id` and `alba.heltes_id`/`organization_id` store TEXT `bteg_id` strings. `getOrgStructureForDevices` filters to `ALLOWED_ORG_BTEG_IDS = ["1", "2", "10", "20"]` and returns `{ id, name, bteg_id, org_bteg_id, heltes_bteg_id }` so the form/table can do bteg-based cascade lookups.
+
+**2. Device requests** (`device_requests`, `device_request_comments`, `device_request_status_history`)
+- `request_type`: `new | replace | transfer | decommission | repair` (CHECK constraint).
+- `priority`: `urgent | normal | low` (CHECK).
+- `status`: `pending | approved | rejected` (CHECK). Every transition is auto-logged into `device_request_status_history` by `createDeviceRequest` / `updateDeviceRequest` / `updateDeviceRequestStatus`.
+- `assigned_to` — integer FK to `profile`, the IT engineer handling this request.
+- `fulfilled_by_request_id` — UUID self-FK. Lets a `new`/`replace` request be satisfied by an existing `transfer` request (admin assigns from the transfer-side edit screen via `assignTransferToRequest`, or the requester picks one in the create form).
+- `parent_request_id` — UUID self-FK reserved for bundle requests; UI not built yet.
+- Requester dept is stored as `req_*_bteg` text columns (NOT FK joins). To display names, look up `bteg_id` against `getOrgStructureForDevices()`.
+
+**3. Reporting** (`/devices/report`) — fully client-side interactive dashboard (`device-report-dashboard.tsx` + `device-report-requests.tsx`). Loads devices + requests + orgStructure once and applies all filters/groupings client-side. Charts use `recharts`.
+
+Shared form pieces (`OrgCascade`, `DevicePicker`, `UserPicker`, `ProfilePicker`, `DeviceSpecsFields`, `REQUEST_TYPE_CONFIG`, `PRIORITY_CONFIG`) live in `components/devices/request-shared.tsx` and are imported by both the create and edit forms.
 
 ### UI Stack
 
@@ -135,3 +165,9 @@ When an order is created (`createOrderWithInstace` in `actions/orders.ts`):
 | `policy` / `section` / `clause` | Policy document hierarchy |
 | `job_position` / `clause_job_position` | Job role compliance linkage |
 | `dining_hall` / `meal_override` | Dining subsystem |
+| `devices` | IT equipment registry; `paired_with_device_id` is self-FK for monitor↔computer pairing |
+| `device_assignments` | Many-to-many `devices` ↔ `users` (one flagged `is_primary`) |
+| `device_history` / `device_maintenance` | Audit log + maintenance records per device |
+| `device_requests` | Multi-type IT requests (new/replace/transfer/decommission/repair); `req_*_bteg` are TEXT, `created_by`/`assigned_to` are integer FKs to `profile` |
+| `device_request_comments` / `device_request_status_history` | Discussion thread + status transition log per request |
+| `organization` / `heltes` / `alba` | Three-level org tree. `heltes.organization_id` and `alba.heltes_id`/`organization_id` store `bteg_id` TEXT — not UUIDs |

@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const SeePolicyButton = ({ policy_id }: { policy_id: string }) => {
+export default function PolicySeeButton({ policy_id }: { policy_id: string }) {
   return (
-    <Link
-      href={`/policy/${policy_id}`}
-      className="cursor-pointer"
-      title="Журам унших">
-      <Eye className=" hover:scale-110 h-6" />
-    </Link>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button asChild variant="ghost" size="icon-sm">
+          <Link href={`/policy/${policy_id}`}>
+            <Eye className="h-4 w-4" />
+            <span className="sr-only">Журам унших</span>
+          </Link>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Журам унших</TooltipContent>
+    </Tooltip>
   );
-};
-
-export default SeePolicyButton;
+}

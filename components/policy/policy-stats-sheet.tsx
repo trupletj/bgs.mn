@@ -1,72 +1,195 @@
-// components/policy-detail-sheet.tsx
 "use client";
 
-import { X } from "lucide-react";
+import { useState } from "react";
+import { Briefcase, FileText, ListChecks } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
-  SheetTitle, // ← ЭНД БАЙГАА!
+  SheetTitle,
 } from "@/components/ui/sheet";
-import { FileText, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import {
+  policyStatusVariant,
+  sortByReferenceNumber,
+  type PolicyDashboardItem,
+} from "@/lib/policy-utils";
 
-const actionTypes = [
+const ACTION_TYPES: { value: string; label: string }[] = [
   { value: "IMPLEMENTATION", label: "Хэрэгжүүлэлт" },
   { value: "MONITORING", label: "Хяналт" },
   { value: "VERIFICATION", label: "Баталгаажуулалт" },
   { value: "DEPLOYMENT", label: "Нэвтрүүлэлт" },
-] as const;
+];
 
-const sortByReferenceNumber = (clauses: any[]) => {
-  return [...clauses].sort((a, b) => {
-    const partsA = (a.reference_number || "").split(".").map(Number);
-    const partsB = (b.reference_number || "").split(".").map(Number);
-    const maxLength = Math.max(partsA.length, partsB.length);
-    for (let i = 0; i < maxLength; i++) {
-      const partA = partsA[i] ?? 0;
-      const partB = partsB[i] ?? 0;
-      if (partA !== partB) return partA - partB;
-    }
-    return 0;
-  });
-};
-
-function TabButton({
-  active,
-  onClick,
-  children,
-  icon: Icon,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
+function ScoreBadge({ score }: { score: number | undefined }) {
+  if (score === undefined) {
+    return <span className="text-xs text-muted-foreground">Үнэлгээгүй</span>;
+  }
+  const cls =
+    score >= 5
+      ? "bg-emerald-100 text-emerald-700"
+      : score >= 3
+        ? "bg-amber-100 text-amber-700"
+        : "bg-rose-100 text-rose-700";
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-3 px-8 py-5 font-semibold transition-all border-b-4 whitespace-nowrap ${
-        active
-          ? "border-blue-600 text-blue-600 bg-blue-50"
-          : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-      }`}>
-      <Icon className="w-5 h-5" />
-      {children}
-    </button>
+    <span
+      className={cn(
+        "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-bold tabular-nums",
+        cls,
+      )}
+    >
+      {score}
+    </span>
+  );
+}
+
+function OverviewTab({ policy }: { policy: PolicyDashboardItem }) {
+  const variant = policyStatusVariant(policy.implementationPercent);
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card className="items-center gap-1 px-4 py-5 text-center">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+            Нийт заалт
+          </p>
+          <p className="text-3xl font-bold tabular-nums text-foreground">
+            {policy.clauses.length}
+          </p>
+        </Card>
+        <Card className="items-center gap-1 px-4 py-5 text-center">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+            Хэрэгжилт
+          </p>
+          <p className="text-3xl font-bold tabular-nums text-foreground">
+            {policy.implementationPercent}%
+          </p>
+        </Card>
+        <Card className="items-center gap-1 px-4 py-5 text-center">
+          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+            Үнэлсэн
+          </p>
+          <p className="text-3xl font-bold tabular-nums text-foreground">
+            {policy.validCount}
+            <span className="ml-1 text-base font-normal text-muted-foreground">
+              / {policy.checkedCount}
+            </span>
+          </p>
+        </Card>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">
+            Хэрэгжилтийн явц
+          </h3>
+          <Badge className={cn("border-transparent", variant.badge)}>
+            {variant.label}
+          </Badge>
+        </div>
+        <Progress
+          value={policy.implementationPercent}
+          indicatorClassName={variant.bar}
+          className="h-3"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ClausesTab({ policy }: { policy: PolicyDashboardItem }) {
+  if (!policy.clauses || policy.clauses.length === 0) {
+    return (
+      <p className="py-12 text-center text-sm text-muted-foreground">
+        Заалт байхгүй эсвэл үнэлгээ хийгдээгүй байна
+      </p>
+    );
+  }
+
+  return (
+    <Accordion type="single" collapsible className="space-y-2">
+      {sortByReferenceNumber(policy.clauses).map((clause) => (
+        <AccordionItem
+          key={clause.id}
+          value={String(clause.id)}
+          className="overflow-hidden rounded-xl border border-border bg-card"
+        >
+          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+            <div className="flex w-full items-center gap-3 text-left">
+              <span className="font-mono text-sm font-bold text-primary">
+                {clause.reference_number}
+              </span>
+              <span className="flex-1 text-sm text-foreground">
+                {clause.text}
+              </span>
+              <Badge variant="outline" className="text-xs">
+                {clause.jobPositions.length} байр
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="border-t border-border bg-muted/20 p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-transparent hover:bg-transparent">
+                  <TableHead>Ажлын байр</TableHead>
+                  <TableHead className="w-44">Төрөл</TableHead>
+                  <TableHead className="w-20 text-center">Оноо</TableHead>
+                  <TableHead>Тайлбар</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clause.jobPositions.map((jp) => {
+                  const typeLabel =
+                    ACTION_TYPES.find((t) => t.value === jp.type)?.label ||
+                    jp.type ||
+                    "Тодорхойгүй";
+                  return (
+                    <TableRow key={String(jp.id)}>
+                      <TableCell className="font-medium text-foreground">
+                        {jp.name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[11px]">
+                          {typeLabel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <ScoreBadge score={jp.rating?.score} />
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {jp.rating?.description || "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
   );
 }
 
 interface PolicyDetailSheetProps {
-  policy: any;
+  policy: PolicyDashboardItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -76,240 +199,75 @@ export default function PolicyDetailSheet({
   open,
   onOpenChange,
 }: PolicyDetailSheetProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "clauses">(
-    "overview",
-  );
+  const [tab, setTab] = useState<"overview" | "clauses">("overview");
 
   if (!policy) return null;
+
+  const variant = policyStatusVariant(policy.implementationPercent);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-3xl p-0 flex flex-col">
-        {/* Header - SheetTitle заавал байх ёстой! */}
-        <SheetHeader className="sticky top-0 z-20 bg-white border-b border-slate-200 px-8 py-6">
-          <div className="flex items-start justify-between">
-            <div>
-              {/* Заавал SheetTitle ашигла! */}
-              <SheetTitle className="text-3xl font-bold text-slate-900">
-                {policy.name}
-              </SheetTitle>
-              <div className="flex flex-wrap gap-6 mt-5">
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-600 font-medium">Хэрэгжилт:</span>
-                  <Badge
-                    variant={
-                      policy.implementationPercent >= 90
-                        ? "default"
-                        : "secondary"
-                    }
-                    className="text-lg px-5 py-2 font-bold">
-                    {policy.implementationPercent}%
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-600 font-medium">Үнэлгээ:</span>
-                  <span className="text-lg font-bold text-slate-800">
-                    {policy.validCount} / {policy.checkedCount}
-                  </span>
-                </div>
-              </div>
+        className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl"
+      >
+        <SheetHeader className="border-b border-border bg-card px-6 py-5">
+          <SheetTitle className="text-xl font-bold tracking-tight text-foreground">
+            {policy.name}
+          </SheetTitle>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Хэрэгжилт:</span>
+              <Badge className={cn("border-transparent", variant.badge)}>
+                {policy.implementationPercent}%
+              </Badge>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onOpenChange(false)}
-              className="rounded-full hover:bg-slate-100">
-              <X className="w-6 h-6" />
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Үнэлгээ:</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {policy.validCount} / {policy.checkedCount}
+              </span>
+            </div>
+            {policy.reference_code && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Код:</span>
+                <span className="font-mono text-xs">
+                  {policy.reference_code}
+                </span>
+              </div>
+            )}
           </div>
         </SheetHeader>
 
-        {/* Tabs */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200">
-          <div className="flex">
-            <TabButton
-              active={activeTab === "overview"}
-              onClick={() => setActiveTab("overview")}
-              icon={FileText}>
-              Үзүүлэлт
-            </TabButton>
-            <TabButton
-              active={activeTab === "clauses"}
-              onClick={() => setActiveTab("clauses")}
-              icon={Users}>
-              Заалтууд ({policy.clauses?.length || 0})
-            </TabButton>
-          </div>
+        <div className="flex border-b border-border bg-card">
+          {(
+            [
+              { key: "overview", label: "Үзүүлэлт", Icon: FileText },
+              { key: "clauses", label: `Заалтууд (${policy.clauses.length})`, Icon: ListChecks },
+            ] as const
+          ).map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={cn(
+                "flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-medium transition-colors",
+                tab === key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </div>
 
-        {/* ЗӨВХӨН ТАБААС ХАМААРЧ КОНТЕНТ ХАРУУЛНА */}
-        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
-          {activeTab === "overview" && (
-            <div className="px-10 py-5 space-y-12">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="text-center p-10 bg-gradient-to-br from-blue-50 to-blue-100 rounded-3xl border-2 border-blue-200">
-                  <p className="text-blue-600 font-bold uppercase tracking-wider mb-4">
-                    Нийт заалт
-                  </p>
-                  <p className="text-5xl font-bold text-blue-900">
-                    {policy.clauses?.length || 0}
-                  </p>
-                </div>
-                <div className="text-center p-10 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-3xl border-2 border-emerald-200">
-                  <p className="text-emerald-600 font-bold uppercase tracking-wider mb-4">
-                    Хэрэгжилт
-                  </p>
-                  <p className="text-5xl font-bold text-emerald-900">
-                    {policy.implementationPercent}%
-                  </p>
-                </div>
-                <div className="text-center p-10 bg-gradient-to-br from-amber-50 to-amber-100 rounded-3xl border-2 border-amber-200">
-                  <p className="text-amber-600 font-bold uppercase tracking-wider mb-4">
-                    Үнэлгээ
-                  </p>
-                  <p className="text-5xl font-bold text-amber-900">
-                    {policy.validCount}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xl font-bold mb-6">Хэрэгжилтийн явц</h3>
-                <div className="w-full bg-slate-200 rounded-full h-8 overflow-hidden shadow-inner">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${policy.implementationPercent}%`,
-                      backgroundColor:
-                        policy.implementationPercent >= 90
-                          ? "#10b981"
-                          : policy.implementationPercent >= 70
-                            ? "#f59e0b"
-                            : "#ef4444",
-                    }}
-                  />
-                </div>
-                <p className="text-right mt-4 text-lg font-bold text-slate-700">
-                  {policy.implementationPercent}% хүрсэн
-                </p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "clauses" && (
-            <div className="px-10 pt-5 pb-32">
-              <h3 className="text-2xl font-bold mb-6">
-                Үнэлгээ хийгдсэн заалтууд
-              </h3>
-
-              {policy.clauses && policy.clauses.length > 0 ? (
-                <Accordion type="single" collapsible className="space-y-6">
-                  {sortByReferenceNumber(policy.clauses).map((clause: any) => (
-                    <AccordionItem
-                      key={clause.id}
-                      value={clause.id}
-                      className="border-2 border-slate-300 rounded-2xl overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all">
-                      <AccordionTrigger className="px-8 py-6 hover:no-underline bg-gradient-to-r from-blue-50 to-indigo-50">
-                        <div className="flex w-full items-center justify-between text-left">
-                          <div className="flex items-center gap-6">
-                            <span className="font-mono text-xl font-bold text-blue-700">
-                              {clause.reference_number}
-                            </span>
-                            <span className="text-base font-medium text-slate-700">
-                              {clause.text}
-                            </span>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="font-bold text-lg ml-2 px-5 py-2">
-                            {clause.jobPositions.length} байр
-                          </Badge>
-                        </div>
-                      </AccordionTrigger>
-
-                      <AccordionContent className="bg-white border-t-2 border-slate-200">
-                        <div className="p-8 space-y-8">
-                          <div className="overflow-x-auto rounded-xl border-2 border-slate-200">
-                            <table className="w-full">
-                              <thead className="bg-gradient-to-r from-slate-100 to-slate-200">
-                                <tr>
-                                  <th className="text-left px-6 py-4 font-bold">
-                                    Ажлын байр
-                                  </th>
-                                  <th className="text-left px-6 py-4 font-bold">
-                                    Төрөл
-                                  </th>
-                                  <th className="text-center px-6 py-4 font-bold">
-                                    Оноо
-                                  </th>
-                                  <th className="text-left px-6 py-4 font-bold">
-                                    Тайлбар
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {clause.jobPositions.map((jp: any) => {
-                                  const typeLabel =
-                                    actionTypes.find((t) => t.value === jp.type)
-                                      ?.label ||
-                                    jp.type ||
-                                    "Тодорхойгүй";
-                                  const score = jp.rating?.score;
-
-                                  return (
-                                    <tr
-                                      key={jp.id}
-                                      className="hover:bg-blue-50">
-                                      <td className="px-6 py-4 font-medium text-slate-900">
-                                        {jp.name}
-                                      </td>
-                                      <td className="px-6 py-4">
-                                        <Badge variant="outline">
-                                          {typeLabel}
-                                        </Badge>
-                                      </td>
-                                      <td className="px-6 py-4 text-center">
-                                        {score !== undefined ? (
-                                          <span
-                                            className={`px-5 py-2 rounded-full text-white font-bold text-lg ${
-                                              score >= 5
-                                                ? "bg-emerald-500"
-                                                : score >= 3
-                                                  ? "bg-amber-500"
-                                                  : "bg-red-500"
-                                            }`}>
-                                            {score}
-                                          </span>
-                                        ) : (
-                                          <span className="text-slate-400">
-                                            Үнэлгээгүй
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="px-6 py-4 text-slate-600 max-w-lg">
-                                        {jp.rating?.description || "-"}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              ) : (
-                <div className="text-center py-24 text-slate-500">
-                  <p className="text-2xl font-medium">
-                    Заалт байхгүй эсвэл үнэлгээ хийгдээгүй байна.
-                  </p>
-                </div>
-              )}
-            </div>
+        <div className="flex-1 overflow-y-auto bg-muted/10 p-6">
+          {tab === "overview" ? (
+            <OverviewTab policy={policy} />
+          ) : (
+            <ClausesTab policy={policy} />
           )}
         </div>
       </SheetContent>

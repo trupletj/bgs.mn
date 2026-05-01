@@ -4,9 +4,11 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type OrgStructure, type DeviceType, DEVICE_TYPE_CONFIG } from "@/types/device";
-import { getDevicesForRequest, searchAssignableUsers } from "@/actions/devices";
+import { getDevicesForRequest } from "@/actions/devices";
+import type { UserSearchResult } from "@/actions/users";
 import { Search, Package2, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserSearchPicker } from "@/components/users/user-search-picker";
 
 export const NONE = "__none__";
 
@@ -292,65 +294,58 @@ export function DevicePicker({
   );
 }
 
-// ─── User picker (search users from `users` table) ──────────────────────────
+// ─── User picker (single-select wrapper around UserSearchPicker) ────────────
 
 export interface PickedUser {
-  id: string; first_name: string; last_name: string; position_name?: string;
+  id: string;
+  first_name: string;
+  last_name: string;
+  position_name?: string;
 }
 
 export function UserPicker({
-  selected, onSelect, placeholder = "Нэрээр хайх...",
+  selected,
+  onSelect,
+  placeholder = "Нэр, овог, утас, албан тушаал...",
 }: {
   selected: PickedUser | null;
   onSelect: (u: PickedUser | null) => void;
   placeholder?: string;
 }) {
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<PickedUser[]>([]);
-
-  useEffect(() => {
-    if (!search.trim()) { setResults([]); return; }
-    const t = setTimeout(async () => {
-      const res = await searchAssignableUsers(search);
-      setResults(res);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  if (selected) return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm">
-      <span className="font-medium">{selected.last_name} {selected.first_name}</span>
-      {selected.position_name && <span className="text-xs text-muted-foreground">· {selected.position_name}</span>}
-      <button type="button" onClick={() => { onSelect(null); setSearch(""); }} className="ml-auto text-muted-foreground hover:text-destructive">
-        <X className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
+  if (selected) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm">
+        <span className="font-medium">
+          {selected.last_name} {selected.first_name}
+        </span>
+        {selected.position_name && (
+          <span className="text-xs text-muted-foreground">
+            · {selected.position_name}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => onSelect(null)}
+          className="ml-auto text-muted-foreground hover:text-destructive"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={placeholder} className="pl-9" />
-      {results.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-md max-h-64 overflow-y-auto">
-          {results.map((u) => (
-            <button
-              key={u.id} type="button"
-              onClick={() => { onSelect(u); setSearch(""); setResults([]); }}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/50"
-            >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                {(u.last_name?.[0] ?? "") + (u.first_name?.[0] ?? "")}
-              </div>
-              <div>
-                <p className="font-medium">{u.last_name} {u.first_name}</p>
-                <p className="text-xs text-muted-foreground">{u.position_name}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <UserSearchPicker
+      placeholder={placeholder}
+      onSelect={(u: UserSearchResult) =>
+        onSelect({
+          id: u.id,
+          first_name: u.first_name ?? "",
+          last_name: u.last_name ?? "",
+          position_name: u.position_name ?? undefined,
+        })
+      }
+    />
   );
 }
 

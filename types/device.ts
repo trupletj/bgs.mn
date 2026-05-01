@@ -5,7 +5,7 @@ export type DeviceType =
   | "scanner"
   | "monitor";
 
-export type DeviceStatus = "active";
+export type DeviceStatus = "active" | "in_repair" | "decommissioned" | "in_storage";
 
 // Type-specific specs stored in jsonb
 export interface ComputerSpecs {
@@ -127,7 +127,10 @@ export const DEVICE_TYPE_CONFIG: Record<DeviceType, { label: string; group: stri
 };
 
 export const DEVICE_STATUS_CONFIG: Record<DeviceStatus, { label: string; className: string }> = {
-  active: { label: "Идэвхтэй", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  active:         { label: "Идэвхтэй",  className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  in_repair:      { label: "Засварт",   className: "bg-amber-50 text-amber-700 border-amber-200" },
+  in_storage:     { label: "Агуулахад", className: "bg-slate-50 text-slate-700 border-slate-200" },
+  decommissioned: { label: "Актласан",  className: "bg-red-50 text-red-700 border-red-200" },
 };
 
 export const DEVICE_TYPES_WITH_SPECS: DeviceType[] = ["desktop", "laptop", "printer", "scanner", "monitor"];
