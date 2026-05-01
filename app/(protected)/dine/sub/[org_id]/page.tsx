@@ -18,13 +18,20 @@ import {
 import QRCode from "qrcode";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { toast } from "sonner";
 
 interface MealPlan {
   date: string;
   breakfast_count: number;
+  dining_hall_id: number | null;
   lunch_count: number;
   dinner_count: number;
   night_meal_count: number;
+}
+
+interface DiningHall {
+  id: number;
+  name: string;
 }
 
 interface QRItem {
@@ -111,11 +118,13 @@ export default function OrgDetailPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [zipping, setZipping] = useState(false);
+  const [diningHalls, setDiningHalls] = useState<DiningHall[]>([]);
 
   const [newCount, setNewCount] = useState(1);
   const [newLabel, setNewLabel] = useState("");
   const [newPlan, setNewPlan] = useState<MealPlan>({
     date: new Date().toISOString().split("T")[0],
+    dining_hall_id: null,
     breakfast_count: 0,
     lunch_count: 0,
     dinner_count: 0,
@@ -127,6 +136,23 @@ export default function OrgDetailPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [linkingLoading, setLinkingLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchDiningHalls = async () => {
+      const { data, error } = await supabase
+        .from("dining_hall")
+        .select("id, name")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching dining halls:", error);
+      } else {
+        setDiningHalls(data || []);
+      }
+    };
+
+    fetchDiningHalls();
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -226,17 +252,28 @@ export default function OrgDetailPage() {
   }
 
   async function handleSavePlan() {
-    await supabase
+    if (!newPlan.dining_hall_id) {
+      toast.warning("Гал тогоо сонгоно уу!");
+      return;
+    }
+    const { error } = await supabase
       .from("sub_employee_meal_plans")
-      .upsert({ org_id, ...newPlan }, { onConflict: "org_id,date" });
-    await fetchData();
-    setNewPlan({
-      date: new Date().toISOString().split("T")[0],
-      breakfast_count: 0,
-      lunch_count: 0,
-      dinner_count: 0,
-      night_meal_count: 0,
-    });
+      .upsert(
+        { org_id, ...newPlan },
+        { onConflict: "org_id,dining_hall_id,date" },
+      );
+
+    if (!error) {
+      await fetchData();
+      setNewPlan({
+        date: new Date().toISOString().split("T")[0],
+        dining_hall_id: null,
+        breakfast_count: 0,
+        lunch_count: 0,
+        dinner_count: 0,
+        night_meal_count: 0,
+      });
+    }
   }
 
   // Ажилтан холбох
@@ -357,11 +394,34 @@ export default function OrgDetailPage() {
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">
+              Гал тогоо
+            </label>
+            <select
+              value={newPlan.dining_hall_id ?? ""}
+              onChange={(e) =>
+                setNewPlan((p) => ({
+                  ...p,
+                  dining_hall_id: e.target.value
+                    ? Number(e.target.value)
+                    : null,
+                }))
+              }
+              className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">Сонгох...</option>
+              {diningHalls.map((hall) => (
+                <option key={hall.id} value={hall.id}>
+                  {hall.name}
+                </option>
+              ))}
+            </select>
+          </div>
           {[
-            { key: "breakfast_count", label: "Өглөө" },
-            { key: "lunch_count", label: "Өдөр" },
-            { key: "dinner_count", label: "Орой" },
-            { key: "night_meal_count", label: "Шөнө" },
+            { key: "breakfast_count", label: "Өглөөний цай" },
+            { key: "lunch_count", label: "Өдрийн хоол" },
+            { key: "dinner_count", label: "Оройн хоол" },
+            { key: "night_meal_count", label: "Шөнийн хоол" },
           ].map(({ key, label }) => (
             <div key={key}>
               <label className="text-xs text-slate-500 mb-1 block">

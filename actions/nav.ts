@@ -67,7 +67,7 @@ export async function getNavServices(): Promise<NavService[]> {
   }
 
   if (hasDiningAccess) {
-    services.push({
+    const dineService: NavService = {
       key: "dine",
       title: "Хоол",
       url: "/dine",
@@ -76,7 +76,13 @@ export async function getNavServices(): Promise<NavService[]> {
         { title: "Гал тогоо", url: "/dine/list" },
         { title: "Түр зуурын гал тогоо", url: "/dine/temp-kitchen" },
       ],
-    });
+    };
+
+    if (roles.some((r) => ["super_admin", "Kiosk_manager"].includes(r))) {
+      dineService.items.push({ title: "QR үүсгэх", url: "/dine/sub" });
+    }
+
+    services.push(dineService);
   }
 
   if (hasEmployeeAccess) {
@@ -116,10 +122,10 @@ export async function getNavServices(): Promise<NavService[]> {
       url: "/devices",
       basePaths: ["/devices"],
       items: [
-        { title: "Бүртгэл",       url: "/devices" },
+        { title: "Бүртгэл", url: "/devices" },
         { title: "Хүсэлт гаргах", url: "/devices/request" },
-        { title: "Хүсэлтүүд",     url: "/devices/requests" },
-        { title: "Тайлан",         url: "/devices/report" },
+        { title: "Хүсэлтүүд", url: "/devices/requests" },
+        { title: "Тайлан", url: "/devices/report" },
       ],
     });
   }

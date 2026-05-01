@@ -23,7 +23,6 @@ export default function SubEmployeeManager() {
         .from("organization")
         .select("id, name")
         .eq("is_active", true)
-        .not("bteg_id", "in", "('1','2','20','27','28','24')")
         .order("name");
 
       if (!orgs) return;
@@ -64,7 +63,7 @@ export default function SubEmployeeManager() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 w-full mx-auto">
       <h1 className="text-2xl font-bold mb-6 text-slate-800">
         Гэрээт ажилчдын удирдлага
       </h1>
@@ -82,7 +81,7 @@ export default function SubEmployeeManager() {
       </div>
 
       {/* Жагсаалт */}
-      <div className="space-y-2">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredOrgs.map((org) => (
           <button
             key={org.id}
