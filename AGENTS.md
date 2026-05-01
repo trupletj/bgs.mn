@@ -32,3 +32,21 @@
 - Store credentials in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
 - Never commit service-role secrets; if policies change, describe rollback steps alongside the migration.
 - Keep the schema synchronized by running `supabase db diff` before committing SQL updates.
+
+## Recent Food Log / Supabase Notes
+- A database overview document was added at `docs/supabase-database.md`; update it when schema ownership or major table groups change.
+- `meal_logs.sub_employee_id` represents гэрээт/туслан компанийн QR-based meal logs. Regular employee logs should keep using `user_id` or `bteg_id`.
+- `daily_meal_summary` now includes `sub_employee_total`, populated by `public.refresh_daily_meal_summary()`. The existing cron refreshes hourly, so avoid row-level summary refresh triggers on `meal_logs` unless real-time summary is required.
+- Relevant migrations:
+  - `supabase/migrations/20260501212114_add_sub_employee_meal_summary.sql`
+  - `supabase/migrations/20260501212457_set_refresh_daily_meal_summary_search_path.sql`
+- `/dine` uses `components/dine/food-log-summary-table.tsx` for the summary table. The `Гэрээт` column is clickable and opens `components/dine/sub-employee-meal-detail-modal.tsx`.
+- `SubEmployeeMealDetailModal` has two modes:
+  - summary mode: no `orgName`, shows all `meal_logs` for the selected `date + dining_hall_id` where `sub_employee_id is not null`;
+  - breakdown mode: receives `orgName`, filters to one гэрээт company from the expanded breakdown.
+- The expanded `/dine` breakdown still uses `get_meal_expected_vs_actual`. That RPC already includes `sub_employee_meal_plans` as expected counts and `meal_logs.sub_employee_id` as actual counts under `Гэрээт`.
+- `expected plan-д орсон эсэх` in the sub-employee detail modal is currently company-level: it checks whether the company's `sub_employee_meal_plans` count for that meal type is greater than zero. The schema does not assign a per-person expected meal plan.
+- Verification caveats from the implementation:
+  - `npx eslint components/dine/sub-employee-meal-detail-modal.tsx components/dine/food-log-summary-table.tsx components/dine/meal-breakdown-row.tsx` passed.
+  - Full `npm run lint` currently scans `.next` and many existing repo issues, so it fails for pre-existing/generated files.
+  - `npx tsc --noEmit` currently fails on stale `.next/types/validator.ts` referencing removed `app/(protected)/dine/food-log/page.js`; clear/regenerate `.next` or fix the stale route state before using full typecheck as a gate.
