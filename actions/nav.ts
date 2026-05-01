@@ -29,6 +29,22 @@ export async function getNavServices(): Promise<NavService[]> {
     items: [],
   });
 
+  services.push({
+    key: "attendance",
+    title: "Ирц",
+    url: "/attendance",
+    basePaths: ["/attendance"],
+    items: [],
+  });
+
+  services.push({
+    key: "eelj",
+    title: "Ээлж",
+    url: "/eelj",
+    basePaths: ["/eelj"],
+    items: [],
+  });
+
   const orderItems: NavSubItem[] = [];
   if (
     roles.some((r) =>

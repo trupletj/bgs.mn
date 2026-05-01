@@ -3,6 +3,7 @@ import { hasPermission, hasRole } from "@/actions/rbac";
 import { FileText, Star, BookOpen, BarChart3, TrendingUp, ClipboardList, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { OrderTrendChart } from "@/components/dashboard/order-trend-chart";
 import { OrderStatusChart } from "@/components/dashboard/order-status-chart";
+import { AttendanceWidget } from "@/components/dashboard/attendance-widget";
 
 export default async function DashboardPage() {
   const hasPolicyAccess = await hasPermission("policy", "access");
@@ -43,6 +44,9 @@ export default async function DashboardPage() {
           Систем ажиллаж байна
         </div>
       </div>
+
+      {/* Attendance — permission-гүй, бүх нэвтэрсэн хэрэглэгчид */}
+      <AttendanceWidget />
 
       {/* Order stats — захиалгын эрх бүхий хүмүүст */}
       {hasOrderAccess && orderStats && (

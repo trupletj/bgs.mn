@@ -29,26 +29,20 @@ export async function deleteOverride(id: number) {
 
   revalidatePath("/dine/temp-kitchen");
 }
+// Centralized in actions/users.ts; map to shape this caller expects.
+import { searchUsers as _searchUsers } from "./users";
+
 export async function searchUsers(query: string) {
-  const supabase = await createClient();
-
   if (!query || query.length < 2) return [];
-
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, bteg_id, first_name, last_name, nice_name, position_name")
-    .or(
-      `first_name.ilike.%${query}%,last_name.ilike.%${query}%,position_name.ilike.%${query}%`,
-    )
-    .eq("is_active", true)
-    .limit(15);
-
-  if (error) {
-    console.error("Search error:", error);
-    return [];
-  }
-
-  return data;
+  const results = await _searchUsers(query, 15);
+  return results.map((u) => ({
+    id: u.id,
+    bteg_id: u.bteg_id,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    nice_name: u.nice_name,
+    position_name: u.position_name,
+  }));
 }
 
 export async function updateMealOverride(id: number, values: any) {
