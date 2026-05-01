@@ -26,7 +26,7 @@ const MEAL_TYPES = [
   { value: "morning_meal", label: "Өглөөний хоол" },
   { value: "lunch", label: "Өдрийн хоол" },
   { value: "dinner", label: "Оройн хоол" },
-  { value: "nightmeal", label: "Шөнийн хоол" },
+  { value: "night_meal", label: "Шөнийн хоол" },
 ];
 
 export function TimeSlotManager({ hallId }: { hallId: number }) {

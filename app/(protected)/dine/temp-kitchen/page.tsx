@@ -22,7 +22,7 @@ const MEAL_TYPES = [
   { id: "morning_meal", label: "Ө.Хоол" },
   { id: "lunch", label: "Өдөр" },
   { id: "dinner", label: "Орой" },
-  { id: "nightmeal", label: "Шөнө" },
+  { id: "night_meal", label: "Шөнө" },
 ];
 
 export default async function TempKitchenPage({
