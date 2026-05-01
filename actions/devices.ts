@@ -3,34 +3,21 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getProfileIdFromAuthUserId } from "./profile";
+import { searchUsers as _searchUsers } from "./users";
 import type { DeviceType, DeviceStatus, DeviceSpecs } from "@/types/device";
 
 // ─── User search ──────────────────────────────────────────────────────────────
+// Centralized in actions/users.ts. Энэ нь backwards-compat shim.
 
 export async function searchAssignableUsers(query: string) {
-  const supabase = await createClient();
-  const parts = query.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return [];
-
-  let q = supabase
-    .from("users")
-    .select("id, first_name, last_name, position_name, department_name")
-    .eq("is_active", true)
-    .limit(10);
-
-  // Хэрэв хэд хэдэн үг байвал тус бүрийг ovog/ner-т хайна (AND шүүлт)
-  for (const part of parts) {
-    q = q.or(`first_name.ilike.%${part}%,last_name.ilike.%${part}%`);
-  }
-
-  const { data } = await q.order("last_name");
-  return (data ?? []) as {
-    id: string;
-    first_name: string;
-    last_name: string;
-    position_name?: string;
-    department_name?: string;
-  }[];
+  const results = await _searchUsers(query, 10);
+  return results.map((u) => ({
+    id: u.id,
+    first_name: u.first_name ?? "",
+    last_name: u.last_name ?? "",
+    position_name: u.position_name ?? undefined,
+    department_name: u.department_name ?? undefined,
+  }));
 }
 
 // ─── Read ─────────────────────────────────────────────────────────────────────

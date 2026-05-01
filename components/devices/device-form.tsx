@@ -10,14 +10,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  createDevice, updateDevice, searchAssignableUsers,
+  createDevice, updateDevice,
   searchDevicesForPairing, setMonitorPairings, createPairedMonitors,
 } from "@/actions/devices";
+import type { UserSearchResult } from "@/actions/users";
 import {
-  DEVICE_TYPE_CONFIG,
+  DEVICE_TYPE_CONFIG, DEVICE_STATUS_CONFIG,
   type DeviceType, type DeviceStatus, type Device, type OrgStructure,
 } from "@/types/device";
 import { Search, X, Monitor as MonitorIcon, Laptop2, Plus, Sparkles } from "lucide-react";
+import { UserSearchPicker } from "@/components/users/user-search-picker";
 
 const DEVICE_TYPES = Object.entries(DEVICE_TYPE_CONFIG) as [DeviceType, { label: string; group: string }][];
 const NONE = "__none__";
@@ -40,7 +42,7 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
   const [serial, setSerial]     = useState(device?.serial_number ?? "");
   const [mfr, setMfr]           = useState(device?.manufacturer ?? "");
   const [type, setType]         = useState<DeviceType>(device?.device_type ?? "desktop");
-  const status: DeviceStatus = "active";
+  const [status, setStatus]     = useState<DeviceStatus>(device?.status ?? "active");
   const [location, setLocation] = useState(device?.location ?? "");
   const [purchaseDate, setPD]   = useState(device?.purchase_date ?? "");
   const [warrantyDate, setWD]   = useState(device?.warranty_expiry_date ?? "");
@@ -163,23 +165,19 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
   // ── Хариуцагчид ──
   const existingUsers = device?.device_assignments?.map((a) => a.user).filter(Boolean) as UserOption[] ?? [];
   const [selectedUsers, setSelectedUsers] = useState<UserOption[]>(existingUsers);
-  const [userSearch, setUserSearch]       = useState("");
-  const [userResults, setUserResults]     = useState<UserOption[]>([]);
 
-  useEffect(() => {
-    if (!userSearch.trim()) { setUserResults([]); return; }
-    const timer = setTimeout(async () => {
-      const results = await searchAssignableUsers(userSearch);
-      setUserResults(results);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [userSearch]);
-
-  const addUser = (u: UserOption) => {
+  const addUser = (u: UserSearchResult) => {
     if (selectedUsers.find((s) => s.id === u.id)) return;
-    setSelectedUsers((p) => [...p, u]);
-    setUserSearch("");
-    setUserResults([]);
+    setSelectedUsers((p) => [
+      ...p,
+      {
+        id: u.id,
+        first_name: u.first_name ?? "",
+        last_name: u.last_name ?? "",
+        position_name: u.position_name ?? undefined,
+        department_name: u.department_name ?? undefined,
+      },
+    ]);
   };
   const removeUser = (id: string) => setSelectedUsers((p) => p.filter((u) => u.id !== id));
 
@@ -301,6 +299,17 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
             </Select>
           </div>
           <div>
+            <Label>Төлөв</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as DeviceStatus)}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.entries(DEVICE_STATUS_CONFIG) as [DeviceStatus, { label: string }][]).map(([val, cfg]) => (
+                  <SelectItem key={val} value={val}>{cfg.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label>Худалдан авсан огноо</Label>
             <Input type="date" value={purchaseDate} onChange={(e) => setPD(e.target.value)} className="mt-1" />
           </div>
@@ -410,31 +419,11 @@ export function DeviceForm({ mode, device, orgStructure }: Props) {
             <h2 className="text-sm font-semibold">Хариуцагчид</h2>
           </div>
           <div className="p-5 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Нэрээр хайх..."
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                className="pl-9"
-              />
-              {userResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-md">
-                  {userResults.map((u) => (
-                    <button key={u.id} type="button" onClick={() => addUser(u)}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/50">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {(u.last_name?.[0] ?? "") + (u.first_name?.[0] ?? "")}
-                      </div>
-                      <div>
-                        <p className="font-medium">{u.last_name} {u.first_name}</p>
-                        <p className="text-xs text-muted-foreground">{u.position_name}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <UserSearchPicker
+              placeholder="Нэр, овог, утас, албан тушаал..."
+              excludeIds={selectedUsers.map((u) => u.id)}
+              onSelect={addUser}
+            />
             {selectedUsers.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {selectedUsers.map((u, i) => (

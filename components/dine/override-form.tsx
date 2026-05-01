@@ -1,22 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import {
-  CalendarIcon,
-  Loader2,
-  UserPlus,
-  Check,
-  ChevronsUpDown,
-  X,
-} from "lucide-react";
-import { useDebounce } from "use-debounce";
+import { CalendarIcon, Loader2, UserPlus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Form,
@@ -38,18 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { UserSearchPicker } from "@/components/users/user-search-picker";
+import type { UserSearchResult } from "@/actions/users";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { createMealOverride, searchUsers } from "@/actions/meal-override";
+import { createMealOverride } from "@/actions/meal-override";
 
 const formSchema = z.object({
   selected_users: z
@@ -77,11 +64,6 @@ const formSchema = z.object({
 
 export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch] = useDebounce(searchTerm, 500);
-  const [users, setUsers] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -93,19 +75,26 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
     },
   });
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (debouncedSearch.length < 2) {
-        setUsers([]);
-        return;
-      }
-      setIsSearching(true);
-      const results = await searchUsers(debouncedSearch);
-      setUsers(results);
-      setIsSearching(false);
-    };
-    fetchUsers();
-  }, [debouncedSearch]);
+  const handleAddUser = (user: UserSearchResult) => {
+    const current = form.getValues("selected_users");
+    if (current.some((u) => u.user_id === user.id)) return;
+
+    const fullName = [user.last_name, user.first_name]
+      .filter(Boolean)
+      .join(" ");
+    form.setValue(
+      "selected_users",
+      [
+        ...current,
+        {
+          user_id: user.id,
+          nice_name: user.nice_name || fullName || "Нэргүй",
+          bteg_id: user.bteg_id ?? "",
+        },
+      ],
+      { shouldValidate: true, shouldDirty: true },
+    );
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
@@ -129,7 +118,6 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
         selected_users: [],
         note: "",
       });
-      setSearchTerm("");
     } catch (error: any) {
       toast.error(error.message || "Алдаа гарлаа");
     } finally {
@@ -181,71 +169,11 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
             )}
           </div>
 
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-between font-normal">
-                <span>Ажилтан хайх...</span>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-[var(--radix-popover-trigger-width)] p-0"
-              align="start">
-              <Command shouldFilter={false}>
-                <CommandInput
-                  placeholder="Нэрээр хайх..."
-                  onValueChange={setSearchTerm}
-                />
-                <CommandList>
-                  {isSearching && (
-                    <div className="p-4 text-sm text-center">Хайж байна...</div>
-                  )}
-                  <CommandEmpty>Ажилтан олдсонгүй.</CommandEmpty>
-                  <CommandGroup>
-                    {users.map((user) => {
-                      const isSelected = form
-                        .watch("selected_users")
-                        .some((u) => u.user_id === user.id);
-                      return (
-                        <CommandItem
-                          key={user.id}
-                          onSelect={() => {
-                            if (!isSelected) {
-                              form.setValue("selected_users", [
-                                ...form.getValues("selected_users"),
-                                {
-                                  user_id: user.id,
-                                  nice_name: user.nice_name,
-                                  bteg_id: user.bteg_id,
-                                },
-                              ]);
-                            } else {
-                              removeUser(user.id);
-                            }
-                            setOpen(false);
-                          }}>
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              isSelected ? "opacity-100" : "opacity-0",
-                            )}
-                          />
-                          <div className="flex flex-col text-sm">
-                            <span>{user.nice_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {user.position_name}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <UserSearchPicker
+            placeholder="Нэр, овог, утас, албан тушаал..."
+            excludeIds={form.watch("selected_users").map((u) => u.user_id)}
+            onSelect={handleAddUser}
+          />
           <FormMessage>
             {form.formState.errors.selected_users?.message}
           </FormMessage>

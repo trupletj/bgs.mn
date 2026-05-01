@@ -30,7 +30,8 @@ import {
   Search, X, ExternalLink, Building2,
   Cpu, Laptop2, Monitor as MonitorIcon, Printer as PrinterIcon, ScanLine,
 } from "lucide-react";
-import { DEVICE_TYPE_CONFIG } from "@/types/device";
+import { DEVICE_TYPE_CONFIG, DEVICE_STATUS_CONFIG, type DeviceStatus } from "@/types/device";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Device, DeviceType, OrgStructure } from "@/types/device";
@@ -62,16 +63,24 @@ const TYPE_COLORS: Record<string, string> = {
   scanner: "text-orange-600 bg-orange-50 border-orange-200",
 };
 
-function TypeIcon({ type, size = "md" }: { type: string; size?: "sm" | "md" }) {
+function TypeIcon({ type, size = "md", subtitle }: { type: string; size?: "sm" | "md"; subtitle?: string }) {
   const Icon = TYPE_ICONS[type] ?? Cpu;
   const label = DEVICE_TYPE_CONFIG[type as DeviceType]?.label ?? type;
   const cls = TYPE_COLORS[type] ?? "text-muted-foreground bg-muted/40 border-border";
   const dim = size === "sm" ? "h-6 w-6" : "h-8 w-8";
   const iconDim = size === "sm" ? "h-3 w-3" : "h-4 w-4";
   return (
-    <div title={label} className={cn("inline-flex items-center justify-center rounded-md border", dim, cls)}>
-      <Icon className={iconDim} />
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("inline-flex items-center justify-center rounded-md border", dim, cls)}>
+          <Icon className={iconDim} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        <span className="font-medium">{label}</span>
+        {subtitle && <span className="text-xs opacity-80 block">{subtitle}</span>}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -117,7 +126,7 @@ function buildColumns(pairedChildren: Map<string, Row[]>): ColumnDef<Row>[] {
           {children.length > 0 && (
             <div title={`${children.length} холбогдсон төхөөрөмж`} className="flex items-center gap-0.5 ml-1 pl-1.5 border-l border-border/60">
               {children.slice(0, 4).map((c) => (
-                <TypeIcon key={c.id} type={c.device_type} size="sm" />
+                <TypeIcon key={c.id} type={c.device_type} size="sm" subtitle={c.name} />
               ))}
               {children.length > 4 && (
                 <span className="text-[10px] font-semibold text-muted-foreground ml-0.5">+{children.length - 4}</span>
@@ -128,6 +137,20 @@ function buildColumns(pairedChildren: Map<string, Row[]>): ColumnDef<Row>[] {
       );
     },
     filterFn: (row, _id, value) => !value || row.original.device_type === value,
+  },
+  {
+    id: "status",
+    accessorFn: (r) => r.status,
+    header: "Төлөв",
+    cell: ({ row }) => {
+      const cfg = DEVICE_STATUS_CONFIG[row.original.status as DeviceStatus] ?? DEVICE_STATUS_CONFIG.active;
+      return (
+        <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap", cfg.className)}>
+          {cfg.label}
+        </span>
+      );
+    },
+    filterFn: (row, _id, value) => !value || row.original.status === value,
   },
   {
     id: "serial_number",
@@ -311,6 +334,7 @@ export function DevicesTable({ data, orgStructure }: Props) {
   });
 
   const currentTypeFilter = (columnFilters.find((f) => f.id === "device_type")?.value as string) ?? "";
+  const currentStatusFilter = (columnFilters.find((f) => f.id === "status")?.value as string) ?? "";
 
   return (
     <div className="flex flex-col gap-3">
@@ -433,6 +457,43 @@ export function DevicesTable({ data, orgStructure }: Props) {
             >
               <Icon className="h-3.5 w-3.5" />
               {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Toolbar row 3: status filter pills */}
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          onClick={() => setColumnFilters((prev) => prev.filter((f) => f.id !== "status"))}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            currentStatusFilter === ""
+              ? "border-foreground bg-foreground text-background"
+              : "border-border bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+          )}
+        >
+          Төлөв бүгд
+        </button>
+        {(Object.entries(DEVICE_STATUS_CONFIG) as [DeviceStatus, { label: string; className: string }][]).map(([value, cfg]) => {
+          const active = currentStatusFilter === value;
+          return (
+            <button
+              key={value}
+              onClick={() =>
+                setColumnFilters((prev) => [
+                  ...prev.filter((f) => f.id !== "status"),
+                  { id: "status", value },
+                ])
+              }
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                active
+                  ? cn("border-current shadow-sm", cfg.className)
+                  : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              )}
+            >
+              {cfg.label}
             </button>
           );
         })}

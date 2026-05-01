@@ -28,6 +28,24 @@ export async function getClauseJobPosition({
   return data as ClauseJobPosition;
 }
 
+export async function getClauseJobPositionsForClause(
+  clauseId: string,
+): Promise<ClauseJobPosition[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("clause_job_position")
+    .select("*")
+    .eq("clause_id", clauseId);
+
+  if (error) {
+    console.error("Get clause job positions bulk error:", error);
+    return [];
+  }
+
+  return (data ?? []) as ClauseJobPosition[];
+}
+
 export async function createClauseJobPosition({
   clauseId,
   jobPositionId,
