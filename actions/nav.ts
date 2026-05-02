@@ -91,6 +91,7 @@ export async function getNavServices(): Promise<NavService[]> {
       items: [
         { title: "Гал тогоо", url: "/dine/list" },
         { title: "Түр зуурын гал тогоо", url: "/dine/temp-kitchen" },
+        { title: "Сарын тайлан", url: "/dine/monthly-report" },
       ],
     };
 
