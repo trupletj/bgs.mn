@@ -18,6 +18,7 @@ import { ChevronDown, ChevronRight, Utensils } from "lucide-react";
 import { MealLogsDetailModal } from "./meal-logs-detail-modal";
 import { MealBreakdownRow } from "./meal-breakdown-row";
 import { SubEmployeeMealDetailModal } from "./sub-employee-meal-detail-modal";
+import { DuplicateMealHallReport } from "./duplicate-meal-hall-report";
 
 interface ExpectedBreakdownData {
   meal_type: string;
@@ -302,7 +303,7 @@ export default function FoodLogSummaryTable({
             Тухайн өдөр идэх ёстой хоол
           </div>
           <Badge variant="secondary" className="px-3 py-1">
-            Нийт expected:{" "}
+            Нийт тооцоолсон:{" "}
             {loadingExpected ? "..." : totalExpectedMeals.toLocaleString()}
           </Badge>
         </div>
@@ -373,7 +374,9 @@ export default function FoodLogSummaryTable({
                       </TableCell>
                       {MEAL_TYPE_ORDER.map((mealType) => (
                         <TableCell key={mealType} className="text-right">
-                          {(hall.expectedByMeal[mealType] || 0).toLocaleString()}
+                          {(
+                            hall.expectedByMeal[mealType] || 0
+                          ).toLocaleString()}
                         </TableCell>
                       ))}
                       <TableCell className="bg-slate-50 text-right font-bold">
@@ -557,6 +560,8 @@ export default function FoodLogSummaryTable({
           </div>
         </CardContent>
       </Card>
+
+      <DuplicateMealHallReport date={selectedDate} />
 
       <div className="text-[10px] text-slate-400 italic">
         Сүүлд шинэчлэгдсэн:{" "}

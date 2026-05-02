@@ -124,6 +124,7 @@ Legacy sync:
 | `user_meal_configs` | Ажилтны хоолны байрлал/тохиргоо | `id` | 1886 | On |
 | `meal_location_overrides` | Байршлын түр override | `id` | 6 | On |
 | `daily_meal_summary` | Өдрийн нэгтгэл | `id` | 60 | Off |
+| `food_report_daily_snapshot` | Сарын тайланд ашиглах final өдөр тутмын snapshot | `id` | - | On |
 | `sub_employee_for_food` | Дэд/түр ажилтны хоолны бүртгэл | `id` | 7 | Off |
 | `sub_employee_meal_plans` | Дэд ажилтны хоолны төлөвлөгөө | `id` | 1 | Off |
 
@@ -137,6 +138,7 @@ Legacy sync:
 - `user_meal_configs.*_location -> dining_hall.id`
 - `meal_location_overrides.user_id -> users.id`
 - `daily_meal_summary.dining_hall_id -> dining_hall.id`
+- `food_report_daily_snapshot.dining_hall_id -> dining_hall.id`
 
 RLS policy тойм:
 
@@ -151,7 +153,18 @@ RLS policy тойм:
 - `users_with_stats` view нь `get_users_with_stats()` RPC-г view болгон харуулдаг.
 - `get_meal_breakdown_by_org(...)`, `get_meal_expected_vs_actual(...)`, `get_meal_employee_details(...)`
 - `refresh_daily_meal_summary()`
+- `snapshot_food_report_day(...)`, `snapshot_due_food_reports()`, `get_food_monthly_report(...)`
 - `sync_meal_config_bteg_id()` нь `user_meal_configs` insert дээр `bteg_id` бөглөнө.
+
+Сарын хоолны тайлан:
+
+- `food_report_daily_snapshot` нь `target.vw_worker_day_log_14d` устахаас өмнө expected/actual тайланг хадгална.
+- Snapshot grain: `report_date + dining_hall_id + meal_type + org_name + dep_name + heltes_name`.
+- `snapshot_due_food_reports()` нь Ulaanbaatar өдрөөр D+7 болсон өдрийг snapshot хийнэ.
+- `snapshot-food-report-daily` cron нь өдөр бүр `18:00 UTC` (`02:00 Asia/Ulaanbaatar`) ажиллана.
+- Final болсон snapshot автоматаар дарж бичигдэхгүй; correction хийхдээ `snapshot_food_report_day(p_date, true)`-г зориуд ажиллуулна.
+- Гэрээт expected нь `sub_employee_meal_plans` дээрх `breakfast_count`, `morning_meal_count`, `lunch_count`, `dinner_count`, `night_meal_count` багануудаас уншина.
+- Гэрээт actual нь `meal_logs.sub_employee_id` дээр тулгуурлана. Одоогийн UI дээр expected / actual хэлбэрээр харуулж болно.
 
 ## Бүлэг 5: Төхөөрөмж, asset, хүсэлт
 
@@ -321,6 +334,10 @@ Sync trigger тойм:
 | `20260430205453` | `eelj_phase2_request_schema` |
 | `20260430205557` | `eelj_phase2_request_rpcs` |
 | `20260430213737` | `eelj_phase2_my_cards_rpc` |
+| `20260502090208` | `create_food_monthly_report_snapshots` |
+| `20260502090312` | `secure_food_report_snapshot_access` |
+| `20260502091843` | `reschedule_food_report_snapshot_cron` |
+| `20260502102353` | `add_sub_employee_morning_meal_expected` |
 
 ## Security/RLS тэмдэглэл
 
@@ -328,4 +345,3 @@ Sync trigger тойм:
 - Харин `dining_hall`, `chefs`, `kiosks`, `meal_logs`, `user_meal_configs`, `meal_location_overrides`, `leave_*`, `gazar`, `user_autobus_request` дээр RLS идэвхтэй байна.
 - Зарим RLS policy `public` role-д `SELECT`, `INSERT`, `UPDATE`, `DELETE`-ийг `true` нөхцөлтэй өгсөн байна. Энэ нь kiosk/meal flow-д зориулагдсан байж болох ч Data API-д нээлттэй эсэхийг production security review-д заавал шалгах хэрэгтэй.
 - Олон `SECURITY DEFINER` function `public` schema-д байна. Supabase public exposed schema дээр privilege boundary-г тогтмол audit хийх шаардлагатай.
-
