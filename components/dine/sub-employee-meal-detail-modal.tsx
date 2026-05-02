@@ -67,6 +67,7 @@ interface UserRow {
 interface PlanRow {
   org_id: string;
   breakfast_count: number | null;
+  morning_meal_count: number | null;
   lunch_count: number | null;
   dinner_count: number | null;
   night_meal_count: number | null;
@@ -85,6 +86,7 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 
 const PLAN_FIELD_BY_MEAL: Record<string, string> = {
   breakfast: "breakfast_count",
+  morning_meal: "morning_meal_count",
   lunch: "lunch_count",
   dinner: "dinner_count",
   night_meal: "night_meal_count",
@@ -93,6 +95,7 @@ const PLAN_FIELD_BY_MEAL: Record<string, string> = {
 function getPlannedCount(plan: PlanRow | undefined, mealType: string): number {
   if (!plan) return 0;
   if (mealType === "breakfast") return Number(plan.breakfast_count || 0);
+  if (mealType === "morning_meal") return Number(plan.morning_meal_count || 0);
   if (mealType === "lunch") return Number(plan.lunch_count || 0);
   if (mealType === "dinner") return Number(plan.dinner_count || 0);
   if (mealType === "night_meal") return Number(plan.night_meal_count || 0);
@@ -182,7 +185,7 @@ export function SubEmployeeMealDetailModal({
           ? supabase
               .from("sub_employee_meal_plans")
               .select(
-                "org_id, breakfast_count, lunch_count, dinner_count, night_meal_count",
+                "org_id, breakfast_count, morning_meal_count, lunch_count, dinner_count, night_meal_count",
               )
               .in("org_id", orgIds)
               .eq("dining_hall_id", hallId)
