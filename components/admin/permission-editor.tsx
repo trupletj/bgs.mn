@@ -46,7 +46,14 @@ const MODULE_OPTIONS = [
   "users_info",
 ];
 
-const ACTION_OPTIONS = ["read", "create", "edit", "delete", "access"];
+const ACTION_OPTIONS = [
+  "read",
+  "create",
+  "edit",
+  "delete",
+  "access",
+  "purchase",
+];
 
 export function PermissionEditor({
   permissionId,
