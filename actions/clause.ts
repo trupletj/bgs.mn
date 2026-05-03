@@ -2,6 +2,24 @@ import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
+type ReferenceNumberRow = {
+  reference_number: string | null;
+};
+
+type ClausePositionInput = {
+  positionId?: string | null;
+  job_position_id?: string | null;
+  type?: string | null;
+};
+
+type ClauseUpdateData = Partial<{
+  text: string;
+  reference_number: string;
+  section_id: string;
+  parent_id: string | null;
+  policy_id: string;
+}>;
+
 export const getClauses = async ({ section_id }: { section_id: string }) => {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -15,10 +33,10 @@ export const getClauses = async ({ section_id }: { section_id: string }) => {
   return sortByReferenceNumber(data);
 };
 
-const sortByReferenceNumber = (clauses: any[]) => {
+const sortByReferenceNumber = <T extends ReferenceNumberRow>(clauses: T[]) => {
   return clauses.sort((a, b) => {
-    const refA = a.reference_number.split(".").map(Number);
-    const refB = b.reference_number.split(".").map(Number);
+    const refA = (a.reference_number ?? "").split(".").map(Number);
+    const refB = (b.reference_number ?? "").split(".").map(Number);
 
     for (let i = 0; i < Math.max(refA.length, refB.length); i++) {
       const partA = refA[i] ?? 0;
@@ -55,7 +73,7 @@ export const createClause = async (data: {
   section_id: string;
   parent_id?: string | null;
   policy_id: string;
-  positions?: any[];
+  positions?: ClausePositionInput[];
 }) => {
   try {
     // Section байгаа эсэхийг шалгах
@@ -118,12 +136,12 @@ export const createClause = async (data: {
     if (data.positions && data.positions.length > 0) {
       const clausePositions = data.positions.map((position) => ({
         clause_id: clause.id,
-        position_id: position.positionId,
+        position_id: position.positionId ?? position.job_position_id,
         type: position.type,
-      }));
+      })).filter((position) => position.position_id && position.type);
 
       const { error: positionError } = await supabase
-        .from("clause_position")
+        .from("clause_job_position")
         .insert(clausePositions);
 
       if (positionError) {
@@ -155,7 +173,7 @@ export const getClause = async (id: string) => {
         *,
         section:section_id (*),
         policy:policy_id (*),
-        clause_position (*)
+        clause_job_position (*)
       `
       )
       .eq("id", id)
@@ -174,7 +192,7 @@ export const getClause = async (id: string) => {
       parentId: clause.parent_id,
       policyId: clause.policy_id,
       isDeleted: clause.is_deleted,
-      clause_job_position: clause.clause_position || [],
+      clause_job_position: clause.clause_job_position || [],
     };
   } catch (error) {
     throw new Error(`Заалт хайхад алдаа гарлаа: ${(error as Error).message}`);
@@ -189,7 +207,7 @@ export const getAllClauses = async (sectionId?: string) => {
         `
         *,
         policy:policy_id (*),
-        clause_position (*)
+        clause_job_position (*)
       `
       )
       .eq("is_deleted", false);
@@ -210,7 +228,7 @@ export const getAllClauses = async (sectionId?: string) => {
       parentId: clause.parent_id,
       policyId: clause.policy_id,
       isDeleted: clause.is_deleted,
-      clause_job_position: clause.clause_position || [],
+      clause_job_position: clause.clause_job_position || [],
     }));
   } catch (error) {
     throw new Error(
@@ -227,7 +245,7 @@ export const updateClause = async (
     section_id: string;
     parent_id: string | null;
     policy_id: string;
-    positions?: any[];
+    positions?: ClausePositionInput[];
   }>
 ) => {
   try {
@@ -274,7 +292,7 @@ export const updateClause = async (
     }
 
     // Clause update хийх
-    const updateData: any = {};
+    const updateData: ClauseUpdateData = {};
     if (data.text !== undefined) updateData.text = data.text;
     if (data.reference_number !== undefined)
       updateData.reference_number = data.reference_number;
@@ -296,7 +314,7 @@ export const updateClause = async (
     if (data.positions !== undefined) {
       // Хуучин position-уудыг устгах
       const { error: deleteError } = await supabase
-        .from("clause_position")
+        .from("clause_job_position")
         .delete()
         .eq("clause_id", id);
 
@@ -308,12 +326,12 @@ export const updateClause = async (
       if (data.positions && data.positions.length > 0) {
         const clausePositions = data.positions.map((position) => ({
           clause_id: id,
-          position_id: position.positionId,
+          position_id: position.positionId ?? position.job_position_id,
           type: position.type,
-        }));
+        })).filter((position) => position.position_id && position.type);
 
         const { error: positionError } = await supabase
-          .from("clause_position")
+          .from("clause_job_position")
           .insert(clausePositions);
 
         if (positionError) {
