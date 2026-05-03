@@ -1,10 +1,16 @@
 import { getOrderProcesses } from "@/actions/order-process";
+import { hasRole } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 import OrderProcessList from "@/components/orders/order-process-type-list";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
 export default async function OrderProcessesPage() {
+  const is_admin = await hasRole(["super_admin"]);
+  if (!is_admin) {
+    return <UnauthorizedPage />;
+  }
   const res = await getOrderProcesses();
   const processes = Array.isArray(res) ? res : (res?.data ?? []);
 

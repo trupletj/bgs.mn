@@ -27,6 +27,8 @@ export async function getNavServices(): Promise<NavService[]> {
     "create",
   );
   const hasCreateOrder = await hasPermission("order", "create");
+  const hasOrderPurchase = await hasPermission("order", "purchase");
+  const hasOrderReview = await hasPermission("order", "edit");
 
   const services: NavService[] = [];
 
@@ -55,33 +57,17 @@ export async function getNavServices(): Promise<NavService[]> {
   });
 
   const orderItems: NavSubItem[] = [];
-  if (
-    roles.some((r) =>
-      ["hr_emp", "monitoring_emp", "super_admin", "order_system"].includes(r),
-    )
-  ) {
-    orderItems.push({ title: "Миний захиалгууд", url: "/orders/list" });
-  }
-  if (
-    roles.some((r) => ["hr_emp", "super_admin", "order_system"].includes(r))
-  ) {
+  if (hasOrderPurchase) {
     orderItems.push({ title: "Худалдан авалт", url: "/orders/purchase" });
   }
-  if (
-    roles.some((r) =>
-      ["hr_emp", "monitoring_emp", "super_admin", "order_system"].includes(r),
-    )
-  ) {
+  if (hasOrderReview) {
     orderItems.push({ title: "Хяналт", url: "/orders/review" });
   }
-  if (
-    roles.some((r) =>
-      ["monitoring_emp", "super_admin", "order_system"].includes(r),
-    )
-  ) {
+  if (roles.some((r) => ["super_admin"].includes(r))) {
     orderItems.push({ title: "Захиалгын төрөл", url: "/order-processes" });
   }
   if (hasCreateOrder) {
+    orderItems.push({ title: "Миний захиалгууд", url: "/orders/list" });
     orderItems.push({ title: "+ Захиалга үүсгэх", url: "/orders/add" });
   }
   if (orderItems.length > 0) {
