@@ -26,6 +26,7 @@ export async function getNavServices(): Promise<NavService[]> {
     "job_description",
     "create",
   );
+  const hasCreateOrder = await hasPermission("order", "create");
 
   const services: NavService[] = [];
 
@@ -80,6 +81,9 @@ export async function getNavServices(): Promise<NavService[]> {
   ) {
     orderItems.push({ title: "Захиалгын төрөл", url: "/order-processes" });
   }
+  if (hasCreateOrder) {
+    orderItems.push({ title: "+ Захиалга үүсгэх", url: "/orders/add" });
+  }
   if (orderItems.length > 0) {
     services.push({
       key: "orders",
@@ -128,7 +132,7 @@ export async function getNavServices(): Promise<NavService[]> {
     ];
 
     if (hasPolicyCreate) {
-      policyItems.push({ title: "Журам нэмэх", url: "/policy/new" });
+      policyItems.push({ title: "+ Журам нэмэх", url: "/policy/new" });
     }
 
     services.push({
@@ -150,7 +154,7 @@ export async function getNavServices(): Promise<NavService[]> {
 
     if (hasJobDescriptionCreate) {
       jobDescriptionItems.push({
-        title: "Тодорхойлолт нэмэх",
+        title: "+ Тодорхойлолт нэмэх",
         url: "/job-descriptions/new",
       });
     }
