@@ -155,18 +155,6 @@ export default async function DashboardPage() {
             />
           </div>
         </section>
-      ) : !hasOrderAccess ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card py-24 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-            <BarChart3 className="h-6 w-6 text-muted-foreground/40" />
-          </div>
-          <p className="font-semibold text-foreground">
-            Статистик харах эрх байхгүй
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Системийн администратортой холбогдоно уу
-          </p>
-        </div>
       ) : null}
     </div>
   );
