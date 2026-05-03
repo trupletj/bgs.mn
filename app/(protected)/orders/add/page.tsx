@@ -1,11 +1,18 @@
 import { Suspense } from "react";
 import { OrderCreateForm } from "@/components/orders/order-create-form";
 import { getOrderProcessesForCurrentUser } from "@/actions/order-process";
+import { hasPermission } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateOrderTestPage() {
   const processes = await getOrderProcessesForCurrentUser();
+  const canCreate = await hasPermission("order", "create");
+
+  if (!canCreate) {
+    return <UnauthorizedPage />;
+  }
 
   return (
     <main className="container mx-auto py-6 px-4 w-full">

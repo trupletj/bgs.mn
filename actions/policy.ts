@@ -417,7 +417,7 @@ export const getPolicy = async (id: string) => {
 
         if (clauseIds.length > 0) {
           const { data: positions, error: positionsError } = await supabase
-            .from("clause_position")
+            .from("clause_job_position")
             .select("*")
             .in("clause_id", clauseIds);
 
