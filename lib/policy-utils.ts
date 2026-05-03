@@ -33,6 +33,43 @@ export interface PolicyDashboardSummary {
   avgPercent: number;
 }
 
+export interface PositionClauseStat {
+  id: string | number;
+  text: string | null;
+  reference_number: string | null;
+  type: string | null;
+  rating: { score: number; description: string | null } | null;
+}
+
+export interface PositionPolicyGroup {
+  id: string;
+  name: string;
+  reference_code: string | null;
+  clauses: PositionClauseStat[];
+}
+
+export interface JobPositionPerfItem {
+  id: string;
+  name: string;
+  organizationName: string;
+  heltesName: string;
+  albaName: string;
+  unitLabel: string;
+  totalScore: number;
+  validCount: number;
+  linkedCount: number;
+  hasRatings: boolean;
+  implementationPercent: number;
+  policies: PositionPolicyGroup[];
+}
+
+export interface JobPositionPerfSummary {
+  total: number;
+  ratedCount: number;
+  unratedCount: number;
+  avgPercent: number;
+}
+
 export function formatPolicyDate(value: string | null | undefined): string {
   if (!value) return "—";
   const d = new Date(value);
