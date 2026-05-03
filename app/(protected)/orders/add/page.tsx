@@ -1,12 +1,11 @@
 import { Suspense } from "react";
 import { OrderCreateForm } from "@/components/orders/order-create-form";
-import { getOrderProcesses } from "@/actions/order-process";
+import { getOrderProcessesForCurrentUser } from "@/actions/order-process";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateOrderTestPage() {
-  const data = await getOrderProcesses();
-  const processes = Array.isArray(data) ? data : data?.data ?? [];
+  const processes = await getOrderProcessesForCurrentUser();
 
   return (
     <main className="container mx-auto py-6 px-4 w-full">

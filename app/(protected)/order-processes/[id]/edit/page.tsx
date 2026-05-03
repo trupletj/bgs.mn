@@ -28,9 +28,24 @@ export default async function EditOrderProcessPage({
     .select("id, display_name")
     .order("display_name");
 
+  const { data: heltes } = await supabase
+    .from("heltes")
+    .select("bteg_id, name, organization_id")
+    .eq("is_active", true)
+    .order("name")
+    .in("organization_id", ["1", "2", "20"]);
+
+  const { data: companies } = await supabase
+    .from("organization")
+    .select("bteg_id, name")
+    .in("bteg_id", ["1", "2", "20"])
+    .order("bteg_id");
+
   const initialData = {
     id: process.id,
     name: process.name,
+    allowed_heltes_ids: process.allowed_heltes_ids,
+    purchase_role_ids: process.purchase_role_ids,
     steps: process.steps.map((step) => ({
       step_order: step.step_order,
       step_name: step.step_name,
@@ -53,6 +68,8 @@ export default async function EditOrderProcessPage({
       </p>
       <OrderProcessForm
         roles={roles || []}
+        heltes={(heltes || []).filter((item) => item.bteg_id)}
+        companies={(companies || []).filter((item) => item.bteg_id)}
         initialData={initialData}
         isEdit={true}
       />

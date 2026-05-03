@@ -18,6 +18,14 @@ export async function getNavServices(): Promise<NavService[]> {
   const hasDiningAccess = await hasPermission("dining", "access");
   const hasEmployeeAccess = await hasPermission("employee", "read");
   const hasPolicyCreate = await hasPermission("policy", "create");
+  const hasJobDescriptionAccess = await hasPermission(
+    "job_description",
+    "access",
+  );
+  const hasJobDescriptionCreate = await hasPermission(
+    "job_description",
+    "create",
+  );
 
   const services: NavService[] = [];
 
@@ -129,6 +137,30 @@ export async function getNavServices(): Promise<NavService[]> {
       url: "/policy",
       basePaths: ["/policy"],
       items: policyItems,
+    });
+  }
+
+  if (
+    hasJobDescriptionAccess &&
+    roles.some((r) => ["super_admin", "hr_emp"].includes(r))
+  ) {
+    const jobDescriptionItems: NavSubItem[] = [
+      { title: "Тодорхойлолтын жагсаалт", url: "/job-descriptions" },
+    ];
+
+    if (hasJobDescriptionCreate) {
+      jobDescriptionItems.push({
+        title: "Тодорхойлолт нэмэх",
+        url: "/job-descriptions/new",
+      });
+    }
+
+    services.push({
+      key: "job-descriptions",
+      title: "Албан тушаалын тодорхойлолт",
+      url: "/job-descriptions",
+      basePaths: ["/job-descriptions"],
+      items: jobDescriptionItems,
     });
   }
 

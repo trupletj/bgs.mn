@@ -9,6 +9,8 @@ import { PolicyHeader } from "./PolicyHeader";
 import { SectionItem } from "./SectionItem";
 import { Button } from "@/components/ui/button";
 import { createPolicy, createSection, createClause } from "@/actions/policy";
+import { PolicyScopeSelector } from "./policy-scope-selector";
+import type { PolicyScopeTarget } from "@/types/types";
 
 export const NewPolicy = () => {
   const router = useRouter();
@@ -16,8 +18,10 @@ export const NewPolicy = () => {
     name: "",
     reference_code: "",
     approved_date: null,
+    scope_targets: [],
     section: [],
   });
+  const [scopeTargets, setScopeTargets] = useState<PolicyScopeTarget[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Helper functions
@@ -279,6 +283,7 @@ export const NewPolicy = () => {
         name: policyData.name,
         reference_code: policyData.reference_code,
         approved_date: policyData.approved_date,
+        scope_targets: scopeTargets,
       });
 
       // 2. Бүлэг болон заалтуудыг хадгалах
@@ -331,6 +336,14 @@ export const NewPolicy = () => {
         isProcessing={isProcessing}
         onSubmit={handleSubmit}
       />
+
+      <div className="mt-6">
+        <PolicyScopeSelector
+          value={scopeTargets}
+          onChange={setScopeTargets}
+          disabled={isProcessing}
+        />
+      </div>
 
       <div className="mt-6">
         <div className="flex items-center justify-between">

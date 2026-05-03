@@ -1,9 +1,17 @@
 import { hasPermission } from "@/actions/rbac";
 import UnauthorizedPage from "@/app/unauthorized/page";
-import { columns } from "@/components/users/columns";
+import { columns, type User } from "@/components/users/columns";
 import { DataTable } from "@/components/users/data-table";
 import { createClient } from "@/utils/supabase/server";
 import { Users, UserCheck, Building2 } from "lucide-react";
+
+type EmployeeUserRow = Omit<User, "organization_name"> & {
+  bteg_id?: string | null;
+  email?: string | null;
+  address?: string | null;
+  job_position_id?: string | null;
+  organization?: { name?: string | null } | null;
+};
 
 export default async function UsersPage() {
   const supabase = await createClient();
@@ -14,7 +22,7 @@ export default async function UsersPage() {
   const { data: users, error } = await supabase
     .from("users")
     .select(
-      `id, first_name, last_name, phone, register_number,
+      `id, bteg_id, first_name, last_name, phone, register_number,
        department_name, heltes_name, position_name, is_active,
        email, address, job_position_id,
        organization:organization_id ( name )`,
@@ -25,7 +33,7 @@ export default async function UsersPage() {
 
   if (error) return <div className="p-6 text-destructive">Алдаа: {error.message}</div>;
 
-  const transformedUsers = (users ?? []).map((user: any) => ({
+  const transformedUsers = ((users ?? []) as unknown as EmployeeUserRow[]).map((user) => ({
     ...user,
     organization_name: user.organization?.name ?? null,
     organization: undefined,
@@ -40,8 +48,8 @@ export default async function UsersPage() {
   const permissions = { canReadDine, canEditDine, canReadUserDetail, canManageActions: false };
 
   // Stats
-  const orgs = new Set(transformedUsers.map((u: any) => u.organization_name).filter(Boolean));
-  const depts = new Set(transformedUsers.map((u: any) => u.department_name).filter(Boolean));
+  const orgs = new Set(transformedUsers.map((u) => u.organization_name).filter(Boolean));
+  const depts = new Set(transformedUsers.map((u) => u.department_name).filter(Boolean));
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">

@@ -232,19 +232,23 @@ export function SubEmployeeMealDetailModal({
           const plan = planByOrgId.get(subEmployee.org_id);
           const planField = PLAN_FIELD_BY_MEAL[log.meal_type];
 
-          return [{
-            id: log.id,
-            qrLabel: subEmployee?.custom_label || "QR тодорхойгүй",
-            linkedUserName: subEmployee?.bteg_id
-              ? userNameByBteg.get(subEmployee.bteg_id) || null
-              : null,
-            companyName:
-              orgNameById.get(subEmployee.org_id) ||
-              "Гэрээт байгууллага тодорхойгүй",
-            mealType: log.meal_type,
-            scannedAt: log.scanned_at,
-            isExpected: planField ? getPlannedCount(plan, log.meal_type) > 0 : false,
-          }];
+          return [
+            {
+              id: log.id,
+              qrLabel: subEmployee?.custom_label || "QR тодорхойгүй",
+              linkedUserName: subEmployee?.bteg_id
+                ? userNameByBteg.get(subEmployee.bteg_id) || null
+                : null,
+              companyName:
+                orgNameById.get(subEmployee.org_id) ||
+                "Гэрээт байгууллага тодорхойгүй",
+              mealType: log.meal_type,
+              scannedAt: log.scanned_at,
+              isExpected: planField
+                ? getPlannedCount(plan, log.meal_type) > 0
+                : false,
+            },
+          ];
         }),
       );
 
@@ -271,7 +275,7 @@ export function SubEmployeeMealDetailModal({
               <TableRow>
                 <TableHead>QR label</TableHead>
                 <TableHead>Холбосон ажилтан</TableHead>
-                <TableHead>Компани</TableHead>
+                <TableHead>Байгууллага</TableHead>
                 <TableHead>Хоол</TableHead>
                 <TableHead>Төлөвлөгөө</TableHead>
                 <TableHead className="text-right">Идсэн цаг</TableHead>
@@ -299,9 +303,7 @@ export function SubEmployeeMealDetailModal({
               ) : (
                 rows.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      {row.qrLabel}
-                    </TableCell>
+                    <TableCell className="font-medium">{row.qrLabel}</TableCell>
                     <TableCell>
                       {row.linkedUserName || (
                         <span className="text-slate-400">Холбоогүй</span>

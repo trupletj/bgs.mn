@@ -12,6 +12,19 @@ export default async function CreateOrderProcessPage() {
     .select("id, display_name")
     .order("display_name");
 
+  const { data: heltes } = await supabase
+    .from("heltes")
+    .select("bteg_id, name, organization_id")
+    .eq("is_active", true)
+    .in("organization_id", ["1", "2", "20"])
+    .order("name");
+
+  const { data: companies } = await supabase
+    .from("organization")
+    .select("bteg_id, name")
+    .in("bteg_id", ["1", "2", "20"])
+    .order("bteg_id");
+
   return (
     <div className="container mx-auto p-4 w-full">
       <Button variant="ghost" asChild className="pl-0 mb-6">
@@ -24,7 +37,12 @@ export default async function CreateOrderProcessPage() {
       <p className="text-muted-foreground mb-8">
         Захиалгын процессын шинэ төрөл үүсгэх
       </p>
-      <OrderProcessForm roles={roles || []} isEdit={false} />
+      <OrderProcessForm
+        roles={roles || []}
+        heltes={(heltes || []).filter((item) => item.bteg_id)}
+        companies={(companies || []).filter((item) => item.bteg_id)}
+        isEdit={false}
+      />
     </div>
   );
 }
