@@ -6,7 +6,8 @@ import { FileText } from "lucide-react";
 export const revalidate = 0;
 
 export default async function PoliciesPage() {
-  const { policies, summary } = await getPolicyDashboardData();
+  const { policies, summary, positions, positionSummary } =
+    await getPolicyDashboardData();
 
   if (policies.length === 0) {
     return (
@@ -32,5 +33,12 @@ export default async function PoliciesPage() {
     );
   }
 
-  return <PolicyDashboard policies={policies} summary={summary} />;
+  return (
+    <PolicyDashboard
+      policies={policies}
+      summary={summary}
+      positions={positions}
+      positionSummary={positionSummary}
+    />
+  );
 }
