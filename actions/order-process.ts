@@ -1,11 +1,13 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getProfileIdFromAuthUserId } from "./profile";
 
 export interface OrderProcessFormData {
   name: string;
+  allowed_heltes_ids: string[];
+  purchase_role_ids: number[];
   steps: Array<{
     step_order: number;
     step_name: string;
@@ -36,12 +38,12 @@ interface Step {
 }
 
 interface OrderProcess {
-  is_deleted: any;
+  is_deleted: boolean | null;
   created_at: string | number | Date;
   id: number;
   name: string;
   steps: Array<{
-    required_approval_count: any;
+    required_approval_count: number;
     id: number;
     step_order: number;
     step_name: string;
@@ -52,12 +54,40 @@ interface OrderProcess {
       display_name: string;
     }>;
   }>;
+  allowed_heltes_ids: string[];
+  purchase_role_ids: number[];
+}
+
+export interface OrderProcessOption {
+  id: string;
+  name: string;
+}
+
+interface RoleNameRow {
+  roles?: { name?: string | null } | null;
+}
+
+interface RoleAccessRow extends RoleNameRow {
+  role_id: number | string | null;
+}
+
+interface NestedOrderProcessRow {
+  order_processes:
+    | {
+        id: number;
+        name: string;
+      }
+    | {
+        id: number;
+        name: string;
+      }[]
+    | null;
 }
 
 export async function createOrderProcess(
   formData: OrderProcessFormData,
 ): Promise<OrderProcessResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   try {
     const { data: process, error: processError } = await supabase
@@ -67,6 +97,12 @@ export async function createOrderProcess(
       .single();
 
     if (processError) throw processError;
+
+    await saveOrderProcessAccess({
+      processId: process.id,
+      allowedHeltesIds: formData.allowed_heltes_ids,
+      purchaseRoleIds: formData.purchase_role_ids,
+    });
 
     for (const step of formData.steps) {
       const { data: stepData, error: stepError } = await supabase
@@ -111,7 +147,7 @@ export async function updateOrderProcess(
   id: number,
   formData: OrderProcessFormData,
 ): Promise<OrderProcessResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   try {
     /* -------------------------------------------------
@@ -139,6 +175,12 @@ export async function updateOrderProcess(
       .eq("id", id);
 
     if (processError) throw processError;
+
+    await saveOrderProcessAccess({
+      processId: id,
+      allowedHeltesIds: formData.allowed_heltes_ids,
+      purchaseRoleIds: formData.purchase_role_ids,
+    });
 
     /* -------------------------------------------------
      3. Хуучин steps + roles устгах
@@ -210,7 +252,7 @@ export async function updateOrderProcess(
 export async function getOrderProcess(
   id: number,
 ): Promise<OrderProcess | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   try {
     const { data: process, error: processError } = await supabase
@@ -244,6 +286,21 @@ export async function getOrderProcess(
 
     if (stepsError) throw stepsError;
 
+    const [{ data: heltesRows, error: heltesError }, { data: purchaseRoleRows, error: purchaseRoleError }] =
+      await Promise.all([
+        supabase
+          .from("order_process_allowed_heltes")
+          .select("heltes_bteg_id")
+          .eq("order_process_id", id),
+        supabase
+          .from("order_process_purchase_roles")
+          .select("role_id")
+          .eq("order_process_id", id),
+      ]);
+
+    if (heltesError) throw heltesError;
+    if (purchaseRoleError) throw purchaseRoleError;
+
     const steps = (stepsData as unknown as Step[]).map((step) => ({
       id: step.id,
       step_order: step.step_order,
@@ -256,6 +313,8 @@ export async function getOrderProcess(
     return {
       ...process,
       steps,
+      allowed_heltes_ids: (heltesRows ?? []).map((row) => row.heltes_bteg_id),
+      purchase_role_ids: (purchaseRoleRows ?? []).map((row) => row.role_id),
     };
   } catch (error) {
     console.error("Error fetching order process:", error);
@@ -263,8 +322,55 @@ export async function getOrderProcess(
   }
 }
 
+async function saveOrderProcessAccess({
+  processId,
+  allowedHeltesIds,
+  purchaseRoleIds,
+}: {
+  processId: number;
+  allowedHeltesIds: string[];
+  purchaseRoleIds: number[];
+}) {
+  const supabase = await createClient();
+
+  const [{ error: deleteHeltesError }, { error: deleteRolesError }] =
+    await Promise.all([
+      supabase
+        .from("order_process_allowed_heltes")
+        .delete()
+        .eq("order_process_id", processId),
+      supabase
+        .from("order_process_purchase_roles")
+        .delete()
+        .eq("order_process_id", processId),
+    ]);
+
+  if (deleteHeltesError) throw deleteHeltesError;
+  if (deleteRolesError) throw deleteRolesError;
+
+  if (allowedHeltesIds.length > 0) {
+    const { error } = await supabase.from("order_process_allowed_heltes").insert(
+      allowedHeltesIds.map((heltes_bteg_id) => ({
+        order_process_id: processId,
+        heltes_bteg_id,
+      })),
+    );
+    if (error) throw error;
+  }
+
+  if (purchaseRoleIds.length > 0) {
+    const { error } = await supabase.from("order_process_purchase_roles").insert(
+      purchaseRoleIds.map((role_id) => ({
+        order_process_id: processId,
+        role_id,
+      })),
+    );
+    if (error) throw error;
+  }
+}
+
 export async function getOrderProcesses() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   try {
     const { data, error } = await supabase
@@ -288,10 +394,131 @@ export async function getOrderProcesses() {
   }
 }
 
+export async function getOrderProcessesForCurrentUser(): Promise<OrderProcessOption[]> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const [{ data: roleRows }, { data: userProfile }] = await Promise.all([
+    supabase
+      .from("profile")
+      .select("id, roles_profiles(roles(name))")
+      .eq("auth_user_id", user.id)
+      .single(),
+    supabase
+      .from("users")
+      .select("heltes_id")
+      .eq("auth_user_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  const roleProfileRows = (roleRows?.roles_profiles ?? []) as RoleNameRow[];
+  const roles = roleProfileRows
+    .map((row) => row.roles?.name)
+    .filter((name): name is string => Boolean(name));
+
+  if (roles.includes("super_admin")) {
+    const data = await getOrderProcesses();
+    const processes = Array.isArray(data) ? data : data?.data ?? [];
+    return processes.map((process: { id: number | string; name: string }) => ({
+      id: String(process.id),
+      name: process.name,
+    }));
+  }
+
+  if (!userProfile?.heltes_id) return [];
+
+  const { data, error } = await supabase
+    .from("order_process_allowed_heltes")
+    .select(
+      `
+      order_processes!inner (
+        id,
+        name,
+        is_deleted
+      )
+    `,
+    )
+    .eq("heltes_bteg_id", userProfile.heltes_id)
+    .eq("order_processes.is_deleted", false);
+
+  if (error) {
+    console.error("Error fetching available order processes:", error);
+    return [];
+  }
+
+  return ((data ?? []) as NestedOrderProcessRow[])
+    .map((row) =>
+      Array.isArray(row.order_processes)
+        ? row.order_processes[0]
+        : row.order_processes
+    )
+    .filter((process): process is { id: number; name: string } =>
+      Boolean(process)
+    )
+    .map((process) => ({
+      id: String(process.id),
+      name: process.name,
+    }));
+}
+
+export async function getPurchaseAllowedProcessIdsForCurrentUser(): Promise<{
+  isSuperAdmin: boolean;
+  processIds: number[];
+}> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { isSuperAdmin: false, processIds: [] };
+
+  const { data: profile } = await supabase
+    .from("profile")
+    .select("id, roles_profiles(role_id, roles(name))")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  const roleRows = (profile?.roles_profiles ?? []) as RoleAccessRow[];
+  const roleNames = roleRows.map((row) => row.roles?.name).filter(Boolean);
+
+  if (roleNames.includes("super_admin")) {
+    return { isSuperAdmin: true, processIds: [] };
+  }
+
+  const roleIds = roleRows
+    .map((row) => Number(row.role_id))
+    .filter((id) => Number.isFinite(id));
+
+  if (roleIds.length === 0) return { isSuperAdmin: false, processIds: [] };
+
+  const { data, error } = await supabase
+    .from("order_process_purchase_roles")
+    .select("order_process_id")
+    .in("role_id", roleIds);
+
+  if (error) {
+    console.error("Error fetching purchase process access:", error);
+    return { isSuperAdmin: false, processIds: [] };
+  }
+
+  return {
+    isSuperAdmin: false,
+    processIds: Array.from(
+      new Set((data ?? []).map((row) => Number(row.order_process_id))),
+    ),
+  };
+}
+
 export async function deleteOrderProcess(
   id: number,
 ): Promise<OrderProcessResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   try {
     const { error } = await supabase
@@ -325,7 +552,7 @@ export async function updateOrderManagementStatus({
   currentOrderStatus?: string | null;
   currentManagementStatus?: string | null;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const profileId = await getProfileIdFromAuthUserId();
 
@@ -368,7 +595,8 @@ export async function updateFulfillmentStatus({
   oldStatus: string;
   reason?: string;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
+  await assertCanAccessFulfillmentPurchase(fulfillmentId);
   const profileId = await getProfileIdFromAuthUserId();
 
   const { error: updateError } = await supabase
@@ -394,7 +622,8 @@ export async function updateFulfillmentStatus({
 }
 
 export async function getOrderItemsForOrderProcess(orderId: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
+  await assertCanAccessOrderPurchase(Number(orderId));
 
   const { data, error } = await supabase
     .from("order_items")
@@ -427,4 +656,65 @@ export async function getOrderItemsForOrderProcess(orderId: string) {
   }
 
   return data || [];
+}
+
+export async function assertCanAccessOrderPurchase(orderId: number) {
+  const supabase = await createClient();
+  const { isSuperAdmin, processIds } =
+    await getPurchaseAllowedProcessIdsForCurrentUser();
+
+  if (isSuperAdmin) return;
+  if (processIds.length === 0) {
+    throw new Error("Энэ захиалгын биелэлтийг харах эрхгүй байна");
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("order_process_id")
+    .eq("id", orderId)
+    .single();
+
+  if (error || !data?.order_process_id) {
+    throw new Error("Захиалга олдсонгүй");
+  }
+
+  if (!processIds.includes(Number(data.order_process_id))) {
+    throw new Error("Энэ захиалгын биелэлтийг харах эрхгүй байна");
+  }
+}
+
+export async function assertCanAccessOrderItemPurchase(orderItemId: number) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("order_id")
+    .eq("id", orderItemId)
+    .single();
+
+  if (error || !data?.order_id) {
+    throw new Error("Захиалгын мөр олдсонгүй");
+  }
+
+  await assertCanAccessOrderPurchase(Number(data.order_id));
+}
+
+async function assertCanAccessFulfillmentPurchase(fulfillmentId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("order_fulfillment")
+    .select("order_items(order_id)")
+    .eq("id", fulfillmentId)
+    .single();
+
+  const orderItems = Array.isArray(data?.order_items)
+    ? data?.order_items[0]
+    : data?.order_items;
+
+  if (error || !orderItems?.order_id) {
+    throw new Error("Биелэлт олдсонгүй");
+  }
+
+  await assertCanAccessOrderPurchase(Number(orderItems.order_id));
 }

@@ -1,4 +1,4 @@
-import { hasPermission, hasRole } from "@/actions/rbac";
+import { hasPermission } from "@/actions/rbac";
 import { JobDescriptionDetail } from "@/components/job-description/job-description-detail";
 import { createClient } from "@/utils/supabase/client";
 

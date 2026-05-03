@@ -151,6 +151,7 @@ RLS policy тойм:
 Холбогдох function/view:
 
 - `users_with_stats` view нь `get_users_with_stats()` RPC-г view болгон харуулдаг.
+- `get_users_with_stats()` нь kiosk sync-д нэг ажилтанд нэг shift мөр буцаана. `15:00` хүртэл өнөөдөр дуусаж буй өмнөх өдрийн шөнийн ээлжийг өнөөдрийн `day_date` ээлжээс давуу сонгож, өглөө/сунасан хоолны бүртгэлийг зөв ажиллуулна.
 - `get_meal_breakdown_by_org(...)`, `get_meal_expected_vs_actual(...)`, `get_meal_employee_details(...)`
 - `refresh_daily_meal_summary()`
 - `snapshot_food_report_day(...)`, `snapshot_due_food_reports()`, `get_food_monthly_report(...)`
