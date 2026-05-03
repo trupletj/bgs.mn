@@ -46,7 +46,6 @@ interface Order {
   id: string;
   title: string;
   status: string;
-  management_status?: string;
   created_at: string;
   profile?: { name?: string; department_name?: string } | null;
 }
@@ -54,6 +53,14 @@ interface Order {
 interface StatusCount {
   status: string;
   total: number;
+}
+
+type OrderRow = Omit<Order, "profile"> & {
+  profile?: Order["profile"] | Order["profile"][];
+};
+
+interface OrderSummaryRow {
+  status?: string | null;
 }
 
 const PAGE_SIZE = 15;
@@ -69,26 +76,12 @@ const ORDER_STATUS: Record<string, { label: string; className: string }> = {
   rejected:          { label: "Татгалзсан",         className: "bg-red-50 text-red-700 border-red-200" },
 };
 
-const MGMT_STATUS: Record<string, { label: string; className: string }> = {
-  pending:    { label: "Хүлээгдэж байна",   className: "bg-slate-100 text-slate-600 border-slate-200" },
-  processing: { label: "Боловсруулж байна", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  completed:  { label: "Дууссан",           className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  cancelled:  { label: "Цуцлагдсан",        className: "bg-red-50 text-red-700 border-red-200" },
-  on_hold:    { label: "Түр зогссон",       className: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-};
-
 const ORDER_STATUS_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(ORDER_STATUS).map(([k, v]) => [k, v.label])
 );
-const MGMT_STATUS_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(MGMT_STATUS).map(([k, v]) => [k, v.label])
-);
 
-function StatusBadge({ status, type }: { status: string; type: "order" | "mgmt" }) {
-  const cfg =
-    type === "order"
-      ? ORDER_STATUS[status]
-      : MGMT_STATUS[status];
+function StatusBadge({ status }: { status: string }) {
+  const cfg = ORDER_STATUS[status];
   const className = cfg?.className ?? "bg-gray-100 text-gray-600 border-gray-200";
   const label = cfg?.label ?? status;
   return (
@@ -110,7 +103,6 @@ export default function AllOrderList() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderStatusCounts, setOrderStatusCounts] = useState<StatusCount[]>([]);
-  const [mgmtStatusCounts, setMgmtStatusCounts] = useState<StatusCount[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 400);
   const [page, setPage] = useState(1);
@@ -127,17 +119,13 @@ export default function AllOrderList() {
       let query = supabase
         .from("orders")
         .select(
-          "id, title, status, management_status, created_at, profile:created_profile(name, department_name)",
+          "id, title, status, created_at, profile:created_profile(name, department_name)",
           { count: "exact" }
         )
         .ilike("title", `%${debouncedSearch}%`);
 
       if (selectedStatus !== "all") {
-        if (MGMT_STATUS_LABELS[selectedStatus]) {
-          query = query.eq("management_status", selectedStatus);
-        } else {
-          query = query.eq("status", selectedStatus);
-        }
+        query = query.eq("status", selectedStatus);
       }
 
       const { data, count, error } = await query
@@ -147,7 +135,7 @@ export default function AllOrderList() {
       if (error) throw error;
 
       setOrders(
-        (data || []).map((row: any) => ({
+        ((data || []) as OrderRow[]).map((row) => ({
           ...row,
           profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
         }))
@@ -158,27 +146,23 @@ export default function AllOrderList() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, selectedStatus]);
+  }, [page, debouncedSearch, selectedStatus, supabase]);
 
   // ── Fetch summaries ──────────────────────────────────────────────────────────
   const fetchSummaries = useCallback(async () => {
-    const { data } = await supabase.from("orders").select("status, management_status");
+    const { data } = await supabase.from("orders").select("status");
     if (!data) return;
 
     const orderMap: Record<string, number> = {};
-    const mgmtMap: Record<string, number> = {};
 
-    data.forEach((row: any) => {
-      if (row.management_status) {
-        mgmtMap[row.management_status] = (mgmtMap[row.management_status] || 0) + 1;
-      } else if (row.status) {
+    (data as OrderSummaryRow[]).forEach((row) => {
+      if (row.status) {
         orderMap[row.status] = (orderMap[row.status] || 0) + 1;
       }
     });
 
     setOrderStatusCounts(Object.entries(orderMap).map(([status, total]) => ({ status, total })));
-    setMgmtStatusCounts(Object.entries(mgmtMap).map(([status, total]) => ({ status, total })));
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
   useEffect(() => { fetchSummaries(); }, [fetchSummaries]);
@@ -186,14 +170,12 @@ export default function AllOrderList() {
   // Reset page when filter/search changes
   useEffect(() => { setPage(1); }, [debouncedSearch, selectedStatus]);
 
-  const totalAll =
-    orderStatusCounts.reduce((s, c) => s + c.total, 0) +
-    mgmtStatusCounts.reduce((s, c) => s + c.total, 0);
+  const totalAll = orderStatusCounts.reduce((s, c) => s + c.total, 0);
 
   const activeFilterLabel =
     selectedStatus === "all"
       ? null
-      : ORDER_STATUS_LABELS[selectedStatus] || MGMT_STATUS_LABELS[selectedStatus] || selectedStatus;
+      : ORDER_STATUS_LABELS[selectedStatus] || selectedStatus;
 
   const getDetailHref = (order: Order) =>
     order.status === "approved" || order.status === "changes_requested"
@@ -269,23 +251,6 @@ export default function AllOrderList() {
                   ))}
                 </>
               )}
-              {mgmtStatusCounts.length > 0 && (
-                <>
-                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-                    Худалдан авалтын статус
-                  </div>
-                  {mgmtStatusCounts.map((s) => (
-                    <SelectItem key={`m-${s.status}`} value={s.status}>
-                      <span className="flex items-center gap-2">
-                        {MGMT_STATUS_LABELS[s.status] ?? s.status}
-                        <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
-                          {s.total}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </>
-              )}
             </SelectContent>
           </Select>
         </div>
@@ -309,17 +274,6 @@ export default function AllOrderList() {
                 active={selectedStatus === s.status}
                 onClick={() => setSelectedStatus(s.status)}
                 colorClass={cn("border", ORDER_STATUS[s.status]?.className ?? "bg-gray-100 text-gray-600 border-gray-200")}
-                activeClass="ring-2 ring-current"
-              />
-            ))}
-            {mgmtStatusCounts.map((s) => (
-              <FilterPill
-                key={`m-${s.status}`}
-                label={MGMT_STATUS_LABELS[s.status] ?? s.status}
-                count={s.total}
-                active={selectedStatus === s.status}
-                onClick={() => setSelectedStatus(s.status)}
-                colorClass={cn("border", MGMT_STATUS[s.status]?.className ?? "bg-gray-100 text-gray-600 border-gray-200")}
                 activeClass="ring-2 ring-current"
               />
             ))}
@@ -353,7 +307,6 @@ export default function AllOrderList() {
               <TableHead className="pl-5 font-semibold">Захиалга</TableHead>
               <TableHead className="font-semibold">Үүсгэгч</TableHead>
               <TableHead className="font-semibold">Баталгаажуулалт</TableHead>
-              <TableHead className="font-semibold">Худалдан авалтын статус</TableHead>
               <TableHead className="font-semibold">Огноо</TableHead>
               <TableHead className="pr-5 text-right font-semibold">Үйлдэл</TableHead>
             </TableRow>
@@ -365,14 +318,13 @@ export default function AllOrderList() {
                   <TableCell className="pl-5"><Skeleton className="h-4 w-48" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell className="pr-5"><Skeleton className="ml-auto h-7 w-14" /></TableCell>
                 </TableRow>
               ))
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={5}>
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
                       <Inbox className="h-5 w-5 text-muted-foreground/40" />
@@ -419,14 +371,7 @@ export default function AllOrderList() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={order.status} type="order" />
-                  </TableCell>
-                  <TableCell>
-                    {order.management_status ? (
-                      <StatusBadge status={order.management_status} type="mgmt" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
+                    <StatusBadge status={order.status} />
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(order.created_at)}
@@ -480,10 +425,7 @@ export default function AllOrderList() {
                   {order.title}
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <StatusBadge status={order.status} type="order" />
-                  {order.management_status && (
-                    <StatusBadge status={order.management_status} type="mgmt" />
-                  )}
+                  <StatusBadge status={order.status} />
                   <span className="text-[11px] text-muted-foreground">
                     {formatDate(order.created_at)}
                   </span>

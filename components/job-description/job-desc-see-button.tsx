@@ -8,7 +8,7 @@ const SeePolicyButton = ({
 }) => {
   return (
     <Link
-      href={`/dashboard/job-descriptions/${job_description_id}`}
+      href={`/job-descriptions/${job_description_id}`}
       className="cursor-pointer"
       title="Албан тушаалын тодорхойлолт унших">
       <Eye className=" hover:scale-110 h-6" />

@@ -492,8 +492,8 @@ export function MonthlyFoodReport({
           <div className="flex flex-col gap-2">
             <CardTitle>Сарын нэгтгэл</CardTitle>
             <CardDescription>
-              {companyRows.length} компани, {filteredSummary.length} дэлгэрэнгүй
-              мөр, {filteredDaily.length} өдөр тутмын мөр
+              {companyRows.length} байгууллага, {filteredSummary.length}{" "}
+              дэлгэрэнгүй мөр, {filteredDaily.length} өдөр тутмын мөр
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
