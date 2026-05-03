@@ -3,10 +3,14 @@
 import { cache } from "react";
 import { createClient } from "@/utils/supabase/server";
 import type {
+  JobPositionPerfItem,
+  JobPositionPerfSummary,
   PolicyClauseStat,
   PolicyDashboardItem,
   PolicyDashboardSummary,
   PolicyJobPositionStat,
+  PositionClauseStat,
+  PositionPolicyGroup,
 } from "@/lib/policy-utils";
 
 const fetchDashboard = cache(async () => {
@@ -36,7 +40,8 @@ const fetchDashboard = cache(async () => {
             id,
             name,
             heltes:heltes!heltes_id (name, sub_title),
-            alba:alba!alba_id (name, sub_title)
+            alba:alba!alba_id (name, sub_title),
+            organization:organization!organization_id (name, sub_title)
           ),
           ratings:rating!clause_job_position_id (
             score,
@@ -67,6 +72,27 @@ const fetchDashboard = cache(async () => {
     }
   >();
 
+  const policyMeta = new Map<
+    string,
+    { name: string; reference_code: string | null }
+  >();
+
+  const positionMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      organizationName: string;
+      heltesName: string;
+      albaName: string;
+      totalScore: number;
+      validCount: number;
+      linkedCount: number;
+      hasRatings: boolean;
+      policies: Map<string, Map<string | number, PositionClauseStat>>;
+    }
+  >();
+
   (policies ?? []).forEach((p) => {
     policyMap.set(p.id, {
       id: p.id,
@@ -79,6 +105,10 @@ const fetchDashboard = cache(async () => {
       departments: new Set<string>(),
       clauses: new Map(),
       hasRatings: false,
+    });
+    policyMeta.set(p.id, {
+      name: p.name || "Нэргүй",
+      reference_code: p.reference_code,
     });
   });
 
@@ -103,6 +133,7 @@ const fetchDashboard = cache(async () => {
           name: string | null;
           heltes?: { name?: string | null; sub_title?: string | null } | null;
           alba?: { name?: string | null; sub_title?: string | null } | null;
+          organization?: { name?: string | null; sub_title?: string | null } | null;
         }
       | null;
 
@@ -110,6 +141,10 @@ const fetchDashboard = cache(async () => {
       jobPosition?.heltes?.name || jobPosition?.heltes?.sub_title || "";
     const aName =
       jobPosition?.alba?.name || jobPosition?.alba?.sub_title || "";
+    const oName =
+      jobPosition?.organization?.name ||
+      jobPosition?.organization?.sub_title ||
+      "";
     if (hName) stats.departments.add(hName);
     if (aName) stats.departments.add(aName);
 
@@ -155,6 +190,50 @@ const fetchDashboard = cache(async () => {
     };
 
     clauseStats.jobPositions.push(jobPositionStat);
+
+    // Position-аар pivot
+    const positionId = jobPosition?.id != null ? String(jobPosition.id) : "";
+    if (!positionId) return;
+
+    if (!positionMap.has(positionId)) {
+      positionMap.set(positionId, {
+        id: positionId,
+        name: jobPosition?.name || "Нэргүй",
+        organizationName: oName,
+        heltesName: hName,
+        albaName: aName,
+        totalScore: 0,
+        validCount: 0,
+        linkedCount: 0,
+        hasRatings: false,
+        policies: new Map(),
+      });
+    }
+
+    const posStats = positionMap.get(positionId)!;
+    posStats.linkedCount++;
+
+    if (latestRating && latestRating.score !== 6) {
+      posStats.totalScore += latestRating.score;
+      posStats.validCount++;
+      posStats.hasRatings = true;
+    }
+
+    if (!posStats.policies.has(policyId)) {
+      posStats.policies.set(policyId, new Map());
+    }
+    const posPolicyClauses = posStats.policies.get(policyId)!;
+    if (!posPolicyClauses.has(clause.id)) {
+      posPolicyClauses.set(clause.id, {
+        id: clause.id,
+        text: clause.text,
+        reference_number: clause.reference_number,
+        type: (cjp.type as string | null) ?? null,
+        rating: latestRating
+          ? { score: latestRating.score, description: latestRating.description }
+          : null,
+      });
+    }
   });
 
   const processedPolicies: PolicyDashboardItem[] = Array.from(
@@ -190,7 +269,65 @@ const fetchDashboard = cache(async () => {
         : 0,
   };
 
-  return { policies: processedPolicies, summary };
+  const processedPositions: JobPositionPerfItem[] = Array.from(
+    positionMap.values(),
+  ).map((p) => {
+    const policies: PositionPolicyGroup[] = Array.from(p.policies.entries())
+      .map(([policyId, clauseMap]) => {
+        const meta = policyMeta.get(policyId);
+        return {
+          id: policyId,
+          name: meta?.name ?? "Нэргүй",
+          reference_code: meta?.reference_code ?? null,
+          clauses: Array.from(clauseMap.values()),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, "mn"));
+
+    const unitLabel =
+      [p.heltesName, p.albaName].filter(Boolean).join(" · ") ||
+      p.organizationName ||
+      "—";
+
+    return {
+      id: p.id,
+      name: p.name,
+      organizationName: p.organizationName,
+      heltesName: p.heltesName,
+      albaName: p.albaName,
+      unitLabel,
+      totalScore: p.totalScore,
+      validCount: p.validCount,
+      linkedCount: p.linkedCount,
+      hasRatings: p.hasRatings,
+      implementationPercent:
+        p.validCount > 0
+          ? Math.round((p.totalScore / (p.validCount * 5)) * 100)
+          : 0,
+      policies,
+    };
+  });
+
+  const ratedPositions = processedPositions.filter((p) => p.validCount > 0);
+  const positionSummary: JobPositionPerfSummary = {
+    total: processedPositions.length,
+    ratedCount: ratedPositions.length,
+    unratedCount: processedPositions.length - ratedPositions.length,
+    avgPercent:
+      ratedPositions.length > 0
+        ? Math.round(
+            ratedPositions.reduce((s, p) => s + p.implementationPercent, 0) /
+              ratedPositions.length,
+          )
+        : 0,
+  };
+
+  return {
+    policies: processedPolicies,
+    summary,
+    positions: processedPositions,
+    positionSummary,
+  };
 });
 
 export async function getPolicyDashboardData() {
