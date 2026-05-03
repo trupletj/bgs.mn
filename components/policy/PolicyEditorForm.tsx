@@ -9,7 +9,8 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Button } from "@/components/ui/button";
 import ClauseItemEdit from "./ClauseItemEdit";
 import { Clause, Section } from "@/types/clause";
-import { ActionType } from "@/types/types";
+import { ActionType, PolicyScopeTarget } from "@/types/types";
+import { PolicyScopeSelector } from "./policy-scope-selector";
 
 interface PolicyFormData {
   name: string;
@@ -23,6 +24,7 @@ interface PolicyFormProps {
     name: string;
     referenceCode: string;
     approvedDate: Date | null;
+    scopeTargets?: PolicyScopeTarget[];
     sections: Array<{
       id: string;
       policyId?: string;
@@ -54,6 +56,9 @@ export default function PolicyEditerForm({
     referenceCode: initialData?.referenceCode || "",
     approvedDate: initialData?.approvedDate || null,
   });
+  const [scopeTargets, setScopeTargets] = useState<PolicyScopeTarget[]>(
+    initialData?.scopeTargets ?? [],
+  );
   const [sections, setSections] = useState<Section[]>(
     initialData?.sections.map((s) => ({
       ...s,
@@ -382,6 +387,7 @@ export default function PolicyEditerForm({
         name: policyData.name,
         reference_code: policyData.referenceCode,
         approved_date: policyData.approvedDate,
+        scope_targets: scopeTargets,
       };
 
       const policyResponse = await fetch(url, {
@@ -619,6 +625,12 @@ export default function PolicyEditerForm({
             />
           </div>
         </div>
+
+        <PolicyScopeSelector
+          value={scopeTargets}
+          onChange={setScopeTargets}
+          disabled={isProcessing}
+        />
 
         <div className="mt-6">
           <div className="flex items-center justify-between">

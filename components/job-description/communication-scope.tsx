@@ -46,7 +46,7 @@ export function CommunicationScopeSelector({
   const handleChange = (
     section: keyof CommunicationScope,
     field: string,
-    checked: boolean
+    checked: boolean,
   ) => {
     const newScope = {
       ...scope,
@@ -74,7 +74,9 @@ export function CommunicationScopeSelector({
               <div className="p-2 rounded-lg bg-primary/10">
                 <Building2 className="h-4 w-4 text-primary" />
               </div>
-              <Label className="font-semibold text-base">Компани дотор</Label>
+              <Label className="font-semibold text-base">
+                Байгууллага дотор
+              </Label>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -86,7 +88,7 @@ export function CommunicationScopeSelector({
                   handleChange(
                     "company_internal",
                     "department_heads",
-                    checked as boolean
+                    checked as boolean,
                   )
                 }
                 className="mt-0.5"
@@ -105,7 +107,7 @@ export function CommunicationScopeSelector({
                   handleChange(
                     "company_internal",
                     "employees",
-                    checked as boolean
+                    checked as boolean,
                   )
                 }
                 className="mt-0.5"

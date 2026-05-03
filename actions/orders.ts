@@ -3,8 +3,37 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
 import { getProfileIdFromAuthUserId } from "./profile";
+import { getOrderProcessesForCurrentUser } from "./order-process";
 import { createClient } from "@/utils/supabase/server";
 import { createClient as client } from "@/utils/supabase/client";
+
+interface DetailReviewer {
+  status?: string | null;
+  reviewer_profile_id?: number | null;
+  order_step_id?: number | null;
+  order_steps?:
+    | {
+        step_order?: number | null;
+        step_name?: string | null;
+      }
+    | Array<{
+        step_order?: number | null;
+        step_name?: string | null;
+      }>
+    | null;
+  sub_order_items?: DetailSubOrderItem[];
+}
+
+interface DetailSubOrderItem {
+  reviewer_profile_id?: number | null;
+  order_step_id?: number | null;
+}
+
+function getReviewerStep(reviewer: DetailReviewer) {
+  return Array.isArray(reviewer.order_steps)
+    ? reviewer.order_steps[0]
+    : reviewer.order_steps;
+}
 
 export async function getOrderWithDetail(orderId: string) {
   const supabase = client();
@@ -83,9 +112,9 @@ export async function getOrderWithDetail(orderId: string) {
   }
 
   const latestInstance = instances?.[0];
-  let reviewers =
+  let reviewers: DetailReviewer[] =
     latestInstance?.order_step_reviewers?.filter(
-      (r: any) => r.status !== "skipped",
+      (r: DetailReviewer) => r.status !== "skipped",
     ) || [];
 
   // 4. Sub_order_item-үүдийг тусдаа авч, reviewer-т тааруулах
@@ -109,15 +138,15 @@ export async function getOrderWithDetail(orderId: string) {
       console.error("Sub items error:", subError);
     } else if (subItems) {
       // Reviewer бүрт харьяалах sub_order_item-үүдийг нэмэх
-      reviewers = reviewers.map((reviewer: any) => ({
+      reviewers = reviewers.map((reviewer) => ({
         ...reviewer,
         sub_order_items: subItems.filter(
-          (sub: any) =>
+          (sub: DetailSubOrderItem) =>
             sub.reviewer_profile_id === reviewer.reviewer_profile_id &&
             sub.order_step_id === reviewer.order_step_id,
         ),
-        step_order: reviewer.order_steps?.step_order,
-        step_name: reviewer.order_steps?.step_name,
+        step_order: getReviewerStep(reviewer)?.step_order,
+        step_name: getReviewerStep(reviewer)?.step_name,
       }));
     }
   }
@@ -326,6 +355,12 @@ export async function createOrderWithInstace(
   }
   const auth_user_id = user?.id;
   const profile_id = await getProfileIdFromAuthUserId();
+  const allowedProcesses = await getOrderProcessesForCurrentUser();
+  const requestedProcessId = String(orderData.order_process_id);
+
+  if (!allowedProcesses.some((process) => process.id === requestedProcessId)) {
+    throw new Error("Энэ захиалгын төрлөөр захиалга үүсгэх эрхгүй байна.");
+  }
 
   const { data, error } = await supabase
     .from("orders")

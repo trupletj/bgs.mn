@@ -4,6 +4,7 @@
 import { createClient } from "@/utils/supabase/client";
 import { revalidatePath } from "next/cache";
 import { getProfileIdFromAuthUserId } from "./profile";
+import { assertCanAccessOrderItemPurchase } from "./order-process";
 
 export async function createFulfillment(formData: {
   orderItemId: number;
@@ -13,6 +14,7 @@ export async function createFulfillment(formData: {
   status: string;
 }) {
   const supabase = createClient();
+  await assertCanAccessOrderItemPurchase(formData.orderItemId);
 
   const profileId = await getProfileIdFromAuthUserId();
 
@@ -35,7 +37,7 @@ export async function createFulfillment(formData: {
     .insert({
       fulfillment_id: fulfillment.id,
       old_status: null,
-      new_status: "ordered",
+      new_status: formData.status,
       reason: "Анхны захиалга үүсгэв",
       changed_by: profileId,
     });
