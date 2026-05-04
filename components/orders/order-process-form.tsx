@@ -157,15 +157,22 @@ export default function OrderProcessForm({
   // Initial data-г form-д оруулах
   useEffect(() => {
     if (initialData) {
+      const allowedHeltesIds = (initialData.allowed_heltes_ids ?? []).map(String);
+      const purchaseRoleIds = (initialData.purchase_role_ids ?? []).map(Number);
+
       reset({
         name: initialData.name,
-        allowed_heltes_ids: initialData.allowed_heltes_ids ?? [],
-        purchase_role_ids: initialData.purchase_role_ids ?? [],
-        steps: initialData.steps,
+        allowed_heltes_ids: allowedHeltesIds,
+        purchase_role_ids: purchaseRoleIds,
+        steps: initialData.steps.map((step) => ({
+          ...step,
+          role_ids: step.role_ids.map(Number),
+          required_approval_count: step.required_approval_count || 1,
+        })),
       });
 
       const firstSelectedHeltes = heltes.find((item) =>
-        initialData.allowed_heltes_ids?.includes(item.bteg_id),
+        allowedHeltesIds.includes(String(item.bteg_id)),
       );
       setSelectedCompanyId(firstSelectedHeltes?.organization_id ?? "");
     }
@@ -227,10 +234,10 @@ export default function OrderProcessForm({
 
   const selectedHeltesIds = watch("allowed_heltes_ids") || [];
   const selectedHeltes = heltes.filter((item) =>
-    selectedHeltesIds.includes(item.bteg_id),
+    selectedHeltesIds.includes(String(item.bteg_id)),
   );
   const companyHeltes = selectedCompanyId
-    ? heltes.filter((item) => item.organization_id === selectedCompanyId)
+    ? heltes.filter((item) => String(item.organization_id) === selectedCompanyId)
     : [];
   const selectedPurchaseRoleIds = watch("purchase_role_ids") || [];
   const selectedPurchaseRoles = roles.filter((role) =>
@@ -240,7 +247,7 @@ export default function OrderProcessForm({
   const removeHeltes = (heltesId: string) => {
     setValue(
       "allowed_heltes_ids",
-      selectedHeltesIds.filter((id) => id !== heltesId),
+      selectedHeltesIds.filter((id) => id !== String(heltesId)),
     );
   };
 
@@ -252,7 +259,7 @@ export default function OrderProcessForm({
   };
 
   const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
+    setSelectedCompanyId(String(companyId));
     setValue("allowed_heltes_ids", [], { shouldValidate: true });
     setHeltesOpen(false);
   };
@@ -316,7 +323,7 @@ export default function OrderProcessForm({
                     <ScrollArea className="h-64">
                       {companyHeltes.map((item) => {
                         const isSelected = selectedHeltesIds.includes(
-                          item.bteg_id,
+                          String(item.bteg_id),
                         );
                         return (
                           <CommandItem
@@ -324,9 +331,9 @@ export default function OrderProcessForm({
                             onSelect={() => {
                               const next = isSelected
                                 ? selectedHeltesIds.filter(
-                                    (id) => id !== item.bteg_id,
+                                    (id) => id !== String(item.bteg_id),
                                   )
-                                : [...selectedHeltesIds, item.bteg_id];
+                                : [...selectedHeltesIds, String(item.bteg_id)];
                               setValue("allowed_heltes_ids", next, {
                                 shouldValidate: true,
                               });
