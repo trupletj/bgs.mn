@@ -35,6 +35,13 @@ export type SavePolicyDocumentInput = {
 
 type ExistingIdRow = { id: string };
 
+type ExistingClausePositionRow = {
+  id: string;
+  clause_id: string | null;
+  job_position_id: string | null;
+  type: string | null;
+};
+
 type FlatClause = {
   localKey: string;
   id?: string;
@@ -110,6 +117,10 @@ function requireMappedId(
   const id = map.get(key);
   if (!id) throw new Error(`${label} ID олдсонгүй`);
   return id;
+}
+
+function clausePositionKey(clauseId: string, positionId: string) {
+  return `${clauseId}:${positionId}`;
 }
 
 export async function savePolicyDocument(
@@ -353,17 +364,7 @@ export async function savePolicyDocument(
     }
   }
 
-  const savedClauseIds = Array.from(clauseIdByKey.values());
-  if (savedClauseIds.length > 0) {
-    const { error: deletePositionError } = await supabase
-      .from("clause_job_position")
-      .delete()
-      .in("clause_id", savedClauseIds);
-
-    if (deletePositionError) throw deletePositionError;
-  }
-
-  const clausePositions = flatClauses.flatMap((clause) => {
+  const incomingClausePositions = flatClauses.flatMap((clause) => {
     const clauseId = clauseIdByKey.get(clause.localKey);
     if (!clauseId) return [];
 
@@ -376,12 +377,143 @@ export async function savePolicyDocument(
       .filter((position) => position.position_id && position.type);
   });
 
-  if (clausePositions.length > 0) {
-    const { error: positionInsertError } = await supabase
-      .from("clause_job_position")
-      .insert(clausePositions);
+  const uniqueIncomingPositions = Array.from(
+    new Map(
+      incomingClausePositions.map((position) => [
+        clausePositionKey(position.clause_id, position.position_id as string),
+        position,
+      ]),
+    ).values(),
+  );
 
-    if (positionInsertError) throw positionInsertError;
+  const savedClauseIds = Array.from(clauseIdByKey.values());
+  if (savedClauseIds.length > 0) {
+    const { data: existingPositions, error: existingPositionError } =
+      await supabase
+        .from("clause_job_position")
+        .select("id, clause_id, job_position_id, type")
+        .in("clause_id", savedClauseIds);
+
+    if (existingPositionError) throw existingPositionError;
+
+    const existingByKey = new Map(
+      ((existingPositions ?? []) as ExistingClausePositionRow[])
+        .filter((position) => position.clause_id && position.job_position_id)
+        .map((position) => [
+          clausePositionKey(
+            position.clause_id as string,
+            position.job_position_id as string,
+          ),
+          position,
+        ]),
+    );
+
+    const incomingKeys = new Set(
+      uniqueIncomingPositions.map((position) =>
+        clausePositionKey(position.clause_id, position.position_id as string),
+      ),
+    );
+
+    const positionUpdates = uniqueIncomingPositions
+      .map((position) => {
+        const existing = existingByKey.get(
+          clausePositionKey(position.clause_id, position.position_id as string),
+        );
+        if (!existing) return null;
+
+        return {
+          id: existing.id,
+          clause_id: position.clause_id,
+          job_position_id: position.position_id,
+          type: position.type,
+          is_checked: true,
+        };
+      })
+      .filter((position): position is NonNullable<typeof position> =>
+        Boolean(position),
+      );
+
+    if (positionUpdates.length > 0) {
+      const { error: positionUpdateError } = await supabase
+        .from("clause_job_position")
+        .upsert(positionUpdates, { onConflict: "id" });
+
+      if (positionUpdateError) throw positionUpdateError;
+    }
+
+    const newPositions = uniqueIncomingPositions
+      .filter(
+        (position) =>
+          !existingByKey.has(
+            clausePositionKey(
+              position.clause_id,
+              position.position_id as string,
+            ),
+          ),
+      )
+      .map((position) => ({
+        clause_id: position.clause_id,
+        job_position_id: position.position_id,
+        type: position.type,
+        is_checked: true,
+      }));
+
+    if (newPositions.length > 0) {
+      const { error: positionInsertError } = await supabase
+        .from("clause_job_position")
+        .insert(newPositions);
+
+      if (positionInsertError) throw positionInsertError;
+    }
+
+    const removedPositions = (
+      (existingPositions ?? []) as ExistingClausePositionRow[]
+    ).filter(
+        (position) =>
+          position.clause_id &&
+          position.job_position_id &&
+          !incomingKeys.has(
+            clausePositionKey(position.clause_id, position.job_position_id),
+          ),
+      );
+    const removedPositionIds = removedPositions.map((position) => position.id);
+
+    if (removedPositionIds.length > 0) {
+      const { data: ratedPositions, error: ratedPositionError } = await supabase
+        .from("rating")
+        .select("clause_job_position_id")
+        .in("clause_job_position_id", removedPositionIds);
+
+      if (ratedPositionError) throw ratedPositionError;
+
+      const ratedPositionIds = new Set(
+        (ratedPositions ?? []).map((rating) => rating.clause_job_position_id),
+      );
+      const removablePositionIds = removedPositionIds.filter(
+        (id) => !ratedPositionIds.has(id),
+      );
+      const historicalPositionIds = removedPositionIds.filter((id) =>
+        ratedPositionIds.has(id),
+      );
+
+      if (removablePositionIds.length > 0) {
+        const { error: deletePositionError } = await supabase
+          .from("clause_job_position")
+          .delete()
+          .in("id", removablePositionIds);
+
+        if (deletePositionError) throw deletePositionError;
+      }
+
+      if (historicalPositionIds.length > 0) {
+        const { error: unlinkPositionError } = await supabase
+          .from("clause_job_position")
+          .update({ is_checked: false })
+          .in("id", historicalPositionIds);
+
+        if (unlinkPositionError) throw unlinkPositionError;
+      }
+    }
   }
 
   return {

@@ -25,9 +25,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  addOrderItem,
   deleteImagesFromStorage,
-  createOrderWithInstace,
+  createOrderWithItems,
 } from "@/actions/orders";
 import ImageUploader from "../image-uploader";
 import ImageViewer from "../image-viewer";
@@ -193,29 +192,18 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
     setLoading(true);
 
     try {
-      const { data: order, error: orderError } = await createOrderWithInstace({
-        title: formData.title,
-        description: formData.description,
-        order_type: formData.order_type,
-        urgency_level: formData.urgency_level,
-        requested_delivery_date: formData.requested_delivery_date || undefined,
-        notes: formData.notes,
-        status: formData.status,
-        order_process_id: formData.order_process_id,
-      });
-
-      if (orderError || !order) {
-        throw new Error(
-          orderError?.message || "Захиалга үүсгэхэд алдаа гарлаа",
-        );
-      }
-
-      // 2. Сэлбэгүүд нэмэх (зургийн URL-г оруулах)
-      for (const [index, item] of orderItems.entries()) {
-        const imageUrl = uploadedImages[index];
-
-        const { error: itemError } = await addOrderItem({
-          order_id: order.id,
+      const { data: order, error: orderError } = await createOrderWithItems({
+        orderData: {
+          title: formData.title,
+          description: formData.description,
+          order_type: formData.order_type,
+          urgency_level: formData.urgency_level,
+          requested_delivery_date: formData.requested_delivery_date || undefined,
+          notes: formData.notes,
+          status: formData.status,
+          order_process_id: formData.order_process_id,
+        },
+        items: orderItems.map((item, index) => ({
           part_number: item.part_number,
           part_name: item.part_name,
           part_description: item.part_description,
@@ -224,15 +212,17 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
             typeof item.quantity === "string"
               ? parseFloat(item.quantity) || 0
               : item.quantity,
-          unit: item.unit,
+          unit: item.unit || "piece",
           notes: item.notes,
-          image_url: imageUrl || "",
+          image_url: uploadedImages[index] || "",
           spare_type: item.spare_type,
-        });
+        })),
+      });
 
-        if (itemError) {
-          throw new Error(`Сэлбэг нэмэхэд алдаа гарлаа: ${itemError.message}`);
-        }
+      if (orderError || !order) {
+        throw new Error(
+          orderError?.message || "Захиалга үүсгэхэд алдаа гарлаа",
+        );
       }
 
       if (pendingImageDeletions.length > 0) {
@@ -291,7 +281,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
             />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label
                 // htmlFor="urgency"
                 className="text-sm font-medium text-gray-700">
@@ -307,7 +297,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                     | "safety reserves"
                     | "other",
                 ) => handleInputChange("order_type", value)}>
-                <SelectTrigger className="h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <SelectTrigger className="h-10 w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -353,7 +343,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label className="text-sm font-medium text-gray-700">
                 Захиалгын процесс <span className="text-red-500">*</span>
               </Label>
@@ -363,7 +353,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                 onValueChange={(value) =>
                   handleInputChange("order_process_id", value)
                 }>
-                <SelectTrigger className="h-10 border-gray-300">
+                <SelectTrigger className="h-10 w-full border-gray-300">
                   <SelectValue placeholder="Процесс сонгох" />
                 </SelectTrigger>
 
@@ -382,7 +372,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label
                 htmlFor="delivery_date"
                 className="text-sm font-medium text-gray-700 flex items-center space-x-2">
