@@ -581,10 +581,18 @@ export async function getDeviceRequest(id: string) {
     .from("device_requests")
     .select(`
       *,
-      old_device:old_device_id ( id, name, model, serial_number, device_type ),
+      old_device:old_device_id (
+        id, name, model, serial_number, device_type, status, location, specs,
+        device_assignments (
+          id, is_primary, user_id,
+          user:user_id ( id, first_name, last_name, position_name )
+        )
+      ),
       creator:created_by ( name, department_name, position_name ),
       assignee:assigned_to ( name, department_name, position_name ),
-      fulfilled_by:fulfilled_by_request_id ( id, request_type, device_type, status )
+      fulfilled_by:fulfilled_by_request_id ( id, request_type, device_type, status ),
+      children:device_requests!parent_request_id ( id, device_type, status, request_type, specs, transfer_to_org_bteg, transfer_to_heltes_bteg, transfer_to_alba_bteg ),
+      parent:parent_request_id ( id, device_type, status, request_type )
     `)
     .eq("id", id)
     .single();
@@ -726,6 +734,43 @@ export async function getDeviceRequests() {
   return { data: data ?? [], error };
 }
 
+async function cascadeStatusToChildren(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  parentId: string,
+  status: "approved" | "rejected" | "pending",
+  admin_notes: string | null,
+  profileId: string | null,
+) {
+  const { data: children } = await supabase
+    .from("device_requests")
+    .select("id, status")
+    .eq("parent_request_id", parentId);
+
+  if (!children?.length) return;
+
+  for (const c of children) {
+    if (c.status === status) continue;
+    await supabase
+      .from("device_requests")
+      .update({
+        status,
+        admin_notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", c.id);
+    await supabase.from("device_request_status_history").insert({
+      request_id: c.id,
+      from_status: c.status,
+      to_status: status,
+      note: admin_notes
+        ? `[Эх хүсэлтээс автомат] ${admin_notes}`
+        : "[Эх хүсэлтээс автомат]",
+      changed_by: profileId ? Number(profileId) : null,
+    });
+    revalidatePath(`/devices/requests/${c.id}/edit`);
+  }
+}
+
 export async function updateDeviceRequestStatus(
   id: string,
   status: "approved" | "rejected",
@@ -753,6 +798,8 @@ export async function updateDeviceRequestStatus(
     note: admin_notes || null,
     changed_by: profileId ? Number(profileId) : null,
   });
+
+  await cascadeStatusToChildren(supabase, id, status, admin_notes ?? null, profileId);
 
   revalidatePath("/devices/requests");
   revalidatePath(`/devices/requests/${id}/edit`);
@@ -789,6 +836,13 @@ export async function updateDeviceRequest(
       note: input.admin_notes || null,
       changed_by: profileId ? Number(profileId) : null,
     });
+    await cascadeStatusToChildren(
+      supabase,
+      id,
+      input.status,
+      input.admin_notes ?? null,
+      profileId,
+    );
   }
 
   revalidatePath("/devices/requests");
@@ -804,10 +858,14 @@ export async function getDevicesForRequest(filters: {
   const { data } = await supabase
     .from("devices")
     .select(`
-      id, name, model, serial_number, device_type,
+      id, name, model, serial_number, device_type, status, location, specs,
       organization:organization_id ( id, name, bteg_id ),
       heltes!devices_heltes_id_fkey ( id, name, bteg_id ),
-      alba!devices_alba_id_fkey ( id, name, bteg_id )
+      alba!devices_alba_id_fkey ( id, name, bteg_id ),
+      device_assignments (
+        id, is_primary, user_id,
+        user:user_id ( id, first_name, last_name, position_name )
+      )
     `)
     .order("name");
 
@@ -818,8 +876,13 @@ export async function getDevicesForRequest(filters: {
     return true;
   }) as {
     id: string; name: string; model?: string; serial_number?: string; device_type: string;
+    status?: string; location?: string; specs?: Record<string, any>;
     organization?: { id: string; name: string; bteg_id: string } | null;
     heltes?: { id: string; name: string; bteg_id: string } | null;
     alba?: { id: string; name: string; bteg_id: string } | null;
+    device_assignments?: {
+      id: string; is_primary?: boolean; user_id?: string;
+      user?: { id: string; first_name?: string; last_name?: string; position_name?: string } | null;
+    }[];
   }[];
 }
