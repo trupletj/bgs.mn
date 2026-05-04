@@ -15,6 +15,7 @@ import {
   Search,
   Check,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import QRCode from "qrcode";
 import JSZip from "jszip";
@@ -107,8 +108,35 @@ function createEmptyPlan(): MealPlan {
   };
 }
 
-function planActualKey(date: string, diningHallId: number | null, mealType: string) {
+function planActualKey(
+  date: string,
+  diningHallId: number | null,
+  mealType: string,
+) {
   return `${date}|${diningHallId ?? ""}|${mealType}`;
+}
+
+function getActualMealLogWeight(isExtraServing: boolean | null): number {
+  return isExtraServing ? 0.5 : 1;
+}
+
+function formatMealCount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function getPlanSummary(plan: MealPlan) {
+  return MEAL_PLAN_FIELDS.reduce(
+    (summary, field) => {
+      const planned = Number(plan[field.key] || 0);
+      const actual = Number(plan[field.actualKey] || 0);
+
+      return {
+        planned: summary.planned + planned,
+        actual: summary.actual + actual,
+      };
+    },
+    { planned: 0, actual: 0 },
+  );
 }
 
 // QR утга үүсгэх
@@ -180,6 +208,7 @@ export default function OrgDetailPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [zipping, setZipping] = useState(false);
+  const [deletingQrId, setDeletingQrId] = useState<string | null>(null);
   const [diningHalls, setDiningHalls] = useState<DiningHall[]>([]);
 
   const [newCount, setNewCount] = useState(1);
@@ -281,8 +310,9 @@ export default function OrgDetailPage() {
       .order("date", { ascending: false });
     if (plans) {
       const typedPlans = plans as MealPlan[];
-      const subEmployeeIds = qrs.map((q) => q.id);
-      const planDates = Array.from(new Set(typedPlans.map((plan) => plan.date)));
+      const planDates = Array.from(
+        new Set(typedPlans.map((plan) => plan.date)),
+      );
       const hallIds = Array.from(
         new Set(
           typedPlans
@@ -292,22 +322,33 @@ export default function OrgDetailPage() {
       );
 
       const actualCounts: Record<string, number> = {};
-      if (subEmployeeIds.length > 0 && planDates.length > 0 && hallIds.length > 0) {
-        const { data: actualLogs } = await supabase
+      if (planDates.length > 0 && hallIds.length > 0) {
+        const { data: actualLogs, error: actualLogsError } = await supabase
           .from("meal_logs")
-          .select("date, dining_hall_id, meal_type")
-          .in("sub_employee_id", subEmployeeIds)
+          .select(
+            "date, dining_hall_id, meal_type, is_extra_serving, sub_employee_for_food!inner(org_id)",
+          )
+          .eq("sub_employee_for_food.org_id", org_id)
           .in("date", planDates)
           .in("dining_hall_id", hallIds);
 
-        (actualLogs || []).forEach((log) => {
-          const key = planActualKey(
-            log.date,
-            log.dining_hall_id,
-            log.meal_type,
+        if (actualLogsError) {
+          console.error(
+            "Error fetching sub employee actual logs:",
+            actualLogsError,
           );
-          actualCounts[key] = (actualCounts[key] || 0) + 1;
-        });
+        } else {
+          (actualLogs || []).forEach((log) => {
+            const key = planActualKey(
+              log.date,
+              log.dining_hall_id,
+              log.meal_type,
+            );
+            actualCounts[key] =
+              (actualCounts[key] || 0) +
+              getActualMealLogWeight(log.is_extra_serving);
+          });
+        }
       }
 
       setMealPlans(
@@ -315,15 +356,25 @@ export default function OrgDetailPage() {
           ...plan,
           morning_meal_count: Number(plan.morning_meal_count || 0),
           actual_breakfast_count:
-            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "breakfast")] || 0,
+            actualCounts[
+              planActualKey(plan.date, plan.dining_hall_id, "breakfast")
+            ] || 0,
           actual_morning_meal_count:
-            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "morning_meal")] || 0,
+            actualCounts[
+              planActualKey(plan.date, plan.dining_hall_id, "morning_meal")
+            ] || 0,
           actual_lunch_count:
-            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "lunch")] || 0,
+            actualCounts[
+              planActualKey(plan.date, plan.dining_hall_id, "lunch")
+            ] || 0,
           actual_dinner_count:
-            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "dinner")] || 0,
+            actualCounts[
+              planActualKey(plan.date, plan.dining_hall_id, "dinner")
+            ] || 0,
           actual_night_meal_count:
-            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "night_meal")] || 0,
+            actualCounts[
+              planActualKey(plan.date, plan.dining_hall_id, "night_meal")
+            ] || 0,
         })),
       );
     }
@@ -384,7 +435,9 @@ export default function OrgDetailPage() {
       await fetchData();
       setNewPlan(createEmptyPlan());
       setEditingPlanId(null);
-      toast.success(editingPlanId ? "Төлөвлөгөө шинэчлэгдлээ" : "Төлөвлөгөө хадгалагдлаа");
+      toast.success(
+        editingPlanId ? "Төлөвлөгөө шинэчлэгдлээ" : "Төлөвлөгөө хадгалагдлаа",
+      );
     } else {
       toast.error(error.message);
     }
@@ -451,6 +504,32 @@ export default function OrgDetailPage() {
     }
   }
 
+  async function handleSoftDeleteQR(item: QRItem) {
+    const confirmed = window.confirm(
+      `"${item.custom_label}" QR кодыг устгах уу?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingQrId(item.id);
+    const { error } = await supabase
+      .from("sub_employee_for_food")
+      .update({ is_active: false })
+      .eq("id", item.id);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setQrItems((prev) => prev.filter((q) => q.id !== item.id));
+      if (linkingItem?.id === item.id) {
+        setLinkingItem(null);
+        setUserSearch("");
+      }
+      toast.success("QR код устгагдлаа");
+    }
+
+    setDeletingQrId(null);
+  }
+
   async function handleDownloadQR(item: QRItem) {
     const canvas = await generateQRCanvas(item);
     const link = document.createElement("a");
@@ -494,7 +573,7 @@ export default function OrgDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
+    <div className="p-6 mx-auto space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -513,7 +592,9 @@ export default function OrgDetailPage() {
       {/* Хоолны төлөвлөгөө */}
       <div className="bg-white border border-slate-200 rounded-xl p-5">
         <h2 className="font-semibold text-slate-700 mb-4">
-          {editingPlanId ? "Хоолны төлөвлөгөө засах" : "Хоолны төлөвлөгөө нэмэх"}
+          {editingPlanId
+            ? "Хоолны төлөвлөгөө засах"
+            : "Хоолны төлөвлөгөө нэмэх"}
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
           <div>
@@ -595,39 +676,90 @@ export default function OrgDetailPage() {
                   <th className="text-left py-2">Огноо</th>
                   <th className="text-left py-2">Гал тогоо</th>
                   {MEAL_PLAN_FIELDS.map((field) => (
-                    <th key={field.key} className="text-center py-2">
-                      {field.shortLabel}
+                    <th
+                      key={field.key}
+                      className="min-w-28 px-2 py-2 text-center">
+                      <span className="font-semibold text-slate-700">
+                        {field.shortLabel}
+                      </span>
                     </th>
                   ))}
+                  <th className="text-right py-2">Нийт</th>
                   <th className="text-right py-2">Үйлдэл</th>
                 </tr>
               </thead>
               <tbody>
-                {mealPlans.map((plan) => (
-                  <tr key={plan.id || `${plan.date}-${plan.dining_hall_id}`} className="border-b border-slate-50">
-                    <td className="py-2 font-medium">{plan.date}</td>
-                    <td className="py-2">
-                      {diningHalls.find((hall) => hall.id === plan.dining_hall_id)
-                        ?.name || `#${plan.dining_hall_id}`}
-                    </td>
-                    {MEAL_PLAN_FIELDS.map((field) => (
-                      <td key={field.key} className="text-center py-2">
-                        {Number(plan[field.key] || 0)} /{" "}
-                        <span className="text-slate-500">
-                          {Number(plan[field.actualKey] || 0)}
-                        </span>
+                {mealPlans.map((plan) => {
+                  const planSummary = getPlanSummary(plan);
+                  const diff = planSummary.actual - planSummary.planned;
+
+                  return (
+                    <tr
+                      key={plan.id || `${plan.date}-${plan.dining_hall_id}`}
+                      className="border-b border-slate-100 align-top">
+                      <td className="py-3 font-medium">{plan.date}</td>
+                      <td className="py-3">
+                        {diningHalls.find(
+                          (hall) => hall.id === plan.dining_hall_id,
+                        )?.name || `#${plan.dining_hall_id}`}
                       </td>
-                    ))}
-                    <td className="text-right py-2">
-                      <button
-                        onClick={() => handleEditPlan(plan)}
-                        className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md text-xs hover:bg-slate-50">
-                        <Pencil className="h-3 w-3" />
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {MEAL_PLAN_FIELDS.map((field) => {
+                        const planned = Number(plan[field.key] || 0);
+                        const actual = Number(plan[field.actualKey] || 0);
+                        const mealDiff = actual - planned;
+
+                        return (
+                          <td key={field.key} className="px-2 py-3 text-center">
+                            <div className="leading-5">
+                              <div className="text-slate-700">
+                                <span className="">Захиалсан:</span>{" "}
+                                <span className="font-semibold">
+                                  {formatMealCount(planned)}
+                                </span>
+                              </div>
+                              <div className="text-blue-700">
+                                <span className="">Идсэн:</span>{" "}
+                                <span className="font-semibold">
+                                  {formatMealCount(actual)}
+                                </span>
+                              </div>
+                              {mealDiff !== 0 && (
+                                <div className="text-xs text-slate-500">
+                                  Зөрүү: {mealDiff > 0 ? "+" : ""}
+                                  {formatMealCount(mealDiff)}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="py-3 text-right">
+                        <div className="leading-5">
+                          <div className="text-slate-700">
+                            {formatMealCount(planSummary.planned)} төлөвлөсөн
+                          </div>
+                          <div className="font-semibold text-blue-700">
+                            {formatMealCount(planSummary.actual)} идсэн
+                          </div>
+                          {diff !== 0 && (
+                            <div className="text-xs text-slate-500">
+                              Зөрүү: {diff > 0 ? "+" : ""}
+                              {formatMealCount(diff)}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="text-right py-3">
+                        <button
+                          onClick={() => handleEditPlan(plan)}
+                          className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md text-xs hover:bg-slate-50">
+                          <Pencil className="h-3 w-3" />
+                          Засах
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -724,6 +856,13 @@ export default function OrgDetailPage() {
                   className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                   <Download className="h-3 w-3" />
                   JPEG татах
+                </button>
+                <button
+                  onClick={() => handleSoftDeleteQR(item)}
+                  disabled={deletingQrId === item.id}
+                  className="flex items-center gap-1 text-xs text-red-600 hover:underline disabled:opacity-50">
+                  <Trash2 className="h-3 w-3" />
+                  {deletingQrId === item.id ? "Устгаж байна..." : "Устгах"}
                 </button>
               </div>
             ))}

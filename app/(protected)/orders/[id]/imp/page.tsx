@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,30 +48,76 @@ import { cn } from "@/lib/utils";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS = [
-  { value: "ordered",   label: "Захиалсан" },
-  { value: "shipped",   label: "Хүргэлтэд гарсан" },
-  { value: "received",  label: "Хүлээн авсан" },
+  { value: "ordered", label: "Захиалсан" },
+  { value: "shipped", label: "Хүргэлтэд гарсан" },
+  { value: "received", label: "Хүлээн авсан" },
   { value: "completed", label: "Дууссан" },
   { value: "cancelled", label: "Цуцлагдсан" },
 ];
 
 const COMPLETED_STATUSES = ["received", "completed", "done"];
 
-const STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
-  received:  { color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3 w-3" />, text: "Хүлээн авсан" },
-  completed: { color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3 w-3" />, text: "Дууссан" },
-  done:      { color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3 w-3" />, text: "Дууссан" },
-  shipped:   { color: "bg-amber-50 text-amber-700 border-amber-200",       icon: <Truck className="h-3 w-3" />,          text: "Хүргэлтэд" },
-  ordered:   { color: "bg-blue-50 text-blue-700 border-blue-200",          icon: <Clock className="h-3 w-3" />,          text: "Захиалсан" },
-  cancelled: { color: "bg-red-50 text-red-700 border-red-200",             icon: <XCircle className="h-3 w-3" />,        text: "Цуцлагдсан" },
+type FulfillmentRow = {
+  id: string;
+  quantity: number | string | null;
+  status: string;
+  notes?: string | null;
+  created_at: string;
+};
+
+type OrderProcessItem = {
+  id: number;
+  part_name: string;
+  part_number?: string | null;
+  unit: string;
+  final_quantity: number;
+  order_fulfillment: FulfillmentRow[];
+};
+
+const STATUS_CONFIG: Record<
+  string,
+  { color: string; icon: React.ReactNode; text: string }
+> = {
+  received: {
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: <CheckCircle2 className="h-3 w-3" />,
+    text: "Хүлээн авсан",
+  },
+  completed: {
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: <CheckCircle2 className="h-3 w-3" />,
+    text: "Дууссан",
+  },
+  done: {
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: <CheckCircle2 className="h-3 w-3" />,
+    text: "Дууссан",
+  },
+  shipped: {
+    color: "bg-amber-50 text-amber-700 border-amber-200",
+    icon: <Truck className="h-3 w-3" />,
+    text: "Хүргэлтэд",
+  },
+  ordered: {
+    color: "bg-blue-50 text-blue-700 border-blue-200",
+    icon: <Clock className="h-3 w-3" />,
+    text: "Захиалсан",
+  },
+  cancelled: {
+    color: "bg-red-50 text-red-700 border-red-200",
+    icon: <XCircle className="h-3 w-3" />,
+    text: "Цуцлагдсан",
+  },
 };
 
 function getStatusCfg(status: string) {
-  return STATUS_CONFIG[status?.toLowerCase()] ?? {
-    color: "bg-muted text-muted-foreground border-border",
-    icon: null,
-    text: status,
-  };
+  return (
+    STATUS_CONFIG[status?.toLowerCase()] ?? {
+      color: "bg-muted text-muted-foreground border-border",
+      icon: null,
+      text: status,
+    }
+  );
 }
 
 function getUnitLabel(value: string) {
@@ -88,13 +134,13 @@ function formatDateTime(dt: string) {
 export default function OrderImplementationPage() {
   const params = useParams();
   const orderId = params.id as string;
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<OrderProcessItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
       const data = await getOrderItemsForOrderProcess(orderId);
-      setItems(data);
+      setItems(data as OrderProcessItem[]);
     } catch {
       toast.error("Өгөгдөл татахад алдаа гарлаа");
     } finally {
@@ -102,13 +148,15 @@ export default function OrderImplementationPage() {
     }
   }, [orderId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const totalItems = items.length;
   const fullyCompleted = items.filter((item) => {
     const done = item.order_fulfillment
-      .filter((f: any) => COMPLETED_STATUSES.includes(f.status?.toLowerCase()))
-      .reduce((s: number, f: any) => s + Number(f.quantity || 0), 0);
+      .filter((f) => COMPLETED_STATUSES.includes(f.status?.toLowerCase()))
+      .reduce((s, f) => s + Number(f.quantity || 0), 0);
     return item.final_quantity > 0 && done >= item.final_quantity;
   }).length;
 
@@ -119,11 +167,10 @@ export default function OrderImplementationPage() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <Link
-          href={`/orders/${orderId}`}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground w-fit"
-        >
+          href={`/orders/purchase`}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground w-fit">
           <ArrowLeft className="h-4 w-4" />
-          Захиалга руу буцах
+          Жагсаалт руу буцах
         </Link>
 
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -131,7 +178,9 @@ export default function OrderImplementationPage() {
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
               Захиалга
             </p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight">Захиалгын биелэлт</h1>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight">
+              Захиалгын биелэлт
+            </h1>
           </div>
           {totalItems > 0 && (
             <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 sm:min-w-[160px]">
@@ -139,14 +188,23 @@ export default function OrderImplementationPage() {
                 <p className="text-xs text-muted-foreground">Нийт биелэлт</p>
                 <p className="text-lg font-bold tabular-nums">
                   {fullyCompleted}
-                  <span className="text-sm font-normal text-muted-foreground"> / {totalItems}</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {" "}
+                    / {totalItems}
+                  </span>
                 </p>
               </div>
-              <div className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                fullyCompleted === totalItems ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-blue-700"
-              )}>
-                {totalItems > 0 ? Math.round((fullyCompleted / totalItems) * 100) : 0}%
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                  fullyCompleted === totalItems
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-blue-50 text-blue-700",
+                )}>
+                {totalItems > 0
+                  ? Math.round((fullyCompleted / totalItems) * 100)
+                  : 0}
+                %
               </div>
             </div>
           )}
@@ -158,12 +216,19 @@ export default function OrderImplementationPage() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card py-16 text-center">
           <Package className="mb-3 h-10 w-10 text-muted-foreground/30" />
           <p className="font-medium">Сэлбэг олдсонгүй</p>
-          <p className="mt-1 text-sm text-muted-foreground">Энэ захиалганд биелэлт бүртгэх зүйл байхгүй байна</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Энэ захиалганд биелэлт бүртгэх зүйл байхгүй байна
+          </p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
           {items.map((item) => (
-            <OrderItemCard key={item.id} item={item} orderId={orderId} onRefresh={load} />
+            <OrderItemCard
+              key={item.id}
+              item={item}
+              orderId={orderId}
+              onRefresh={load}
+            />
           ))}
         </div>
       )}
@@ -178,32 +243,41 @@ function OrderItemCard({
   orderId,
   onRefresh,
 }: {
-  item: any;
+  item: OrderProcessItem;
   orderId: string;
   onRefresh: () => void;
 }) {
-  const router = useRouter();
   const [qtyInput, setQtyInput] = useState("");
   const [notes, setNotes] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("ordered");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [pendingChange, setPendingChange] = useState<{ id: string; old: string; next: string } | null>(null);
+  const [pendingChange, setPendingChange] = useState<{
+    id: string;
+    old: string;
+    next: string;
+  } | null>(null);
+  const [statusChangeComment, setStatusChangeComment] = useState("");
 
   const unit = getUnitLabel(item.unit);
 
   const totalCompleted = item.order_fulfillment
-    .filter((f: any) => COMPLETED_STATUSES.includes(f.status?.toLowerCase()))
-    .reduce((s: number, f: any) => s + Number(f.quantity || 0), 0);
+    .filter((f) => COMPLETED_STATUSES.includes(f.status?.toLowerCase()))
+    .reduce((s, f) => s + Number(f.quantity || 0), 0);
 
-  const percent = item.final_quantity > 0
-    ? Math.min(100, Math.round((totalCompleted / item.final_quantity) * 100))
-    : 0;
+  const percent =
+    item.final_quantity > 0
+      ? Math.min(100, Math.round((totalCompleted / item.final_quantity) * 100))
+      : 0;
 
   const toggleHistory = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -224,8 +298,8 @@ function OrderItemCard({
       setQtyInput("");
       setNotes("");
       onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || "Алдаа гарлаа");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Алдаа гарлаа");
     } finally {
       setIsAdding(false);
     }
@@ -238,7 +312,7 @@ function OrderItemCard({
         fulfillmentId: pendingChange.id,
         newStatus: pendingChange.next,
         oldStatus: pendingChange.old,
-        reason: "Хэрэглэгч өөрчилсөн",
+        reason: statusChangeComment.trim() || "Хэрэглэгч өөрчилсөн",
       });
       toast.success("Статус шинэчлэгдлээ");
       onRefresh();
@@ -246,6 +320,7 @@ function OrderItemCard({
       toast.error("Алдаа гарлаа");
     } finally {
       setPendingChange(null);
+      setStatusChangeComment("");
     }
   };
 
@@ -259,9 +334,13 @@ function OrderItemCard({
               <Package className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-foreground leading-tight">{item.part_name}</p>
+              <p className="font-semibold text-foreground leading-tight">
+                {item.part_name}
+              </p>
               {item.part_number && (
-                <p className="mt-0.5 font-mono text-xs text-muted-foreground">{item.part_number}</p>
+                <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                  {item.part_number}
+                </p>
               )}
             </div>
           </div>
@@ -279,20 +358,25 @@ function OrderItemCard({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
-                    percent >= 100 ? "bg-emerald-500" :
-                    percent >= 50  ? "bg-amber-500" :
-                    "bg-primary"
+                    percent >= 100
+                      ? "bg-emerald-500"
+                      : percent >= 50
+                        ? "bg-amber-500"
+                        : "bg-primary",
                   )}
                   style={{ width: `${percent}%` }}
                 />
               </div>
             </div>
-            <div className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums",
-              percent >= 100 ? "bg-emerald-100 text-emerald-700" :
-              percent >= 50  ? "bg-amber-100 text-amber-700" :
-              "bg-blue-50 text-blue-700"
-            )}>
+            <div
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums",
+                percent >= 100
+                  ? "bg-emerald-100 text-emerald-700"
+                  : percent >= 50
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-blue-50 text-blue-700",
+              )}>
               {percent}%
             </div>
           </div>
@@ -316,21 +400,30 @@ function OrderItemCard({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {item.order_fulfillment.map((f: any, idx: number) => {
+                    {item.order_fulfillment.map((f, idx) => {
                       const scfg = getStatusCfg(f.status);
                       const isOpen = expandedIds.has(f.id);
                       return (
                         <React.Fragment key={f.id}>
                           <tr
                             className="cursor-pointer transition-colors hover:bg-muted/20"
-                            onClick={() => toggleHistory(f.id)}
-                          >
-                            <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{idx + 1}</td>
+                            onClick={() => toggleHistory(f.id)}>
+                            <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
+                              {idx + 1}
+                            </td>
                             <td className="px-4 py-3 font-semibold tabular-nums">
-                              {f.quantity} <span className="font-normal text-muted-foreground">{unit}</span>
+                              {f.quantity}{" "}
+                              <span className="font-normal text-muted-foreground">
+                                {unit}
+                              </span>
                             </td>
                             <td className="px-4 py-3">
-                              <Badge variant="outline" className={cn("gap-1 text-xs px-2 py-0.5", scfg.color)}>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "gap-1 text-xs px-2 py-0.5",
+                                  scfg.color,
+                                )}>
                                 {scfg.icon}
                                 {scfg.text}
                               </Badge>
@@ -341,21 +434,30 @@ function OrderItemCard({
                             <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
                               {formatDateTime(f.created_at)}
                             </td>
-                            <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td
+                              className="px-4 py-3 text-right"
+                              onClick={(e) => e.stopPropagation()}>
                               <Select
                                 value={f.status}
                                 onValueChange={(next) => {
                                   if (next !== f.status) {
-                                    setPendingChange({ id: f.id, old: f.status, next });
+                                    setPendingChange({
+                                      id: f.id,
+                                      old: f.status,
+                                      next,
+                                    });
+                                    setStatusChangeComment("");
                                   }
-                                }}
-                              >
+                                }}>
                                 <SelectTrigger className="h-7 w-36 text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {STATUS_OPTIONS.map((o) => (
-                                    <SelectItem key={o.value} value={o.value} className="text-xs">
+                                    <SelectItem
+                                      key={o.value}
+                                      value={o.value}
+                                      className="text-xs">
                                       {o.label}
                                     </SelectItem>
                                   ))}
@@ -365,7 +467,9 @@ function OrderItemCard({
                           </tr>
                           {isOpen && (
                             <tr>
-                              <td colSpan={6} className="px-4 py-3 bg-muted/10 border-t border-border/40">
+                              <td
+                                colSpan={6}
+                                className="px-4 py-3 bg-muted/10 border-t border-border/40">
                                 <FulfillmentHistory fulfillmentId={f.id} />
                               </td>
                             </tr>
@@ -379,53 +483,74 @@ function OrderItemCard({
 
               {/* Mobile cards */}
               <div className="flex flex-col gap-2 sm:hidden">
-                {item.order_fulfillment.map((f: any) => {
+                {item.order_fulfillment.map((f) => {
                   const scfg = getStatusCfg(f.status);
                   const isOpen = expandedIds.has(f.id);
                   return (
-                    <div key={f.id} className="rounded-lg border border-border/60 overflow-hidden">
+                    <div
+                      key={f.id}
+                      className="rounded-lg border border-border/60 overflow-hidden">
                       <div
                         className="flex items-center gap-3 p-3 cursor-pointer"
-                        onClick={() => toggleHistory(f.id)}
-                      >
+                        onClick={() => toggleHistory(f.id)}>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-semibold tabular-nums">
                               {f.quantity} {unit}
                             </span>
-                            <Badge variant="outline" className={cn("gap-1 text-xs px-1.5 py-0", scfg.color)}>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "gap-1 text-xs px-1.5 py-0",
+                                scfg.color,
+                              )}>
                               {scfg.icon}
                               {scfg.text}
                             </Badge>
                           </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(f.created_at)}</p>
-                          {f.notes && <p className="mt-0.5 text-xs text-muted-foreground">{f.notes}</p>}
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {formatDateTime(f.created_at)}
+                          </p>
+                          {f.notes && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {f.notes}
+                            </p>
+                          )}
                         </div>
                         <div onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={f.status}
                             onValueChange={(next) => {
                               if (next !== f.status) {
-                                setPendingChange({ id: f.id, old: f.status, next });
+                                setPendingChange({
+                                  id: f.id,
+                                  old: f.status,
+                                  next,
+                                });
+                                setStatusChangeComment("");
                               }
-                            }}
-                          >
+                            }}>
                             <SelectTrigger className="h-7 w-28 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               {STATUS_OPTIONS.map((o) => (
-                                <SelectItem key={o.value} value={o.value} className="text-xs">
+                                <SelectItem
+                                  key={o.value}
+                                  value={o.value}
+                                  className="text-xs">
                                   {o.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                        <ChevronDown className={cn(
-                          "h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform",
-                          isOpen && "rotate-180"
-                        )} />
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform",
+                            isOpen && "rotate-180",
+                          )}
+                        />
                       </div>
                       {isOpen && (
                         <div className="border-t border-border/40 p-3 bg-muted/10">
@@ -440,7 +565,9 @@ function OrderItemCard({
           ) : (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-center">
               <ClipboardList className="mb-2 h-7 w-7 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">Биелэлт бүртгэгдээгүй байна</p>
+              <p className="text-sm text-muted-foreground">
+                Биелэлт бүртгэгдээгүй байна
+              </p>
             </div>
           )}
 
@@ -469,13 +596,17 @@ function OrderItemCard({
                 <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                   Статус
                 </label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -498,8 +629,7 @@ function OrderItemCard({
               onClick={handleAdd}
               disabled={isAdding || !qtyInput.trim()}
               size="sm"
-              className="mt-3"
-            >
+              className="mt-3">
               <Plus className="h-4 w-4" />
               {isAdding ? "Хадгалж байна..." : "Биелэлт бүртгэх"}
             </Button>
@@ -508,7 +638,14 @@ function OrderItemCard({
       </section>
 
       {/* Status change confirmation dialog */}
-      <AlertDialog open={!!pendingChange} onOpenChange={(open) => !open && setPendingChange(null)}>
+      <AlertDialog
+        open={!!pendingChange}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingChange(null);
+            setStatusChangeComment("");
+          }
+        }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Төлөв өөрчлөх</AlertDialogTitle>
@@ -517,20 +654,38 @@ function OrderItemCard({
                 <>
                   Статусыг{" "}
                   <span className="font-semibold text-foreground">
-                    {STATUS_OPTIONS.find((o) => o.value === pendingChange.old)?.label}
+                    {
+                      STATUS_OPTIONS.find((o) => o.value === pendingChange.old)
+                        ?.label
+                    }
                   </span>{" "}
                   →{" "}
                   <span className="font-semibold text-foreground">
-                    {STATUS_OPTIONS.find((o) => o.value === pendingChange.next)?.label}
+                    {
+                      STATUS_OPTIONS.find((o) => o.value === pendingChange.next)
+                        ?.label
+                    }
                   </span>{" "}
                   болгож өөрчлөхдөө итгэлтэй байна уу?
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Тайлбар
+            </label>
+            <Input
+              value={statusChangeComment}
+              onChange={(event) => setStatusChangeComment(event.target.value)}
+              placeholder="Төлөв өөрчилсөн тайлбар..."
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Болих</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmStatusChange}>Тийм, өөрчлөх</AlertDialogAction>
+            <AlertDialogAction onClick={confirmStatusChange}>
+              Тийм, өөрчлөх
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -548,7 +703,9 @@ function PageSkeleton() {
         <Skeleton className="h-8 w-48" />
       </div>
       {[1, 2, 3].map((i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <div
+          key={i}
+          className="rounded-xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Skeleton className="h-9 w-9 rounded-lg" />
