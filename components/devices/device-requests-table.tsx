@@ -1,35 +1,23 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ColumnDef, flexRender, getCoreRowModel, getSortedRowModel,
-  getPaginationRowModel, useReactTable, type SortingState,
-} from "@tanstack/react-table";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { DEVICE_TYPE_CONFIG, type DeviceType, type OrgStructure } from "@/types/device";
-import { DeviceRequestActions } from "@/components/devices/device-request-actions";
+import { DEVICE_TYPE_CONFIG, type OrgStructure } from "@/types/device";
 import { REQUEST_TYPE_CONFIG, PRIORITY_CONFIG } from "@/components/devices/request-shared";
+import { DeviceRequestsCardList } from "@/components/devices/device-requests-card-list";
 import type { DeviceRequestType, DeviceRequestPriority, DeviceRequestStatus } from "@/actions/devices";
-import { ArrowUpDown, Pencil, ChevronLeft, ChevronRight, Search, X, Link2 } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 const ALL = "__all__";
 
-const STATUS_CONFIG: Record<DeviceRequestStatus, { label: string; className: string }> = {
-  pending:  { label: "Хүлээгдэж буй", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  approved: { label: "Зөвшөөрөгдсөн", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  rejected: { label: "Татгалзсан",     className: "bg-red-50 text-red-700 border-red-200" },
+const STATUS_CONFIG: Record<DeviceRequestStatus, { label: string }> = {
+  pending:  { label: "Хүлээгдэж буй" },
+  approved: { label: "Зөвшөөрөгдсөн" },
+  rejected: { label: "Татгалзсан" },
 };
-
-function formatDate(d: string) {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, "0")}.${String(dt.getDate()).padStart(2, "0")}`;
-}
 
 type Request = any;
 
@@ -43,8 +31,6 @@ const PILL_ON = "bg-foreground text-background border-foreground";
 const PILL_OFF = "bg-transparent text-muted-foreground hover:text-foreground border-border";
 
 export function DeviceRequestsTable({ data, orgStructure }: Props) {
-  const router = useRouter();
-
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter]     = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter]         = useState<Set<string>>(new Set());
@@ -65,7 +51,6 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
   const [orgFilter, setOrgFilter] = useState("");
   const [heltesFilter, setHeltesFilter] = useState("");
   const [albaFilter, setAlbaFilter] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([{ id: "created_at", desc: true }]);
 
   // Name lookup maps by bteg_id
   const orgByBteg = useMemo(
@@ -130,154 +115,60 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
     });
   }, [data, statusFilter, typeFilter, reqTypeFilter, priorityFilter, orgFilter, heltesFilter, albaFilter, search, orgStructure]);
 
-  const columns: ColumnDef<Request>[] = [
-    {
-      accessorKey: "created_at",
-      header: ({ column }) => (
-        <Button variant="ghost" size="sm" className="-ml-2 h-8 font-medium"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Огноо <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {formatDate(row.original.created_at)}
-        </span>
-      ),
-    },
-    {
-      id: "creator",
-      header: "Гаргагч",
-      cell: ({ row }) => {
-        const r = row.original;
-        const orgName = orgByBteg[r.req_org_bteg];
-        const heltesName = heltesByBteg[r.req_heltes_bteg];
-        const albaName = albaByBteg[r.req_alba_bteg];
-        return (
-          <div className="min-w-[150px]">
-            <p className="text-sm font-medium">{r.creator?.name ?? "—"}</p>
-            {orgName && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {[orgName, heltesName].filter(Boolean).join(" / ")}
-              </p>
-            )}
-            {albaName && (
-              <p className="text-xs text-muted-foreground/70">{albaName}</p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: "device",
-      header: "Төхөөрөмж",
-      cell: ({ row }) => {
-        const r = row.original;
-        const typeCfg = DEVICE_TYPE_CONFIG[r.device_type as DeviceType];
-        const reqCfg = REQUEST_TYPE_CONFIG[r.request_type as DeviceRequestType];
-        return (
-          <div className="flex flex-col gap-1.5 min-w-[140px]">
-            <span className="text-sm font-medium">
-              {typeCfg?.label ?? r.device_type ?? "—"}
-              {r.fulfilled_by_request_id && (
-                <Link2 className="inline-block ml-1.5 h-3 w-3 text-primary" />
-              )}
-            </span>
-            <Badge variant="outline" className="text-xs w-fit">
-              {reqCfg?.emoji} {reqCfg?.label ?? r.request_type}
-            </Badge>
-          </div>
-        );
-      },
-    },
-    {
-      id: "priority",
-      header: "Зэрэглэл",
-      cell: ({ row }) => {
-        const p = (row.original.priority ?? "normal") as DeviceRequestPriority;
-        const cfg = PRIORITY_CONFIG[p];
-        return (
-          <Badge variant="outline" className={cn("text-xs whitespace-nowrap", cfg.className)}>
-            {cfg.label}
-          </Badge>
-        );
-      },
-    },
-    {
-      id: "assignee",
-      header: "Хариуцагч",
-      cell: ({ row }) => {
-        const a = row.original.assignee;
-        return a?.name
-          ? <span className="text-xs text-muted-foreground">{a.name}</span>
-          : <span className="text-xs text-muted-foreground/40">—</span>;
-      },
-    },
-    {
-      accessorKey: "purpose",
-      header: "Зориулалт",
-      cell: ({ row }) => (
-        <span className="text-sm line-clamp-2 max-w-[180px] block">
-          {row.original.purpose || "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => (
-        <Button variant="ghost" size="sm" className="-ml-2 h-8 font-medium"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-          Төлөв <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const cfg = STATUS_CONFIG[row.original.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
-        return (
-          <div className="flex flex-col gap-1">
-            <Badge variant="outline" className={cn("text-xs w-fit whitespace-nowrap", cfg.className)}>
-              {cfg.label}
-            </Badge>
-            {row.original.admin_notes && (
-              <p className="text-xs text-muted-foreground italic max-w-[140px] line-clamp-2">
-                {row.original.admin_notes}
-              </p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: "actions",
-      header: "",
-      cell: ({ row }) => {
-        const r = row.original;
-        return (
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => router.push(`/devices/requests/${r.id}/edit`)}
-              title="Засах"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-600 transition-colors hover:bg-blue-600 hover:border-blue-600 hover:text-white"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            {r.status === "pending" && <DeviceRequestActions requestId={r.id} />}
-          </div>
-        );
-      },
-    },
-  ];
+  // Card list-руу өгөх structure: parent + children + orphans
+  const cardGroups = useMemo(() => {
+    const filteredIds = new Set(filtered.map((r) => r.id));
+    const parents: any[] = [];
+    const childrenByParent = new Map<string, any[]>();
+    const orphans: any[] = [];
 
-  const table = useReactTable({
-    data: filtered,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 20 } },
-  });
+    for (const r of filtered) {
+      if (r.parent_request_id) {
+        if (filteredIds.has(r.parent_request_id)) {
+          const arr = childrenByParent.get(r.parent_request_id) ?? [];
+          arr.push(r);
+          childrenByParent.set(r.parent_request_id, arr);
+        } else {
+          orphans.push(r);
+        }
+      } else {
+        parents.push(r);
+      }
+    }
+
+    parents.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    for (const arr of childrenByParent.values()) {
+      arr.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+    }
+
+    const groups = parents.map((p) => ({
+      parent: p,
+      children: childrenByParent.get(p.id) ?? [],
+    }));
+
+    return { groups, orphans };
+  }, [filtered]);
+
+
+  // Бүх хүсэлтийн parent lookup — orphan child-руу parent summary үзүүлэхэд хэрэгтэй
+  const parentLookup = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const r of data) {
+      if (!r.parent_request_id) map.set(r.id, r);
+    }
+    return map;
+  }, [data]);
+
+  const lookups = useMemo(
+    () => ({ orgByBteg, heltesByBteg, albaByBteg, parentLookup }),
+    [orgByBteg, heltesByBteg, albaByBteg, parentLookup],
+  );
 
   const hasActiveFilters =
     statusFilter.size > 0 || typeFilter.size > 0 || reqTypeFilter.size > 0 || priorityFilter.size > 0 ||
@@ -411,67 +302,28 @@ export function DeviceRequestsTable({ data, orgStructure }: Props) {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground px-1">{filtered.length} хүсэлт</p>
-
-      {/* ─── Table ─── */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map(hg => (
-              <TableRow key={hg.id} className="bg-muted/40 hover:bg-muted/40">
-                {hg.headers.map(h => (
-                  <TableHead key={h.id} className="text-xs font-medium">
-                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-16 text-muted-foreground text-sm">
-                  Хүсэлт олдсонгүй
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map(row => (
-                <TableRow key={row.id} className="hover:bg-muted/30">
-                  {row.getVisibleCells().map(cell => (
-                    <TableCell key={cell.id} className="py-3 align-top">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} хүсэлт
+          {cardGroups.groups.length > 0 && (
+            <span className="ml-1 text-muted-foreground/70">
+              · {cardGroups.groups.length} групп
+            </span>
+          )}
+          {cardGroups.orphans.length > 0 && (
+            <span className="ml-1 text-amber-700">
+              · {cardGroups.orphans.length} хосгүй
+            </span>
+          )}
+        </p>
       </div>
 
-      {/* ─── Pagination ─── */}
-      {table.getPageCount() > 1 && (
-        <div className="flex items-center justify-between px-1">
-          <p className="text-xs text-muted-foreground">
-            {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-              filtered.length
-            )}{" "}
-            / {filtered.length}
-          </p>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" className="h-7 w-7 p-0"
-              onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 w-7 p-0"
-              onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <DeviceRequestsCardList
+        groups={cardGroups.groups}
+        orphanChildren={cardGroups.orphans}
+        lookups={lookups}
+        pageSize={10}
+      />
     </div>
   );
 }

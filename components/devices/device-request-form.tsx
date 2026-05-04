@@ -49,11 +49,20 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
   const [purpose, setPurpose]       = useState("");
   const [specs, setSpecs]           = useState(EMPTY_SPECS);
 
+  // ── Hamt orogno bui delgets (зөвхөн desktop + new/replace үед) ──
+  const [addMonitor, setAddMonitor]       = useState(false);
+  const [monitorSpecs, setMonitorSpecs]   = useState(EMPTY_SPECS);
+
   // ── Old/source device (replace/transfer/decommission/repair) ──
   const [selectedDevice, setSelectedDevice] = useState<PickedDevice | null>(null);
 
-  // ── Transfer destination (replace+transferOld OR transfer) ──
-  const [transferOld, setTransferOld] = useState(false);
+  // ── Хуучин төхөөрөмжтэй юу хийх вэ? (replace) ──
+  type OldDeviceAction = "none" | "transfer" | "decommission" | "repair";
+  const [oldDeviceAction, setOldDeviceAction] = useState<OldDeviceAction>("none");
+  const [oldDeviceNotes, setOldDeviceNotes]   = useState("");
+  const transferOld = oldDeviceAction === "transfer";
+
+  // Transfer destination
   const [trOrgId, setTrOrgId]         = useState("");
   const [trHeltesId, setTrHeltesId]   = useState("");
   const [trAlbaId, setTrAlbaId]       = useState("");
@@ -77,6 +86,12 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
   const needsNewDevice    = requestType === "new" || requestType === "replace";
   const needsSourceDevice = requestType === "replace" || requestType === "transfer" || requestType === "decommission" || requestType === "repair";
   const needsTransferDest = requestType === "transfer" || (requestType === "replace" && transferOld);
+  const canAddMonitor     = needsNewDevice && deviceType === "desktop";
+
+  if (!canAddMonitor && addMonitor) {
+    setAddMonitor(false);
+    setMonitorSpecs(EMPTY_SPECS);
+  }
 
   const handleSubmit = () => {
     if (!reqOrgBteg) { toast.error("Байгууллага сонгоно уу"); return; }
@@ -108,8 +123,90 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
           transfer_to_user_id:     needsTransferDest ? (trUser?.id   || undefined) : undefined,
           fulfilled_by_request_id: needsNewDevice ? fulfilledById : null,
         };
-        await createDeviceRequest(payload);
-        toast.success("Хүсэлт амжилттай илгээгдлээ");
+        const parentId = await createDeviceRequest(payload);
+
+        const created: string[] = [];
+        const errored: string[] = [];
+
+        if (addMonitor && canAddMonitor) {
+          try {
+            await createDeviceRequest({
+              req_org_bteg:    reqOrgBteg    || undefined,
+              req_heltes_bteg: reqHeltesBteg || undefined,
+              req_alba_bteg:   reqAlbaBteg   || undefined,
+              request_type:    requestType,
+              priority,
+              device_type:     "monitor",
+              specs:           buildSpecsFromState("monitor", monitorSpecs),
+              purpose:         `Суурин компьютертэй хамт захиалсан${
+                purpose.trim() ? `: ${purpose.trim()}` : ""
+              }`,
+              parent_request_id: parentId,
+            });
+            created.push("дэлгэц");
+          } catch (e: any) {
+            errored.push(`дэлгэц (${e?.message ?? ""})`);
+          }
+        }
+
+        // Replace + oldDeviceAction → child үүсгэх (transfer/decommission/repair)
+        if (
+          requestType === "replace" &&
+          oldDeviceAction !== "none" &&
+          selectedDevice
+        ) {
+          const actionLabel =
+            oldDeviceAction === "transfer"
+              ? "шилжүүлэх"
+              : oldDeviceAction === "decommission"
+                ? "актлах"
+                : "засварын";
+          try {
+            await createDeviceRequest({
+              req_org_bteg:    reqOrgBteg    || undefined,
+              req_heltes_bteg: reqHeltesBteg || undefined,
+              req_alba_bteg:   reqAlbaBteg   || undefined,
+              request_type:    oldDeviceAction,
+              priority,
+              device_type:     selectedDevice.device_type,
+              old_device_id:   selectedDevice.id,
+              transfer_old:    oldDeviceAction === "transfer",
+              transfer_to_org_bteg:
+                oldDeviceAction === "transfer" ? (trOrgBteg    || undefined) : undefined,
+              transfer_to_heltes_bteg:
+                oldDeviceAction === "transfer" ? (trHeltesBteg || undefined) : undefined,
+              transfer_to_alba_bteg:
+                oldDeviceAction === "transfer" ? (trAlbaBteg   || undefined) : undefined,
+              transfer_to_user_id:
+                oldDeviceAction === "transfer" ? (trUser?.id   || undefined) : undefined,
+              notes: oldDeviceNotes.trim() || undefined,
+              purpose: `Шинэчилсэн төхөөрөмжийг ${
+                oldDeviceAction === "transfer"
+                  ? "шилжүүлэх"
+                  : oldDeviceAction === "decommission"
+                    ? "актлах"
+                    : "засварт явуулах"
+              }${purpose.trim() ? `: ${purpose.trim()}` : ""}`,
+              parent_request_id: parentId,
+            });
+            created.push(actionLabel);
+          } catch (e: any) {
+            errored.push(`${actionLabel} (${e?.message ?? ""})`);
+          }
+        }
+
+        if (errored.length === 0) {
+          toast.success(
+            created.length > 0
+              ? `Хүсэлт + ${created.join(" + ")} хүсэлт үүслээ`
+              : "Хүсэлт амжилттай илгээгдлээ",
+          );
+        } else {
+          toast.warning(
+            `Үндсэн хүсэлт үүссэн. Дараах child үүсгэхэд алдаа: ${errored.join("; ")}`,
+          );
+        }
+
         router.push("/devices/requests");
       } catch (e: any) {
         toast.error(e.message ?? "Алдаа гарлаа");
@@ -129,17 +226,24 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
               onClick={() => {
                 setRequestType(key);
                 setSelectedDevice(null);
-                if (key !== "replace") setTransferOld(false);
+                if (key !== "replace") {
+                  setOldDeviceAction("none");
+                  setOldDeviceNotes("");
+                  setTrOrgId(""); setTrHeltesId(""); setTrAlbaId(""); setTrUser(null);
+                }
               }}
               className={cn(
                 "flex flex-col gap-1 rounded-lg border-2 px-4 py-3 text-left transition-colors",
                 requestType === key
-                  ? "border-primary bg-primary/8"
+                  ? cn("border-current", cfg.className)
                   : "border-border bg-card hover:border-primary/30"
               )}
             >
               <span className="text-sm font-semibold">{cfg.emoji} {cfg.label}</span>
-              <span className="text-xs text-muted-foreground">{cfg.description}</span>
+              <span className={cn(
+                "text-xs",
+                requestType === key ? "opacity-80" : "text-muted-foreground",
+              )}>{cfg.description}</span>
             </button>
           ))}
         </div>
@@ -217,6 +321,36 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
         </Section>
       )}
 
+      {/* ── Hamt дэлгэц захиалах (зөвхөн desktop + new/replace) ── */}
+      {canAddMonitor && (
+        <Section title="Дэлгэц мөн захиалах">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={addMonitor}
+              onChange={(e) => setAddMonitor(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-medium">
+              Энэ суурин компьютертэй хамт дэлгэц захиалах
+            </span>
+          </label>
+          {addMonitor && (
+            <div className="mt-4 grid grid-cols-1 gap-4 rounded-lg border border-border/60 bg-muted/20 p-4 sm:grid-cols-2">
+              <DeviceSpecsFields
+                deviceType="monitor"
+                specs={monitorSpecs}
+                setSpecs={setMonitorSpecs}
+              />
+              <p className="sm:col-span-2 text-xs text-muted-foreground">
+                Дэлгэц нь тусдаа хүсэлт болж үүснэ. Суурин компьютерийн хүсэлтийг
+                зөвшөөрөх / татгалзахад хамт нь автоматаар үйлчилнэ.
+              </p>
+            </div>
+          )}
+        </Section>
+      )}
+
       {/* ── Pick eligible transfer (new/replace) ── */}
       {needsNewDevice && matchingTransfers.length > 0 && (
         <Section
@@ -283,27 +417,44 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
         </Section>
       )}
 
-      {/* ── Transfer destination (transfer always; replace optional) ── */}
-      {(requestType === "transfer" || (requestType === "replace" && selectedDevice)) && (
-        <Section title={requestType === "transfer" ? "Шилжүүлэх хүлээн авагч" : "Хуучин төхөөрөмжийг шилжүүлэх"}>
+      {/* ── Хуучин төхөөрөмжтэй юу хийх вэ? (replace + selectedDevice) ── */}
+      {requestType === "replace" && selectedDevice && (
+        <Section title="Хуучин төхөөрөмжтэй юу хийх вэ?">
           <div className="flex flex-col gap-4">
-            {requestType === "replace" && (
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox" id="transfer" checked={transferOld}
-                  onChange={(e) => {
-                    setTransferOld(e.target.checked);
-                    if (!e.target.checked) { setTrOrgId(""); setTrHeltesId(""); setTrAlbaId(""); setTrUser(null); }
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {([
+                { key: "none",         emoji: "—",  label: "Юу ч хийхгүй", desc: "Хуучин төхөөрөмж байсан газартаа үлдэнэ" },
+                { key: "transfer",     emoji: "↗",  label: "Шилжүүлэх",    desc: "Өөр хэлтэс / хүнд шилжүүлэх" },
+                { key: "decommission", emoji: "🗑", label: "Актлах",        desc: "Үйлчилгээнээс гаргах" },
+                { key: "repair",       emoji: "🔧", label: "Засварт",       desc: "Засварт явуулах" },
+              ] as const).map((a) => (
+                <button
+                  key={a.key} type="button"
+                  onClick={() => {
+                    setOldDeviceAction(a.key);
+                    if (a.key !== "transfer") {
+                      setTrOrgId(""); setTrHeltesId(""); setTrAlbaId(""); setTrUser(null);
+                    }
+                    if (a.key !== "decommission" && a.key !== "repair") {
+                      setOldDeviceNotes("");
+                    }
                   }}
-                  className="h-4 w-4"
-                />
-                <label htmlFor="transfer" className="text-sm font-medium">
-                  Хуучин төхөөрөмжийг өөр хэлтэс / хүнд шилжүүлэх
-                </label>
-              </div>
-            )}
+                  className={cn(
+                    "flex flex-col gap-1 rounded-lg border-2 px-4 py-3 text-left transition-colors",
+                    oldDeviceAction === a.key
+                      ? "border-primary bg-primary/8"
+                      : "border-border bg-card hover:border-primary/30",
+                  )}
+                >
+                  <span className="text-sm font-semibold">
+                    {a.emoji} {a.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{a.desc}</span>
+                </button>
+              ))}
+            </div>
 
-            {needsTransferDest && (
+            {oldDeviceAction === "transfer" && (
               <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/20 p-4">
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Шилжүүлэх хэлтэс / алба</p>
@@ -317,12 +468,80 @@ export function DeviceRequestForm({ orgStructure, eligibleTransfers = [] }: Prop
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-2">
-                    Шилжүүлэх хүн {requestType === "replace" && <span className="font-normal">(заавал биш)</span>}
+                    Шилжүүлэх хүн <span className="font-normal">(заавал биш)</span>
                   </p>
                   <UserPicker selected={trUser} onSelect={setTrUser} />
                 </div>
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                  <Link2 className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-900">
+                    <p className="font-semibold">Шинэ <strong>шилжүүлэх</strong> хүсэлт автоматаар үүснэ</p>
+                    <p className="opacity-80 mt-0.5">
+                      {trOrgBteg
+                        ? "Хуучин төхөөрөмжийг сонгосон газарт шилжүүлэх тусдаа хүсэлт үүснэ."
+                        : "Хүлээн авах нэгжийг одоохондоо тодорхойлоогүй ч шилжүүлэх хүсэлт үүснэ. Дараа нь түүнийг тохирох хэлтэс / хүнтэй холбож болно."}{" "}
+                      Үндсэн хүсэлтийн зөвшөөрлийн төлөв түүнд автоматаар хамаарна.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
+
+            {(oldDeviceAction === "decommission" || oldDeviceAction === "repair") && (
+              <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    {oldDeviceAction === "decommission" ? "Актлах шалтгаан" : "Эвдрэлийн тайлбар"}{" "}
+                    <span className="font-normal">(заавал биш)</span>
+                  </p>
+                  <Textarea
+                    value={oldDeviceNotes}
+                    onChange={(e) => setOldDeviceNotes(e.target.value)}
+                    placeholder={
+                      oldDeviceAction === "decommission"
+                        ? "Яагаад актлах гэж байгааг тайлбарлана уу..."
+                        : "Ямар асуудал гарсан, ямар эвдрэлтэй байгаа..."
+                    }
+                    rows={3}
+                    className="resize-none"
+                  />
+                </div>
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                  <Link2 className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-900">
+                    <p className="font-semibold">
+                      Шинэ <strong>{oldDeviceAction === "decommission" ? "актлах" : "засварын"}</strong> хүсэлт автоматаар үүснэ
+                    </p>
+                    <p className="opacity-80 mt-0.5">
+                      Энэ нь шинэчлэх хүсэлтэд холбогдоно. Үндсэн хүсэлтийн
+                      зөвшөөрлийн төлөв түүнд автоматаар хамаарна.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Transfer destination (transfer request type only) ── */}
+      {requestType === "transfer" && (
+        <Section title="Шилжүүлэх хүлээн авагч">
+          <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Шилжүүлэх хэлтэс / алба</p>
+              <OrgCascade
+                orgStructure={orgStructure}
+                orgId={trOrgId} heltesId={trHeltesId} albaId={trAlbaId}
+                onOrgChange={(v) => { setTrOrgId(v === NONE ? "" : v); setTrHeltesId(""); setTrAlbaId(""); }}
+                onHeltesChange={(v) => { setTrHeltesId(v === NONE ? "" : v); setTrAlbaId(""); }}
+                onAlbaChange={(v) => setTrAlbaId(v === NONE ? "" : v)}
+              />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Шилжүүлэх хүн</p>
+              <UserPicker selected={trUser} onSelect={setTrUser} />
+            </div>
           </div>
         </Section>
       )}
