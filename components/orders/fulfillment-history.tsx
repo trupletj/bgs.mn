@@ -23,16 +23,20 @@ import { format } from "date-fns";
 import { mn } from "date-fns/locale";
 
 // Төлөвийн текстийг хөрвүүлэх функц
-const getStatusLabel = (status: string) => {
+const getStatusLabel = (status?: string | null) => {
+  if (!status) return "";
+
   const map: Record<string, string> = {
     pending: "Шинэ",
     in_progress: "Процесс-д",
+    ordered: "Захиалсан",
     shipped: "Илгээсэн",
+    received: "Хүлээн авсан",
     delivered: "Хүрсэн",
     completed: "Дууссан",
-    rejected: "Татгалзсан",
-    ordered: "Захиалсан",
+    done: "Дууссан",
     cancelled: "Цуцлагдсан",
+    rejected: "Татгалзсан",
   };
   return map[status] || status;
 };
@@ -44,12 +48,23 @@ const StatusBox = ({ label }: { label: string }) => (
   </div>
 );
 
+type FulfillmentStatusHistory = {
+  id: string;
+  old_status: string | null;
+  new_status: string | null;
+  reason?: string | null;
+  created_at: string;
+  profile?: {
+    name?: string | null;
+  } | null;
+};
+
 export function FulfillmentHistory({
   fulfillmentId,
 }: {
   fulfillmentId: string;
 }) {
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<FulfillmentStatusHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,7 +76,7 @@ export function FulfillmentHistory({
         .eq("fulfillment_id", fulfillmentId)
         .order("created_at", { ascending: true }); // Диаграммд зориулж хуучнаас шинэ рүү
 
-      if (!error) setHistory(data || []);
+      if (!error) setHistory((data || []) as FulfillmentStatusHistory[]);
       setLoading(false);
     };
     fetchHistory();
