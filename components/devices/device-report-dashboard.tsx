@@ -17,6 +17,8 @@ import {
   TrendingUp, Layers, Building2,
 } from "lucide-react";
 import { RequestFlowAnalytics } from "@/components/devices/device-report-requests";
+import { RequestLifecycleAnalytics } from "@/components/devices/device-report-lifecycle";
+import { RequestLinkedAnalytics } from "@/components/devices/device-report-linked";
 
 const ALL = "__all__";
 
@@ -399,6 +401,12 @@ export function DeviceReportDashboard({ devices, requests, orgStructure }: Props
           </ResponsiveContainer>
         </ChartCard>
       )}
+
+      {/* ── Lifecycle analytics ── */}
+      <RequestLifecycleAnalytics requests={filteredRequests} />
+
+      {/* ── Parent-child хосолсон хүсэлтийн анализ ── */}
+      <RequestLinkedAnalytics requests={filteredRequests} />
 
       {/* ── Request flow analytics ── */}
       <RequestFlowAnalytics
