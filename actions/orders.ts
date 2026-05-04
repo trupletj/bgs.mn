@@ -240,6 +240,23 @@ export type OrderItem = {
   spare_type: string;
 };
 
+export type CreateOrderItemInput = Pick<
+  OrderItem,
+  | "part_number"
+  | "part_name"
+  | "part_description"
+  | "manufacturer"
+  | "quantity"
+  | "unit"
+  | "notes"
+  | "image_url"
+  | "spare_type"
+>;
+
+type ActionError = {
+  message: string;
+};
+
 export interface OrderReviewers {
   id: number | string;
   order_id: number;
@@ -299,15 +316,7 @@ export async function addOrderItem(orderItem: Partial<OrderItem>): Promise<{
   data: OrderItem | null;
   error: PostgrestError | null;
 }> {
-  const supabase = getSupabaseAdmin();
-  const { data: users, error: userError } =
-    await supabase.auth.admin.listUsers();
-  console.log(
-    "Admin Test (List Users):",
-    users,
-    userError ? "Failed" : "Success",
-  );
-
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("order_items")
     .insert(orderItem)
@@ -444,6 +453,173 @@ export async function createOrderWithInstace(
   }
 
   return { data, error };
+}
+
+export async function createOrderWithItems({
+  orderData,
+  items,
+}: {
+  orderData: Partial<Order>;
+  items: CreateOrderItemInput[];
+}): Promise<{
+  data: Order | null;
+  error: ActionError | null;
+}> {
+  const supabase = await createClient();
+
+  let orderId: number | null = null;
+  let instanceId: number | null = null;
+  let reviewersCreated = false;
+
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error("Хэрэглэгчийн мэдээлэл авах үед алдаа гарлаа.");
+    }
+
+    if (items.length === 0) {
+      throw new Error("Захиалгад дор хаяж нэг сэлбэг нэмнэ үү.");
+    }
+
+    const profile_id = await getProfileIdFromAuthUserId();
+    const allowedProcesses = await getOrderProcessesForCurrentUser();
+    const requestedProcessId = String(orderData.order_process_id);
+
+    if (!allowedProcesses.some((process) => process.id === requestedProcessId)) {
+      throw new Error("Энэ захиалгын төрлөөр захиалга үүсгэх эрхгүй байна.");
+    }
+
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        ...orderData,
+        created_profile: profile_id,
+        auth_user_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (orderError || !order) {
+      throw new Error(orderError?.message || "Захиалга үүсгэхэд алдаа гарлаа");
+    }
+
+    orderId = order.id;
+
+    const { error: itemsError } = await supabase.from("order_items").insert(
+      items.map((item) => ({
+        ...item,
+        order_id: order.id,
+        status: "pending",
+      })),
+    );
+
+    if (itemsError) {
+      throw new Error(`Сэлбэг нэмэхэд алдаа гарлаа: ${itemsError.message}`);
+    }
+
+    const { data: instance, error: instancesError } = await supabase
+      .from("order_instances")
+      .insert({
+        order_id: order.id,
+        order_process_id: orderData.order_process_id,
+        current_step_order: 1,
+        status: "in_progress",
+      })
+      .select()
+      .single();
+
+    if (instancesError || !instance) {
+      throw new Error(
+        instancesError?.message || "Process instance үүсгэхэд алдаа гарлаа",
+      );
+    }
+
+    instanceId = instance.id;
+
+    const { data: step, error: stepError } = await supabase
+      .from("order_steps")
+      .select("id")
+      .eq("order_process_id", orderData.order_process_id)
+      .eq("step_order", 1)
+      .single();
+
+    if (stepError || !step) {
+      throw new Error(
+        "Захиалга үүсгэн хянагчид холбох гэтэл эхний шат олдсонгүй",
+      );
+    }
+
+    const { data: stepRoles, error: roleError } = await supabase
+      .from("order_step_roles")
+      .select("role_id")
+      .eq("order_step_id", step.id);
+
+    if (roleError || !stepRoles?.length) {
+      throw new Error("Эхний шатанд role тохируулаагүй байна");
+    }
+
+    const roleIds = stepRoles.map((r) => r.role_id);
+
+    const { data: profiles, error: profileError } = await supabase
+      .from("roles_profiles")
+      .select("profile_id, role_id")
+      .in("role_id", roleIds);
+
+    if (profileError || !profiles?.length) {
+      throw new Error("Энэ шатанд хянах хүн олдсонгүй");
+    }
+
+    const { error: reviewerError } = await supabase
+      .from("order_step_reviewers")
+      .insert(
+        profiles.map((profile) => ({
+          order_instance_id: instance.id,
+          order_step_id: step.id,
+          reviewer_profile_id: profile.profile_id,
+          role_id: profile.role_id,
+          status: "pending",
+        })),
+      );
+
+    if (reviewerError) {
+      throw new Error(`Reviewer үүсгэхэд алдаа гарлаа: ${reviewerError.message}`);
+    }
+
+    reviewersCreated = true;
+
+    return { data: order as Order, error: null };
+  } catch (error) {
+    if (instanceId) {
+      if (reviewersCreated) {
+        await supabase
+          .from("order_step_reviewers")
+          .delete()
+          .eq("order_instance_id", instanceId);
+      }
+
+      await supabase.from("order_instances").delete().eq("id", instanceId);
+    }
+
+    if (orderId) {
+      await supabase.from("orders").delete().eq("id", orderId);
+    }
+
+    console.error("Error creating order with items:", error);
+
+    return {
+      data: null,
+      error: {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Захиалга үүсгэхэд алдаа гарлаа",
+      },
+    };
+  }
 }
 
 export async function getAwaitingOrders(profile_id: string) {

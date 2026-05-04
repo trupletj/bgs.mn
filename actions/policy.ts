@@ -20,6 +20,7 @@ interface ClausePositionRow {
   clause_id: string;
   job_position_id?: string | null;
   type?: string | null;
+  is_checked?: boolean | null;
 }
 
 async function savePolicyScopeTargets(
@@ -430,7 +431,7 @@ export const getPolicy = async (id: string) => {
         const clausesWithPositions = (allClauses || []).map((clause) => ({
           ...clause,
           clause_position: clausePositions.filter(
-            (pos) => pos.clause_id === clause.id
+            (pos) => pos.clause_id === clause.id && pos.is_checked === true
           ),
         }));
 

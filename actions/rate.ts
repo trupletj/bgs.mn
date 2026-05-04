@@ -223,33 +223,6 @@ async function performChecks(params: SubmitReviewParams) {
   };
 }
 
-// Туслах функц: Алхамд reviewer үүсгэх боломжтой эсэх
-async function canCreateReviewersForStep(step_id: number): Promise<boolean> {
-  const supabase = createClient();
-
-  const { data: roles, error: rolesError } = await supabase
-    .from("order_step_roles")
-    .select("role_id")
-    .eq("order_step_id", step_id);
-
-  if (rolesError || !roles || roles.length === 0) {
-    return false; // Role байхгүй
-  }
-
-  for (const { role_id } of roles) {
-    const { count, error: countError } = await supabase
-      .from("roles_profiles")
-      .select("profile_id", { count: "exact", head: true })
-      .eq("role_id", role_id);
-
-    if (countError || (count ?? 0) === 0) {
-      return false; // Тухайн role-д хэрэглэгч байхгүй
-    }
-  }
-
-  return true;
-}
-
 async function checkAndMoveToNextStep({
   order_instance_id,
   order_step_id,
@@ -286,7 +259,6 @@ async function checkAndMoveToNextStep({
     order_instance_id,
     order_step_id,
     current_step_order,
-    required_approval_count,
   );
 }
 
@@ -294,7 +266,6 @@ async function moveToNextStep(
   order_instance_id: number,
   current_step_id: number,
   current_step_order: number,
-  required_approval_count: number,
 ) {
   const supabase = createClient();
 
@@ -335,14 +306,12 @@ async function moveToNextStep(
   await createNextStepReviewers(
     order_instance_id,
     nextStep.id,
-    required_approval_count,
   );
 }
 
 async function createNextStepReviewers(
   order_instance_id: number,
   next_step_id: number,
-  required_approval_count: number,
 ) {
   const supabase = createClient();
 
