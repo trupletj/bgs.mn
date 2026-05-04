@@ -22,7 +22,7 @@ import { AttendanceWidget } from "@/components/dashboard/attendance-widget";
 
 export default async function DashboardPage() {
   const hasPolicyAccess = await hasPermission("policy", "access");
-  const hasOrderAccess = await hasPermission("order", "review");
+  const hasOrderAccess = await hasPermission("order", "access");
 
   const [policyOverview, orderStats, monthlyTrend, statusBreakdown] =
     await Promise.all([
