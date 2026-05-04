@@ -9,10 +9,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Phone,
-  Briefcase,
   Building2,
   LinkIcon,
   Building,
+  Clock,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
@@ -20,11 +20,33 @@ import { UserMealConfig } from "../dine/user-meal-config";
 import { RiProfileLine } from "react-icons/ri";
 import { DialogDescription } from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
+import type { Dispatch } from "react";
+import {
+  getEmployeeShiftInfo,
+  type EmployeeShiftInfo,
+} from "@/actions/employee-shift";
+
+interface EmployeeDialogData {
+  id: string;
+  bteg_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  register_number?: string | null;
+  department_name?: string | null;
+  heltes_name?: string | null;
+  position_name?: string | null;
+  is_active?: boolean | null;
+  organization_name?: string | null;
+  address?: string | null;
+  email?: string | null;
+  job_position_id?: string | null;
+}
 
 interface EmployeeDetailDialogProps {
-  employee: any | null;
+  employee: EmployeeDialogData | null;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: Dispatch<boolean>;
   permissions: {
     canReadUserDetail: boolean;
     canReadDine: boolean;
@@ -40,15 +62,46 @@ export function EmployeeDetailDialog({
   permissions,
 }: EmployeeDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<string>("");
+  const [shiftInfo, setShiftInfo] = useState<EmployeeShiftInfo | null>(null);
+  const [isShiftLoading, setIsShiftLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setActiveTab("");
+      setShiftInfo(null);
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !employee?.bteg_id) {
+      setShiftInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsShiftLoading(true);
+    getEmployeeShiftInfo(employee.bteg_id)
+      .then((result) => {
+        if (!cancelled) setShiftInfo(result);
+      })
+      .finally(() => {
+        if (!cancelled) setIsShiftLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employee?.bteg_id, open]);
+
   if (!employee) return null;
   const supabase = createClient();
+
+  const formatShiftTime = (value?: string | null) => {
+    if (!value) return "—";
+    const date = new Date(String(value).replace(" ", "T"));
+    if (Number.isNaN(date.getTime())) return String(value);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  };
 
   function getHeltesAndDepartment(
     dep_name: string | null,
@@ -85,10 +138,10 @@ export function EmployeeDetailDialog({
 
       if (descError || !jobDesc) throw new Error("Тодорхойлолт олдсонгүй");
 
-      const url = `/dashboard/job-descriptions/${jobDesc.id}`;
+      const url = `/job-descriptions/${jobDesc.id}`;
       window.open(url, "_blank", "noopener,noreferrer");
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Алдаа гарлаа");
     }
   };
 
@@ -121,6 +174,14 @@ export function EmployeeDetailDialog({
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     Идэвхтэй
                   </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
+                    <Clock className="h-3 w-3" />
+                    {isShiftLoading
+                      ? "Ээлж ачаалж байна"
+                      : shiftInfo?.currentGroupName ||
+                        shiftInfo?.shiftType ||
+                        "Ээлж тодорхойгүй"}
+                  </span>
                 </div>
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   {employee.position_name || "Албан тушаал тодорхойгүй"}
@@ -146,6 +207,18 @@ export function EmployeeDetailDialog({
                 <Phone className="h-4 w-4 shrink-0 text-primary" />
                 <span className="font-mono text-muted-foreground">
                   {employee.phone || "—"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm sm:col-span-3">
+                <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-muted-foreground">
+                  {shiftInfo
+                    ? `${shiftInfo.shiftType || "Ээлж"} · ${formatShiftTime(
+                        shiftInfo.startAt,
+                      )} - ${formatShiftTime(shiftInfo.endAt)}`
+                    : isShiftLoading
+                      ? "Ээлжийн мэдээлэл ачаалж байна"
+                      : "Ээлжийн мэдээлэл олдсонгүй"}
                 </span>
               </div>
             </div>
@@ -212,14 +285,32 @@ export function EmployeeDetailDialog({
                   <span className="font-semibold ">Алба, Хэлтэс:</span>
                   <span className="">
                     {getHeltesAndDepartment(
-                      employee.department_name,
-                      employee.heltes_name,
+                      employee.department_name ?? null,
+                      employee.heltes_name ?? null,
                     )}
                   </span>
                 </div>
                 <div className="flex gap-2 col-span-2">
                   <span className="font-semibold">Албан тушаал:</span>
                   <span className="">{employee.position_name}</span>
+                </div>
+                <div className="flex gap-2 col-span-2">
+                  <span className="font-semibold">Ээлжийн нэр:</span>
+                  <span>
+                    {shiftInfo?.currentGroupName ||
+                      shiftInfo?.shiftType ||
+                      "Мэдээлэл алга"}
+                  </span>
+                </div>
+                <div className="flex gap-2 col-span-2">
+                  <span className="font-semibold">Ажлын цаг:</span>
+                  <span>
+                    {shiftInfo
+                      ? `${formatShiftTime(shiftInfo.startAt)} - ${formatShiftTime(
+                          shiftInfo.endAt,
+                        )}`
+                      : "Мэдээлэл алга"}
+                  </span>
                 </div>
                 <div className="flex gap-2 col-span-2">
                   <span className="font-semibold">Оршин суугаа хаяг:</span>
@@ -235,7 +326,7 @@ export function EmployeeDetailDialog({
               {employee.job_position_id && (
                 <div
                   onClick={() =>
-                    handleNavigateJobDesc(employee.job_position_id)
+                    handleNavigateJobDesc(employee.job_position_id ?? null)
                   }
                   className="text-blue-500 text-sm cursor-pointer hover:underline flex items-center justify-end gap-1 opacity-90 italic">
                   <LinkIcon className="h-4 w-4" />

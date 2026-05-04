@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import { Clause } from "@/types/clause";
 import PolicyEditerForm from "@/components/policy/PolicyEditorForm";
-import { ActionType } from "@/types/types";
+import { ActionType, PolicyScopeTarget } from "@/types/types";
 
 interface Policy {
   id: string;
   name: string | null;
   referenceCode: string | null;
   approvedDate: string | null;
+  scopeTargets?: PolicyScopeTarget[];
   section?: Array<{
     id: string;
     referenceNumber: string;
@@ -91,6 +92,7 @@ export default function PolicyEditClient({ policyId }: PolicyEditClientProps) {
         approvedDate: policy.approvedDate
           ? new Date(policy.approvedDate)
           : null,
+        scopeTargets: policy.scopeTargets ?? [],
         sections: (policy.section ?? []).map((s) => ({
           id: s.id,
           policyId: s.policyId,

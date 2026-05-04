@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 import {
-  ClockIcon,
   PlusIcon,
   TrashIcon,
   FileTextIcon,
@@ -183,6 +182,11 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
 
     if (orderItems.some((item) => !item.part_number.trim())) {
       toast.error("Бүх сэлбэгүүд эдийн дугаартай байх ёстой.");
+      return;
+    }
+
+    if (!formData.order_process_id) {
+      toast.error("Захиалгын процесс сонгоно уу.");
       return;
     }
 
@@ -364,11 +368,17 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
                 </SelectTrigger>
 
                 <SelectContent>
-                  {orderProcesses.map((process) => (
-                    <SelectItem key={process.id} value={process.id}>
-                      {process.name}
-                    </SelectItem>
-                  ))}
+                  {orderProcesses.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      Танай хэлтэст тохирсон захиалгын төрөл алга
+                    </div>
+                  ) : (
+                    orderProcesses.map((process) => (
+                      <SelectItem key={process.id} value={process.id}>
+                        {process.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

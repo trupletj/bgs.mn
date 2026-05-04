@@ -1,8 +1,67 @@
 import { createClient } from "@/utils/supabase/client";
-import { Policy } from "@/types/types";
+import { Policy, PolicyScopeTarget } from "@/types/types";
 import { Clause as ClauseEdit } from "@/types/clause";
 
 const supabase = createClient();
+
+interface ClauseRow {
+  id: string;
+  text: string;
+  reference_number: string | null;
+  section_id: string;
+  parent_id: string | null;
+  policy_id: string | null;
+  is_deleted: boolean | null;
+  clause_position?: ClausePositionRow[];
+}
+
+interface ClausePositionRow {
+  id?: string | number;
+  clause_id: string;
+  job_position_id?: string | null;
+  type?: string | null;
+}
+
+async function savePolicyScopeTargets(
+  policyId: string,
+  scopeTargets?: PolicyScopeTarget[],
+) {
+  const supabase = createClient();
+
+  const { error: deleteError } = await supabase
+    .from("policy_scope_targets")
+    .delete()
+    .eq("policy_id", policyId);
+
+  if (deleteError) throw deleteError;
+
+  const uniqueTargets = Array.from(
+    new Map(
+      (scopeTargets ?? [])
+        .filter((target) => target.target_type && target.target_bteg_id)
+        .map((target) => [
+          `${target.target_type}:${target.target_bteg_id}`,
+          target,
+        ]),
+    ).values(),
+  );
+
+  if (uniqueTargets.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from("policy_scope_targets")
+    .insert(
+      uniqueTargets.map((target) => ({
+        policy_id: policyId,
+        target_type: target.target_type,
+        target_bteg_id: target.target_bteg_id,
+        target_name: target.target_name ?? null,
+        parent_bteg_id: target.parent_bteg_id ?? null,
+      })),
+    );
+
+  if (insertError) throw insertError;
+}
 
 export async function getPolicyById(policyId: string) {
   const supabase = createClient();
@@ -25,7 +84,7 @@ export async function createPolicy(policyData: Omit<Policy, "section">) {
   const supabase = createClient();
 
   if (policyData.reference_code) {
-    const { data: existingPolicy, error: checkError } = await supabase
+    const { data: existingPolicy } = await supabase
       .from("policy")
       .select("id")
       .eq("reference_code", policyData.reference_code)
@@ -62,6 +121,8 @@ export async function createPolicy(policyData: Omit<Policy, "section">) {
     console.error("Create policy error:", error);
     throw error;
   }
+
+  await savePolicyScopeTargets(data.id, policyData.scope_targets);
 
   return data;
 }
@@ -264,7 +325,10 @@ const sortByReferenceNumberSection = (
   return 0;
 };
 
-const sortByReferenceNumber = (a: any, b: any) => {
+const sortByReferenceNumber = (
+  a: { reference_number: string | null },
+  b: { reference_number: string | null },
+) => {
   const refA = (a.reference_number ?? "").split(".").map(Number);
   const refB = (b.reference_number ?? "").split(".").map(Number);
 
@@ -281,8 +345,8 @@ const sortByReferenceNumber = (a: any, b: any) => {
 };
 
 const buildClauseTree = (
-  clauses: any[],
-  parentId: string | null = null
+  clauses: ClauseRow[],
+  parentId: string | null = null,
 ): ClauseEdit[] => {
   return clauses
     .filter((clause) => clause.parent_id === parentId && !clause.is_deleted)
@@ -290,7 +354,7 @@ const buildClauseTree = (
     .map((clause) => ({
       id: clause.id,
       text: clause.text,
-      referenceNumber: clause.reference_number,
+      referenceNumber: clause.reference_number ?? "",
       sectionId: clause.section_id,
       parentId: clause.parent_id,
       policyId: clause.policy_id,
@@ -349,11 +413,11 @@ export const getPolicy = async (id: string) => {
 
         // Clause position-уудыг авах
         const clauseIds = (allClauses || []).map((clause) => clause.id);
-        let clausePositions: any[] = [];
+        let clausePositions: ClausePositionRow[] = [];
 
         if (clauseIds.length > 0) {
           const { data: positions, error: positionsError } = await supabase
-            .from("clause_position")
+            .from("clause_job_position")
             .select("*")
             .in("clause_id", clauseIds);
 
@@ -384,12 +448,24 @@ export const getPolicy = async (id: string) => {
       })
     );
 
+    const { data: scopeTargets, error: scopeError } = await supabase
+      .from("policy_scope_targets")
+      .select("target_type, target_bteg_id, target_name, parent_bteg_id")
+      .eq("policy_id", policy.id)
+      .order("target_type")
+      .order("target_name");
+
+    if (scopeError) {
+      throw new Error(`Хамаарах алба, хэлтэс авахад алдаа гарлаа: ${scopeError.message}`);
+    }
+
     return {
       id: policy.id,
       name: policy.name,
       approvedDate: policy.approved_date,
       referenceCode: policy.reference_code,
       isDeleted: policy.is_deleted,
+      scopeTargets: scopeTargets ?? [],
       section: sectionsWithClauses,
     };
   } catch (error) {
@@ -404,7 +480,7 @@ export async function updatePolicy(
   const supabase = createClient();
 
   if (policyData.reference_code) {
-    const { data: existingPolicy, error: checkError } = await supabase
+    const { data: existingPolicy } = await supabase
       .from("policy")
       .select("id")
       .eq("reference_code", policyData.reference_code)
@@ -439,6 +515,8 @@ export async function updatePolicy(
     console.error("Update policy error:", error);
     throw error;
   }
+
+  await savePolicyScopeTargets(policyId, policyData.scope_targets);
 
   return data;
 }

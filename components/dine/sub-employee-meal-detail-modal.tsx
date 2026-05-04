@@ -67,6 +67,7 @@ interface UserRow {
 interface PlanRow {
   org_id: string;
   breakfast_count: number | null;
+  morning_meal_count: number | null;
   lunch_count: number | null;
   dinner_count: number | null;
   night_meal_count: number | null;
@@ -85,6 +86,7 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
 
 const PLAN_FIELD_BY_MEAL: Record<string, string> = {
   breakfast: "breakfast_count",
+  morning_meal: "morning_meal_count",
   lunch: "lunch_count",
   dinner: "dinner_count",
   night_meal: "night_meal_count",
@@ -93,6 +95,7 @@ const PLAN_FIELD_BY_MEAL: Record<string, string> = {
 function getPlannedCount(plan: PlanRow | undefined, mealType: string): number {
   if (!plan) return 0;
   if (mealType === "breakfast") return Number(plan.breakfast_count || 0);
+  if (mealType === "morning_meal") return Number(plan.morning_meal_count || 0);
   if (mealType === "lunch") return Number(plan.lunch_count || 0);
   if (mealType === "dinner") return Number(plan.dinner_count || 0);
   if (mealType === "night_meal") return Number(plan.night_meal_count || 0);
@@ -182,7 +185,7 @@ export function SubEmployeeMealDetailModal({
           ? supabase
               .from("sub_employee_meal_plans")
               .select(
-                "org_id, breakfast_count, lunch_count, dinner_count, night_meal_count",
+                "org_id, breakfast_count, morning_meal_count, lunch_count, dinner_count, night_meal_count",
               )
               .in("org_id", orgIds)
               .eq("dining_hall_id", hallId)
@@ -229,19 +232,23 @@ export function SubEmployeeMealDetailModal({
           const plan = planByOrgId.get(subEmployee.org_id);
           const planField = PLAN_FIELD_BY_MEAL[log.meal_type];
 
-          return [{
-            id: log.id,
-            qrLabel: subEmployee?.custom_label || "QR тодорхойгүй",
-            linkedUserName: subEmployee?.bteg_id
-              ? userNameByBteg.get(subEmployee.bteg_id) || null
-              : null,
-            companyName:
-              orgNameById.get(subEmployee.org_id) ||
-              "Гэрээт байгууллага тодорхойгүй",
-            mealType: log.meal_type,
-            scannedAt: log.scanned_at,
-            isExpected: planField ? getPlannedCount(plan, log.meal_type) > 0 : false,
-          }];
+          return [
+            {
+              id: log.id,
+              qrLabel: subEmployee?.custom_label || "QR тодорхойгүй",
+              linkedUserName: subEmployee?.bteg_id
+                ? userNameByBteg.get(subEmployee.bteg_id) || null
+                : null,
+              companyName:
+                orgNameById.get(subEmployee.org_id) ||
+                "Гэрээт байгууллага тодорхойгүй",
+              mealType: log.meal_type,
+              scannedAt: log.scanned_at,
+              isExpected: planField
+                ? getPlannedCount(plan, log.meal_type) > 0
+                : false,
+            },
+          ];
         }),
       );
 
@@ -268,7 +275,7 @@ export function SubEmployeeMealDetailModal({
               <TableRow>
                 <TableHead>QR label</TableHead>
                 <TableHead>Холбосон ажилтан</TableHead>
-                <TableHead>Компани</TableHead>
+                <TableHead>Байгууллага</TableHead>
                 <TableHead>Хоол</TableHead>
                 <TableHead>Төлөвлөгөө</TableHead>
                 <TableHead className="text-right">Идсэн цаг</TableHead>
@@ -296,9 +303,7 @@ export function SubEmployeeMealDetailModal({
               ) : (
                 rows.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      {row.qrLabel}
-                    </TableCell>
+                    <TableCell className="font-medium">{row.qrLabel}</TableCell>
                     <TableCell>
                       {row.linkedUserName || (
                         <span className="text-slate-400">Холбоогүй</span>

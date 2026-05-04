@@ -175,7 +175,15 @@ export interface Policy {
   name: string;
   reference_code: string;
   approved_date: Date | null;
+  scope_targets?: PolicyScopeTarget[];
   section: Section[];
+}
+
+export interface PolicyScopeTarget {
+  target_type: "heltes" | "alba";
+  target_bteg_id: string;
+  target_name?: string | null;
+  parent_bteg_id?: string | null;
 }
 
 export function getUnitOptionLabel(value?: string) {
