@@ -10,6 +10,7 @@ import {
   IconShield,
   IconClockHour4,
   IconBus,
+  IconBriefcase,
   type Icon,
 } from "@tabler/icons-react";
 import { usePathname } from "next/navigation";
@@ -39,6 +40,7 @@ const serviceIcons: Record<string, Icon> = {
   dine: IconToolsKitchen2,
   employees: IconUsers,
   policy: IconFileText,
+  "job-descriptions": IconBriefcase,
   admin: IconShield,
 };
 

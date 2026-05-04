@@ -14,6 +14,7 @@ import {
   X,
   Search,
   Check,
+  Pencil,
 } from "lucide-react";
 import QRCode from "qrcode";
 import JSZip from "jszip";
@@ -21,12 +22,19 @@ import { saveAs } from "file-saver";
 import { toast } from "sonner";
 
 interface MealPlan {
+  id?: string;
   date: string;
   breakfast_count: number;
+  morning_meal_count: number;
   dining_hall_id: number | null;
   lunch_count: number;
   dinner_count: number;
   night_meal_count: number;
+  actual_breakfast_count?: number;
+  actual_morning_meal_count?: number;
+  actual_lunch_count?: number;
+  actual_dinner_count?: number;
+  actual_night_meal_count?: number;
 }
 
 interface DiningHall {
@@ -47,6 +55,60 @@ interface User {
   bteg_id: string;
   first_name: string | null;
   last_name: string | null;
+}
+
+const MEAL_PLAN_FIELDS = [
+  {
+    key: "breakfast_count",
+    actualKey: "actual_breakfast_count",
+    label: "Өглөөний цай",
+    shortLabel: "Ө/цай",
+    mealType: "breakfast",
+  },
+  {
+    key: "morning_meal_count",
+    actualKey: "actual_morning_meal_count",
+    label: "Өглөөний хоол",
+    shortLabel: "Ө/хоол",
+    mealType: "morning_meal",
+  },
+  {
+    key: "lunch_count",
+    actualKey: "actual_lunch_count",
+    label: "Өдрийн хоол",
+    shortLabel: "Өдөр",
+    mealType: "lunch",
+  },
+  {
+    key: "dinner_count",
+    actualKey: "actual_dinner_count",
+    label: "Оройн хоол",
+    shortLabel: "Орой",
+    mealType: "dinner",
+  },
+  {
+    key: "night_meal_count",
+    actualKey: "actual_night_meal_count",
+    label: "Шөнийн хоол",
+    shortLabel: "Шөнө",
+    mealType: "night_meal",
+  },
+] as const;
+
+function createEmptyPlan(): MealPlan {
+  return {
+    date: new Date().toISOString().split("T")[0],
+    dining_hall_id: null,
+    breakfast_count: 0,
+    morning_meal_count: 0,
+    lunch_count: 0,
+    dinner_count: 0,
+    night_meal_count: 0,
+  };
+}
+
+function planActualKey(date: string, diningHallId: number | null, mealType: string) {
+  return `${date}|${diningHallId ?? ""}|${mealType}`;
 }
 
 // QR утга үүсгэх
@@ -122,14 +184,8 @@ export default function OrgDetailPage() {
 
   const [newCount, setNewCount] = useState(1);
   const [newLabel, setNewLabel] = useState("");
-  const [newPlan, setNewPlan] = useState<MealPlan>({
-    date: new Date().toISOString().split("T")[0],
-    dining_hall_id: null,
-    breakfast_count: 0,
-    lunch_count: 0,
-    dinner_count: 0,
-    night_meal_count: 0,
-  });
+  const [newPlan, setNewPlan] = useState<MealPlan>(() => createEmptyPlan());
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
 
   // Ажилтан сонгох modal
   const [linkingItem, setLinkingItem] = useState<QRItem | null>(null);
@@ -183,18 +239,19 @@ export default function OrgDetailPage() {
     }
 
     // QR жагсаалт + холбосон ажилтны нэр
-    const { data: qrs } = await supabase
+    const { data: rawQrs } = await supabase
       .from("sub_employee_for_food")
       .select("id, custom_label, created_at, bteg_id")
       .eq("org_id", org_id)
       .eq("is_active", true)
       .order("created_at", { ascending: true });
 
+    const qrs = rawQrs || [];
     if (qrs) {
       // bteg_id байгаа бол users-с нэр татна
       const btegIds = qrs.map((q) => q.bteg_id).filter(Boolean) as string[];
 
-      let userMap: Record<string, string> = {};
+      const userMap: Record<string, string> = {};
       if (btegIds.length > 0) {
         const { data: linkedUsers } = await supabase
           .from("users")
@@ -222,7 +279,54 @@ export default function OrgDetailPage() {
       .select("*")
       .eq("org_id", org_id)
       .order("date", { ascending: false });
-    if (plans) setMealPlans(plans);
+    if (plans) {
+      const typedPlans = plans as MealPlan[];
+      const subEmployeeIds = qrs.map((q) => q.id);
+      const planDates = Array.from(new Set(typedPlans.map((plan) => plan.date)));
+      const hallIds = Array.from(
+        new Set(
+          typedPlans
+            .map((plan) => plan.dining_hall_id)
+            .filter((hallId): hallId is number => typeof hallId === "number"),
+        ),
+      );
+
+      const actualCounts: Record<string, number> = {};
+      if (subEmployeeIds.length > 0 && planDates.length > 0 && hallIds.length > 0) {
+        const { data: actualLogs } = await supabase
+          .from("meal_logs")
+          .select("date, dining_hall_id, meal_type")
+          .in("sub_employee_id", subEmployeeIds)
+          .in("date", planDates)
+          .in("dining_hall_id", hallIds);
+
+        (actualLogs || []).forEach((log) => {
+          const key = planActualKey(
+            log.date,
+            log.dining_hall_id,
+            log.meal_type,
+          );
+          actualCounts[key] = (actualCounts[key] || 0) + 1;
+        });
+      }
+
+      setMealPlans(
+        typedPlans.map((plan) => ({
+          ...plan,
+          morning_meal_count: Number(plan.morning_meal_count || 0),
+          actual_breakfast_count:
+            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "breakfast")] || 0,
+          actual_morning_meal_count:
+            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "morning_meal")] || 0,
+          actual_lunch_count:
+            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "lunch")] || 0,
+          actual_dinner_count:
+            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "dinner")] || 0,
+          actual_night_meal_count:
+            actualCounts[planActualKey(plan.date, plan.dining_hall_id, "night_meal")] || 0,
+        })),
+      );
+    }
 
     setLoading(false);
   }
@@ -256,24 +360,53 @@ export default function OrgDetailPage() {
       toast.warning("Гал тогоо сонгоно уу!");
       return;
     }
-    const { error } = await supabase
-      .from("sub_employee_meal_plans")
-      .upsert(
-        { org_id, ...newPlan },
-        { onConflict: "org_id,dining_hall_id,date" },
-      );
+    const payload = {
+      org_id,
+      date: newPlan.date,
+      dining_hall_id: newPlan.dining_hall_id,
+      breakfast_count: newPlan.breakfast_count,
+      morning_meal_count: newPlan.morning_meal_count,
+      lunch_count: newPlan.lunch_count,
+      dinner_count: newPlan.dinner_count,
+      night_meal_count: newPlan.night_meal_count,
+    };
+
+    const { error } = editingPlanId
+      ? await supabase
+          .from("sub_employee_meal_plans")
+          .update(payload)
+          .eq("id", editingPlanId)
+      : await supabase
+          .from("sub_employee_meal_plans")
+          .upsert(payload, { onConflict: "org_id,dining_hall_id,date" });
 
     if (!error) {
       await fetchData();
-      setNewPlan({
-        date: new Date().toISOString().split("T")[0],
-        dining_hall_id: null,
-        breakfast_count: 0,
-        lunch_count: 0,
-        dinner_count: 0,
-        night_meal_count: 0,
-      });
+      setNewPlan(createEmptyPlan());
+      setEditingPlanId(null);
+      toast.success(editingPlanId ? "Төлөвлөгөө шинэчлэгдлээ" : "Төлөвлөгөө хадгалагдлаа");
+    } else {
+      toast.error(error.message);
     }
+  }
+
+  function handleEditPlan(plan: MealPlan) {
+    setEditingPlanId(plan.id || null);
+    setNewPlan({
+      id: plan.id,
+      date: plan.date,
+      dining_hall_id: plan.dining_hall_id,
+      breakfast_count: Number(plan.breakfast_count || 0),
+      morning_meal_count: Number(plan.morning_meal_count || 0),
+      lunch_count: Number(plan.lunch_count || 0),
+      dinner_count: Number(plan.dinner_count || 0),
+      night_meal_count: Number(plan.night_meal_count || 0),
+    });
+  }
+
+  function cancelEditPlan() {
+    setEditingPlanId(null);
+    setNewPlan(createEmptyPlan());
   }
 
   // Ажилтан холбох
@@ -380,9 +513,9 @@ export default function OrgDetailPage() {
       {/* Хоолны төлөвлөгөө */}
       <div className="bg-white border border-slate-200 rounded-xl p-5">
         <h2 className="font-semibold text-slate-700 mb-4">
-          Хоолны төлөвлөгөө нэмэх
+          {editingPlanId ? "Хоолны төлөвлөгөө засах" : "Хоолны төлөвлөгөө нэмэх"}
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
           <div>
             <label className="text-xs text-slate-500 mb-1 block">Огноо</label>
             <input
@@ -417,12 +550,7 @@ export default function OrgDetailPage() {
               ))}
             </select>
           </div>
-          {[
-            { key: "breakfast_count", label: "Өглөөний цай" },
-            { key: "lunch_count", label: "Өдрийн хоол" },
-            { key: "dinner_count", label: "Оройн хоол" },
-            { key: "night_meal_count", label: "Шөнийн хоол" },
-          ].map(({ key, label }) => (
+          {MEAL_PLAN_FIELDS.map(({ key, label }) => (
             <div key={key}>
               <label className="text-xs text-slate-500 mb-1 block">
                 {label}
@@ -442,12 +570,22 @@ export default function OrgDetailPage() {
             </div>
           ))}
         </div>
-        <button
-          onClick={handleSavePlan}
-          className="mt-3 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-          <Save className="h-4 w-4" />
-          Хадгалах
-        </button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={handleSavePlan}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+            <Save className="h-4 w-4" />
+            {editingPlanId ? "Шинэчлэх" : "Хадгалах"}
+          </button>
+          {editingPlanId && (
+            <button
+              onClick={cancelEditPlan}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm hover:bg-slate-50">
+              <X className="h-4 w-4" />
+              Болих
+            </button>
+          )}
+        </div>
 
         {mealPlans.length > 0 && (
           <div className="mt-4 border-t pt-4 overflow-x-auto">
@@ -455,21 +593,38 @@ export default function OrgDetailPage() {
               <thead>
                 <tr className="text-xs text-slate-500 border-b">
                   <th className="text-left py-2">Огноо</th>
-                  <th className="text-center py-2">Өглөө</th>
-                  <th className="text-center py-2">Өдөр</th>
-                  <th className="text-center py-2">Орой</th>
-                  <th className="text-center py-2">Шөнө</th>
+                  <th className="text-left py-2">Гал тогоо</th>
+                  {MEAL_PLAN_FIELDS.map((field) => (
+                    <th key={field.key} className="text-center py-2">
+                      {field.shortLabel}
+                    </th>
+                  ))}
+                  <th className="text-right py-2">Үйлдэл</th>
                 </tr>
               </thead>
               <tbody>
                 {mealPlans.map((plan) => (
-                  <tr key={plan.date} className="border-b border-slate-50">
+                  <tr key={plan.id || `${plan.date}-${plan.dining_hall_id}`} className="border-b border-slate-50">
                     <td className="py-2 font-medium">{plan.date}</td>
-                    <td className="text-center py-2">{plan.breakfast_count}</td>
-                    <td className="text-center py-2">{plan.lunch_count}</td>
-                    <td className="text-center py-2">{plan.dinner_count}</td>
-                    <td className="text-center py-2">
-                      {plan.night_meal_count}
+                    <td className="py-2">
+                      {diningHalls.find((hall) => hall.id === plan.dining_hall_id)
+                        ?.name || `#${plan.dining_hall_id}`}
+                    </td>
+                    {MEAL_PLAN_FIELDS.map((field) => (
+                      <td key={field.key} className="text-center py-2">
+                        {Number(plan[field.key] || 0)} /{" "}
+                        <span className="text-slate-500">
+                          {Number(plan[field.actualKey] || 0)}
+                        </span>
+                      </td>
+                    ))}
+                    <td className="text-right py-2">
+                      <button
+                        onClick={() => handleEditPlan(plan)}
+                        className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md text-xs hover:bg-slate-50">
+                        <Pencil className="h-3 w-3" />
+                        Edit
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -9,6 +9,7 @@ import {
   FileText,
   Plus,
   Search,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -40,6 +41,21 @@ interface Policy {
   name: string | null;
   approved_date: string | null;
   reference_code: string | null;
+  scopeTargets?: PolicyScopeTarget[];
+}
+
+interface PolicyScopeTarget {
+  target_type: "heltes" | "alba";
+  target_bteg_id: string;
+  target_name: string | null;
+  parent_bteg_id: string | null;
+}
+
+interface ScopeFilterOption {
+  key: string;
+  label: string;
+  type: "heltes" | "alba";
+  target_bteg_id: string;
 }
 
 const PAGE_SIZE = 15;
@@ -52,9 +68,13 @@ function formatDate(value: string | null) {
 
 export default function PolicyList({ is_delete }: { is_delete?: boolean }) {
   const [policies, setPolicies] = useState<Policy[]>([]);
+  const [scopeOptions, setScopeOptions] = useState<ScopeFilterOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [scopeSearchTerm, setScopeSearchTerm] = useState("");
+  const [selectedScopeKey, setSelectedScopeKey] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const [debouncedScopeSearchTerm] = useDebounce(scopeSearchTerm, 300);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -62,23 +82,131 @@ export default function PolicyList({ is_delete }: { is_delete?: boolean }) {
   useEffect(() => {
     fetchPolicies();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, debouncedSearchTerm]);
+  }, [currentPage, debouncedSearchTerm, selectedScopeKey]);
+
+  useEffect(() => {
+    fetchScopeOptions();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, selectedScopeKey]);
+
+  const fetchScopeOptions = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("policy_scope_targets")
+        .select("target_type, target_bteg_id, target_name")
+        .order("target_type")
+        .order("target_name");
+
+      if (error) throw error;
+
+      const optionMap = new Map<string, ScopeFilterOption>();
+      (data || []).forEach((scope) => {
+        const key = `${scope.target_type}:${scope.target_bteg_id}`;
+        if (optionMap.has(key)) return;
+        optionMap.set(key, {
+          key,
+          type: scope.target_type,
+          target_bteg_id: scope.target_bteg_id,
+          label: scope.target_name || scope.target_bteg_id,
+        });
+      });
+
+      setScopeOptions(
+        Array.from(optionMap.values()).sort((a, b) => {
+          const typeDiff =
+            (a.type === "heltes" ? 0 : 1) - (b.type === "heltes" ? 0 : 1);
+          if (typeDiff !== 0) return typeDiff;
+          return a.label.localeCompare(b.label);
+        }),
+      );
+    } catch (error) {
+      toast.error(`Алба, хэлтсийн жагсаалт авахад алдаа: ${(error as Error).message}`);
+    }
+  };
 
   const fetchPolicies = async () => {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const { data, error, count } = await supabase
+      let scopedPolicyIds: string[] | null = null;
+
+      if (selectedScopeKey) {
+        const [targetType, targetBtegId] = selectedScopeKey.split(":");
+        const { data: scopedPolicies, error: scopedError } = await supabase
+          .from("policy_scope_targets")
+          .select("policy_id")
+          .eq("target_type", targetType)
+          .eq("target_bteg_id", targetBtegId);
+
+        if (scopedError) throw scopedError;
+
+        scopedPolicyIds = Array.from(
+          new Set((scopedPolicies || []).map((row) => row.policy_id)),
+        );
+
+        if (scopedPolicyIds.length === 0) {
+          setPolicies([]);
+          setTotalCount(0);
+          setTotalPages(1);
+          return;
+        }
+      }
+
+      let query = supabase
         .from("policy")
         .select("id, name, approved_date, reference_code", { count: "exact" })
         .ilike("name", `%${debouncedSearchTerm}%`)
-        .eq("is_deleted", false)
+        .eq("is_deleted", false);
+
+      if (scopedPolicyIds) {
+        query = query.in("id", scopedPolicyIds);
+      }
+
+      const { data, error, count } = await query
         .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1)
         .order("approved_date", { ascending: false });
 
       if (error) throw error;
 
-      setPolicies(data || []);
+      const policyRows = data || [];
+      const policyIds = policyRows.map((policy) => policy.id);
+      let scopesByPolicy = new Map<string, PolicyScopeTarget[]>();
+
+      if (policyIds.length > 0) {
+        const { data: scopes, error: scopesError } = await supabase
+          .from("policy_scope_targets")
+          .select(
+            "policy_id, target_type, target_bteg_id, target_name, parent_bteg_id",
+          )
+          .in("policy_id", policyIds)
+          .order("target_type")
+          .order("target_name");
+
+        if (scopesError) throw scopesError;
+
+        scopesByPolicy = (scopes || []).reduce((acc, scope) => {
+          const current = acc.get(scope.policy_id) ?? [];
+          current.push({
+            target_type: scope.target_type,
+            target_bteg_id: scope.target_bteg_id,
+            target_name: scope.target_name,
+            parent_bteg_id: scope.parent_bteg_id,
+          });
+          acc.set(scope.policy_id, current);
+          return acc;
+        }, new Map<string, PolicyScopeTarget[]>());
+      }
+
+      setPolicies(
+        policyRows.map((policy) => ({
+          ...policy,
+          scopeTargets: scopesByPolicy.get(policy.id) ?? [],
+        })),
+      );
       setTotalCount(count ?? 0);
       setTotalPages(Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE)));
     } catch (error) {
@@ -87,6 +215,16 @@ export default function PolicyList({ is_delete }: { is_delete?: boolean }) {
       setIsLoading(false);
     }
   };
+
+  const filteredScopeOptions = scopeOptions.filter((option) => {
+    const query = debouncedScopeSearchTerm.toLowerCase();
+    if (!query) return true;
+    return option.label.toLowerCase().includes(query);
+  });
+
+  const selectedScope = scopeOptions.find(
+    (option) => option.key === selectedScopeKey,
+  );
 
   const goTo = (page: number) => {
     setCurrentPage(page);
@@ -116,18 +254,89 @@ export default function PolicyList({ is_delete }: { is_delete?: boolean }) {
         </Button>
       </div>
 
-      {/* Search */}
-      <Card className="px-4 py-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Журмын нэрээр хайх..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <Card className="space-y-3 px-4 py-3">
+        <div className="flex flex-col gap-2 lg:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Журмын нэрээр хайх..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="relative lg:w-80">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Алба, хэлтсээр хайх..."
+              className="pl-9 pr-9"
+              value={scopeSearchTerm}
+              onChange={(e) => setScopeSearchTerm(e.target.value)}
+            />
+            {scopeSearchTerm && (
+              <button
+                type="button"
+                onClick={() => setScopeSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
+
+        {(scopeSearchTerm || selectedScope) && (
+          <div className="space-y-2 border-t pt-3">
+            <div className="max-h-44 overflow-y-auto rounded-md border">
+            <button
+              type="button"
+              onClick={() => setSelectedScopeKey("")}
+              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted ${
+                !selectedScopeKey ? "bg-muted font-medium" : ""
+              }`}>
+              Бүх алба, хэлтэс
+              <span className="text-xs text-muted-foreground">
+                {scopeOptions.length}
+              </span>
+            </button>
+            {filteredScopeOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setSelectedScopeKey(option.key)}
+                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted ${
+                  selectedScopeKey === option.key ? "bg-muted font-medium" : ""
+                }`}>
+                <span className="min-w-0 truncate">{option.label}</span>
+                <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                  {option.type === "heltes" ? "Хэлтэс" : "Алба"}
+                </span>
+              </button>
+            ))}
+            {filteredScopeOptions.length === 0 && (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                Алба, хэлтэс олдсонгүй
+              </div>
+            )}
+          </div>
+          {selectedScope && (
+            <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+              <span className="truncate">
+                Сонгосон: {selectedScope.label}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={() => setSelectedScopeKey("")}>
+                Цэвэрлэх
+              </Button>
+            </div>
+          )}
+          </div>
+        )}
       </Card>
 
       {/* Table */}

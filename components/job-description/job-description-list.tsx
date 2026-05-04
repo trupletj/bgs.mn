@@ -1,7 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  BriefcaseBusiness,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Plus,
+  Search,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { useDebounce } from "use-debounce";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -10,42 +25,43 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "sonner";
-import { useDebounce } from "use-debounce";
-import JobDescSeeButton from "./job-desc-see-button";
-// import JobDescDeleteButton from "./job-desc-delete-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { createClient } from "@/utils/supabase/client";
-import Link from "next/link";
-import { PlusIcon, Search } from "lucide-react";
+import JobDescSeeButton from "./job-desc-see-button";
 
 interface JobDescription {
   id: string;
-  job_position: JobPosition[]; // Allow array here
+  title: string | null;
   a_code: string | null;
+  job_position: JobPosition | JobPosition[] | null;
 }
 
 interface JobPosition {
   name: string | null;
 }
 
-export default function JobDescriptionList({
-  is_create,
-}: {
-  is_create?: boolean;
-}) {
+const PAGE_SIZE = 15;
+
+function getJobPositionName(jobPosition: JobDescription["job_position"]) {
+  if (!jobPosition) return "Албан тушаал тодорхойгүй";
+  const positions = Array.isArray(jobPosition) ? jobPosition : [jobPosition];
+  const names = positions.map((p) => p.name || "").filter(Boolean);
+  return names.length > 0 ? names.join(", ") : "Албан тушаал тодорхойгүй";
+}
+
+export default function JobDescriptionList() {
   const [jobDescriptions, setJobDescriptions] = useState<JobDescription[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 15;
-
-  useEffect(() => {
-    fetchJobDescriptions();
-  }, [currentPage, debouncedSearchTerm]);
-
-  console.log("is_create:", is_create);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchJobDescriptions = useCallback(async () => {
     setIsLoading(true);
@@ -54,27 +70,27 @@ export default function JobDescriptionList({
 
       let query = supabase
         .from("job_description")
-        .select("id, job_position:job_position_id(name), a_code", {
+        .select("id, title, a_code, job_position:job_position_id(name)", {
           count: "exact",
         })
         .eq("is_deleted", false)
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1)
         .order("id", { ascending: false });
 
       if (debouncedSearchTerm) {
         query = query.or(
-          `title.ilike.%${debouncedSearchTerm}%,a_code.ilike.%${debouncedSearchTerm}%`
+          `title.ilike.%${debouncedSearchTerm}%,a_code.ilike.%${debouncedSearchTerm}%`,
         );
       }
 
-      const { data: jobDescriptionsData, error, count } = await query;
+      const { data, error, count } = await query;
 
       if (error) throw error;
 
-      setJobDescriptions(jobDescriptionsData || []);
-      setTotalPages(Math.ceil((count || 0) / pageSize));
+      setJobDescriptions((data || []) as JobDescription[]);
+      setTotalCount(count ?? 0);
+      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE)));
     } catch (error) {
-      console.error("Fetch jobDescriptions error:", error);
       toast.error(`Алдаа: ${(error as Error).message}`);
     } finally {
       setIsLoading(false);
@@ -85,163 +101,198 @@ export default function JobDescriptionList({
     fetchJobDescriptions();
   }, [fetchJobDescriptions]);
 
-  const getJobPositionName = (jobPosition: JobPosition[] | null): string => {
-    if (
-      !jobPosition ||
-      (Array.isArray(jobPosition) && jobPosition.length === 0)
-    ) {
-      return "Ажлын байргүй";
-    }
-    const positions = Array.isArray(jobPosition) ? jobPosition : [jobPosition];
-    return positions
-      .map((p) => p.name || "")
-      .filter(Boolean)
-      .join(", ");
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm]);
+
+  const goTo = (page: number) => {
+    setCurrentPage(page);
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-      {is_create && (
-        <div className="flex justify-end mb-2 w-min-content">
-          <Link
-            href="/dashboard/job-descriptions/new"
-            className="flex cursor-pointer">
-            <Button className="items-center flex">
-              <PlusIcon className="h-4 w-4 " />
-              Нэмэх
-            </Button>
-          </Link>
+    <div className="flex flex-col gap-6 p-4 lg:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
+            Албан тушаал / Тодорхойлолт
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+            Албан тушаалын тодорхойлолтууд
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Бүртгэлтэй тодорхойлолт — нийт {totalCount} ширхэг
+          </p>
         </div>
-      )}
-      <div className="flex justify-between mb-6">
-        <h2 className="text-2xl font-bold min-w-[300px]">
-          Ажлын байрны тодорхойлолтууд
-        </h2>
-        <div className="relative flex items-center border p-2 rounded-md min-w-1/2">
-          <Search className="mr-2" />
-          <input
+      </div>
+
+      <Card className="px-4 py-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
             type="text"
-            placeholder="Код эсвэл нэрээр хайх..."
-            className="w-full"
+            placeholder="Албан тушаалын нэр эсвэл кодоор хайх..."
+            className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-      </div>
+      </Card>
+
       {isLoading ? (
-        <div className="text-center py-8">Ачаалж байна...</div>
+        <Card className="p-4">
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} className="h-10 w-full" />
+            ))}
+          </div>
+        </Card>
       ) : jobDescriptions.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          Бүртгэлтэй ажлын байрны тодорхойлолт олдсонгүй
-        </div>
+        <Card className="items-center gap-2 px-4 py-16 text-center">
+          <BriefcaseBusiness className="h-8 w-8 text-muted-foreground/50" />
+          <p className="font-semibold text-foreground">
+            Тодорхойлолт олдсонгүй
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {debouncedSearchTerm
+              ? "Хайлтын үр дүн байхгүй"
+              : "Эхний албан тушаалын тодорхойлолт үүсгэснээр энд харагдана"}
+          </p>
+        </Card>
       ) : (
-        <>
-          <div className="overflow-x-auto">
-            <Table>
+        <Card className="overflow-hidden p-0">
+          <TooltipProvider delayDuration={150}>
+            <Table className="table-fixed">
               <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[30px]">
-                    Код
-                  </TableHead>
-                  {/* <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
-                    Гарчиг
-                  </TableHead> */}
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[200px]">
-                    Ажлын байр
-                  </TableHead>
-                  <TableHead className="text-center font-bold bg-gray-100 dark:bg-gray-700 px-4 py-3 min-w-[150px]">
-                    Үйлдэл
-                  </TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="w-36">Код</TableHead>
+                  <TableHead>Албан тушаал</TableHead>
+                  <TableHead className="hidden md:table-cell">Гарчиг</TableHead>
+                  <TableHead className="w-24 text-right">Үйлдэл</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobDescriptions.map((job_description) => (
-                  <TableRow key={job_description.id}>
-                    <TableCell className="px-4 py-2 text-center">
-                      {job_description.a_code || "Кодгүй"}
-                    </TableCell>
-                    {/* <TableCell className="px-4 py-2">
-                      <div
-                        className="break-words whitespace-normal"
-                        title={job_description.title || "Гарчиггүй"}>
-                        {job_description.title || "Гарчиггүй"}
-                      </div>
-                    </TableCell> */}
-                    <TableCell className="px-4 py-2">
-                      <div
-                        className="break-words whitespace-normal"
-                        title={getJobPositionName(
-                          job_description.job_position
-                        )}>
-                        {getJobPositionName(job_description.job_position)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <div className="flex gap-2 justify-center items-center">
-                        <JobDescSeeButton
-                          job_description_id={job_description.id}
-                        />
-                        {/* <JobDescDeleteButton
-                          job_description_id={job_description.id}
-                          onDeleted={fetchJobDescriptions}
-                        /> */}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {jobDescriptions.map((jobDescription) => {
+                  const positionName = getJobPositionName(
+                    jobDescription.job_position,
+                  );
+                  return (
+                    <TableRow key={jobDescription.id}>
+                      <TableCell className="text-sm font-medium tabular-nums text-muted-foreground">
+                        {jobDescription.a_code || "Кодгүй"}
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex min-w-0 flex-col gap-0.5">
+                              <span className="truncate">{positionName}</span>
+                              {jobDescription.a_code && (
+                                <span className="truncate text-xs font-normal text-muted-foreground md:hidden">
+                                  {jobDescription.a_code}
+                                </span>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-md whitespace-normal">
+                            <p className="font-semibold">{positionName}</p>
+                            {jobDescription.title && (
+                              <p className="mt-0.5 text-[11px] opacity-70">
+                                {jobDescription.title}
+                              </p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+                        <span className="block truncate">
+                          {jobDescription.title || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <JobDescSeeButton
+                            job_description_id={jobDescription.id}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
-          </div>
-          {!isLoading && jobDescriptions.length > 0 && (
-            <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-gray-500">
-                Нийт {totalPages} хуудасны {currentPage}-р хуудас
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => {
-                    setCurrentPage(1);
-                    window.scrollTo(0, 0);
-                  }}>
-                  Эхний хуудас
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => {
-                    setCurrentPage((prev) => prev - 1);
-                    window.scrollTo(0, 0);
-                  }}>
-                  Өмнөх
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => {
-                    setCurrentPage((prev) => prev + 1);
-                    window.scrollTo(0, 0);
-                  }}>
-                  Дараагийн
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => {
-                    setCurrentPage(totalPages);
-                    window.scrollTo(0, 0);
-                  }}>
-                  Сүүлийн хуудас
-                </Button>
-              </div>
+          </TooltipProvider>
+        </Card>
+      )}
+
+      {!isLoading && jobDescriptions.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {(currentPage - 1) * PAGE_SIZE + 1}–
+            {Math.min(currentPage * PAGE_SIZE, totalCount)} / {totalCount}
+          </p>
+          <TooltipProvider delayDuration={150}>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={currentPage === 1}
+                    onClick={() => goTo(1)}>
+                    <ChevronsLeft className="h-4 w-4" />
+                    <span className="sr-only">Эхний хуудас</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Эхний хуудас</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={currentPage === 1}
+                    onClick={() => goTo(currentPage - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="sr-only">Өмнөх</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Өмнөх</TooltipContent>
+              </Tooltip>
+              <span className="px-2 text-xs font-medium tabular-nums text-muted-foreground">
+                {currentPage} / {totalPages}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => goTo(currentPage + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="sr-only">Дараагийн</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Дараагийн</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => goTo(totalPages)}>
+                    <ChevronsRight className="h-4 w-4" />
+                    <span className="sr-only">Сүүлийн хуудас</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Сүүлийн хуудас</TooltipContent>
+              </Tooltip>
             </div>
-          )}
-        </>
+          </TooltipProvider>
+        </div>
       )}
     </div>
   );

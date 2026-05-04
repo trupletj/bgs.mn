@@ -9,7 +9,8 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Button } from "@/components/ui/button";
 import ClauseItemEdit from "./ClauseItemEdit";
 import { Clause, Section } from "@/types/clause";
-import { ActionType } from "@/types/types";
+import { ActionType, PolicyScopeTarget } from "@/types/types";
+import { PolicyScopeSelector } from "./policy-scope-selector";
 
 interface PolicyFormData {
   name: string;
@@ -23,6 +24,7 @@ interface PolicyFormProps {
     name: string;
     referenceCode: string;
     approvedDate: Date | null;
+    scopeTargets?: PolicyScopeTarget[];
     sections: Array<{
       id: string;
       policyId?: string;
@@ -54,6 +56,9 @@ export default function PolicyEditerForm({
     referenceCode: initialData?.referenceCode || "",
     approvedDate: initialData?.approvedDate || null,
   });
+  const [scopeTargets, setScopeTargets] = useState<PolicyScopeTarget[]>(
+    initialData?.scopeTargets ?? [],
+  );
   const [sections, setSections] = useState<Section[]>(
     initialData?.sections.map((s) => ({
       ...s,
@@ -65,7 +70,7 @@ export default function PolicyEditerForm({
     })) || [],
   );
   const [isProcessing, setIsProcessing] = useState(false);
-  const updateClauseNumbers = (
+  const updateClauseNumbers = useCallback((
     clauses: Clause[],
     parentRef: string,
   ): Clause[] => {
@@ -77,7 +82,7 @@ export default function PolicyEditerForm({
         `${parentRef}.${idx + 1}`,
       ),
     }));
-  };
+  }, []);
 
   const addSection = useCallback(() => {
     if (isProcessing) return;
@@ -92,7 +97,7 @@ export default function PolicyEditerForm({
       },
     ]);
     setIsProcessing(false);
-  }, [isProcessing, sections.length, initialData?.id]);
+  }, [isProcessing, initialData?.id]);
 
   const insertSectionBefore = useCallback(
     (sectionIndex: number) => {
@@ -133,7 +138,7 @@ export default function PolicyEditerForm({
     });
     console.log("Section deleted (UI only)");
     setIsProcessing(false);
-  }, []);
+  }, [updateClauseNumbers]);
 
   const addClause = useCallback(
     (sectionIndex: number) => {
@@ -208,7 +213,7 @@ export default function PolicyEditerForm({
       });
       setIsProcessing(false);
     },
-    [isProcessing],
+    [isProcessing, updateClauseNumbers],
   );
 
   const addSubClause = useCallback(
@@ -354,7 +359,7 @@ export default function PolicyEditerForm({
       });
       setIsProcessing(false);
     },
-    [isProcessing],
+    [isProcessing, updateClauseNumbers],
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -367,23 +372,18 @@ export default function PolicyEditerForm({
         throw new Error("Журмын нэр болон дугаар заавал оруулна уу");
       }
 
-      const method = initialData ? "PUT" : "POST";
-      const url = initialData
-        ? `/api/policy?id=${initialData.id}`
-        : `/api/policy`;
-      console.log("Submitting policy:", {
-        id: initialData?.id,
-        name: policyData.name,
-        referenceCode: policyData.referenceCode,
-        approvedDate: policyData.approvedDate?.toISOString(),
-      });
-
       const requestBody = {
         name: policyData.name,
         reference_code: policyData.referenceCode,
         approved_date: policyData.approvedDate,
+        scope_targets: scopeTargets,
+        sections,
       };
 
+      const method = initialData ? "PUT" : "POST";
+      const url = initialData
+        ? `/api/policy/document?id=${initialData.id}`
+        : `/api/policy`;
       const policyResponse = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -394,138 +394,14 @@ export default function PolicyEditerForm({
         throw new Error(error.error || "Журам хадгалахад алдаа гарлаа");
       }
       const policy = await policyResponse.json();
-      const policyId = policy.id;
-
-      const deletedSections =
-        initialData?.sections.filter(
-          (initSection) => !sections.find((s) => s.id === initSection.id),
-        ) || [];
-      const deletedClauses: { sectionId: string; clauseId: string }[] = [];
-      initialData?.sections.forEach((initSection) => {
-        const currentSection = sections.find((s) => s.id === initSection.id);
-        if (currentSection && initSection.id) {
-          const initClauses = initSection.clauses;
-          const currentClauses = currentSection.clauses;
-          initClauses.forEach((initClause) => {
-            if (
-              initClause.id &&
-              !currentClauses.find((c) => c.id === initClause.id)
-            ) {
-              deletedClauses.push({
-                sectionId: initSection.id,
-                clauseId: initClause.id,
-              });
-            }
-          });
-        }
-      });
-
-      for (const deletedSection of deletedSections) {
-        if (deletedSection.id) {
-          console.log("Deleting section on server:", {
-            sectionId: deletedSection.id,
-          });
-          const response = await fetch(`/api/section?id=${deletedSection.id}`, {
-            method: "DELETE",
-          });
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || "Бүлэг устгахад алдаа гарлаа");
-          }
-        }
-      }
-
-      for (const { clauseId } of deletedClauses) {
-        console.log("Deleting clause on server:", { clauseId });
-        const response = await fetch(`/api/clause?id=${clauseId}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Заалт устгахад алдаа гарлаа");
-        }
-      }
-
-      for (const section of sections) {
-        const sectionMethod = section.id ? "PUT" : "POST";
-        const sectionUrl = section.id
-          ? `/api/section?id=${section.id}`
-          : `/api/section`;
-
-        console.log("Submitting section:", {
-          sectionId: section.id || "new",
-          referenceNumber: section.referenceNumber,
-          text:
-            section.text.substring(0, 20) +
-            (section.text.length > 20 ? "..." : ""),
-        });
-
-        const sectionResponse = await fetch(sectionUrl, {
-          method: sectionMethod,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            policy_id: policyId, // ↪ Шинэ field name
-            reference_number: section.referenceNumber, // ↪ Шинэ field name
-            text: section.text,
-          }),
-        });
-        if (!sectionResponse.ok) {
-          const error = await sectionResponse.json();
-          throw new Error(error.error || "Бүлэг хадгалахад алдаа гарлаа");
-        }
-        const savedSection = await sectionResponse.json();
-
-        const saveClauses = async (
-          clauses: Clause[],
-          parentId: string | null = null,
-        ) => {
-          for (const clause of clauses) {
-            const clauseMethod = clause.id ? "PUT" : "POST";
-            const clauseUrl = clause.id
-              ? `/api/clause?id=${clause.id}`
-              : `/api/clause`;
-
-            console.log("Submitting clause:", {
-              clauseId: clause.id || "new",
-              referenceNumber: clause.referenceNumber,
-              text:
-                clause.text.substring(0, 20) +
-                (clause.text.length > 20 ? "..." : ""),
-              parentId,
-              policyId,
-              positions: clause.positions?.length || 0,
-            });
-
-            const clauseResponse = await fetch(clauseUrl, {
-              method: clauseMethod,
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                section_id: savedSection.id, // ↪ Шинэ field name
-                text: clause.text,
-                reference_number: clause.referenceNumber, // ↪ Шинэ field name
-                parent_id: parentId, // ↪ Шинэ field name
-                policy_id: policyId, // ↪ Шинэ field name
-                positions: clause.positions,
-              }),
-            });
-            if (!clauseResponse.ok) {
-              const error = await clauseResponse.json();
-              throw new Error(error.error || "Заалт хадгалахад алдаа гарлаа");
-            }
-            const savedClause = await clauseResponse.json();
-
-            if (clause.children && clause.children.length > 0) {
-              await saveClauses(clause.children, savedClause.id);
-            }
-          }
-        };
-
-        await saveClauses(section.clauses);
-      }
 
       toast.success(`Журам амжилттай засварлагдлаа`);
       toast.dismiss(toastId);
-      console.log("Form submission successful");
+      console.log("Form submission successful", {
+        id: policy.id,
+        sections: policy.sectionCount,
+        clauses: policy.clauseCount,
+      });
       onSuccess();
     } catch (error) {
       console.error("Submission error:", error);
@@ -619,6 +495,12 @@ export default function PolicyEditerForm({
             />
           </div>
         </div>
+
+        <PolicyScopeSelector
+          value={scopeTargets}
+          onChange={setScopeTargets}
+          disabled={isProcessing}
+        />
 
         <div className="mt-6">
           <div className="flex items-center justify-between">

@@ -46,7 +46,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 // Schema шинэчлэх
 const stepSchema = z.object({
   step_order: z.number().int().positive(),
@@ -61,6 +60,12 @@ const stepSchema = z.object({
 
 const formSchema = z.object({
   name: z.string().min(1, "Захиалгын процессын нэр шаардлагатай"),
+  allowed_heltes_ids: z
+    .array(z.string())
+    .min(1, "Дор хаяж 1 хэлтэс сонгоно уу"),
+  purchase_role_ids: z
+    .array(z.number())
+    .min(1, "Дор хаяж 1 биелэлт харах role сонгоно уу"),
   steps: z.array(stepSchema).min(1, "Дор хаяж 1 step оруулна уу"),
 });
 
@@ -69,6 +74,17 @@ type FormValues = z.infer<typeof formSchema>;
 interface Role {
   id: number;
   display_name: string;
+}
+
+interface Heltes {
+  bteg_id: string;
+  name: string | null;
+  organization_id: string | null;
+}
+
+interface Company {
+  bteg_id: string;
+  name: string | null;
 }
 
 interface StepData {
@@ -83,22 +99,33 @@ interface OrderProcessFormProps {
   initialData?: {
     id?: number;
     name: string;
+    allowed_heltes_ids: string[];
+    purchase_role_ids: number[];
     steps: StepData[];
   };
   isEdit?: boolean;
+  heltes: Heltes[];
+  companies: Company[];
 }
 
 export default function OrderProcessForm({
   roles,
+  heltes,
+  companies,
   initialData,
   isEdit = false,
 }: OrderProcessFormProps) {
   const [openPopovers, setOpenPopovers] = useState<number[]>([]);
+  const [heltesOpen, setHeltesOpen] = useState(false);
+  const [purchaseRolesOpen, setPurchaseRolesOpen] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const defaultValues: FormValues = {
     name: "",
+    allowed_heltes_ids: [],
+    purchase_role_ids: [],
     steps: [
       {
         step_order: 1,
@@ -132,16 +159,25 @@ export default function OrderProcessForm({
     if (initialData) {
       reset({
         name: initialData.name,
+        allowed_heltes_ids: initialData.allowed_heltes_ids ?? [],
+        purchase_role_ids: initialData.purchase_role_ids ?? [],
         steps: initialData.steps,
       });
+
+      const firstSelectedHeltes = heltes.find((item) =>
+        initialData.allowed_heltes_ids?.includes(item.bteg_id),
+      );
+      setSelectedCompanyId(firstSelectedHeltes?.organization_id ?? "");
     }
-  }, [initialData, reset]);
+  }, [heltes, initialData, reset]);
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
     try {
       const formattedData: OrderProcessFormData = {
         name: data.name,
+        allowed_heltes_ids: data.allowed_heltes_ids,
+        purchase_role_ids: data.purchase_role_ids,
         steps: data.steps.map((s, index) => ({
           ...s,
           step_order: index + 1,
@@ -160,7 +196,7 @@ export default function OrderProcessForm({
         toast.success(
           `${data.name} захиалгын төрөл амжилттай ${
             isEdit ? "шинэчлэгдлээ" : "үүслээ"
-          }.`
+          }.`,
         );
         router.push("/order-processes");
         router.refresh();
@@ -177,7 +213,7 @@ export default function OrderProcessForm({
 
   const togglePopover = (index: number) => {
     setOpenPopovers((prev) =>
-      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index],
     );
   };
 
@@ -185,8 +221,40 @@ export default function OrderProcessForm({
     const currentIds = watch(`steps.${stepIndex}.role_ids`) || [];
     setValue(
       `steps.${stepIndex}.role_ids`,
-      currentIds.filter((id) => id !== roleId)
+      currentIds.filter((id) => id !== roleId),
     );
+  };
+
+  const selectedHeltesIds = watch("allowed_heltes_ids") || [];
+  const selectedHeltes = heltes.filter((item) =>
+    selectedHeltesIds.includes(item.bteg_id),
+  );
+  const companyHeltes = selectedCompanyId
+    ? heltes.filter((item) => item.organization_id === selectedCompanyId)
+    : [];
+  const selectedPurchaseRoleIds = watch("purchase_role_ids") || [];
+  const selectedPurchaseRoles = roles.filter((role) =>
+    selectedPurchaseRoleIds.includes(role.id),
+  );
+
+  const removeHeltes = (heltesId: string) => {
+    setValue(
+      "allowed_heltes_ids",
+      selectedHeltesIds.filter((id) => id !== heltesId),
+    );
+  };
+
+  const removePurchaseRole = (roleId: number) => {
+    setValue(
+      "purchase_role_ids",
+      selectedPurchaseRoleIds.filter((id) => id !== roleId),
+    );
+  };
+
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    setValue("allowed_heltes_ids", [], { shouldValidate: true });
+    setHeltesOpen(false);
   };
 
   return (
@@ -201,6 +269,193 @@ export default function OrderProcessForm({
         {errors.name && (
           <p className="text-sm text-red-600">{errors.name.message}</p>
         )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-2">
+          <Label className="text-lg font-semibold">
+            Захиалга үүсгэх company
+          </Label>
+          <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
+            <SelectTrigger className="h-10">
+              <SelectValue placeholder="Байгууллага сонгох" />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map((company) => (
+                <SelectItem key={company.bteg_id} value={company.bteg_id}>
+                  {company.name || `Company ${company.bteg_id}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Label className="text-sm font-medium">Захиалга үүсгэх хэлтэс</Label>
+          <Popover open={heltesOpen} onOpenChange={setHeltesOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!selectedCompanyId}
+                className="h-10 w-full justify-between text-sm">
+                <span className="truncate">
+                  {!selectedCompanyId
+                    ? "Эхлээд байгууллага сонгох"
+                    : selectedHeltes.length === 0
+                      ? "Хэлтэс сонгох..."
+                      : `${selectedHeltes.length} хэлтэс сонгогдсон`}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0 max-w-md">
+              <Command>
+                <CommandInput placeholder="Хэлтэс хайх..." className="h-9" />
+                <CommandList>
+                  <CommandEmpty>Хэлтэс олдсонгүй</CommandEmpty>
+                  <CommandGroup>
+                    <ScrollArea className="h-64">
+                      {companyHeltes.map((item) => {
+                        const isSelected = selectedHeltesIds.includes(
+                          item.bteg_id,
+                        );
+                        return (
+                          <CommandItem
+                            key={item.bteg_id}
+                            onSelect={() => {
+                              const next = isSelected
+                                ? selectedHeltesIds.filter(
+                                    (id) => id !== item.bteg_id,
+                                  )
+                                : [...selectedHeltesIds, item.bteg_id];
+                              setValue("allowed_heltes_ids", next, {
+                                shouldValidate: true,
+                              });
+                            }}
+                            className="flex items-center space-x-2 text-sm py-2">
+                            <Checkbox checked={isSelected} />
+                            <span className="flex-1">{item.name}</span>
+                            <Check
+                              className={cn(
+                                "h-4 w-4",
+                                isSelected ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                          </CommandItem>
+                        );
+                      })}
+                    </ScrollArea>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          {errors.allowed_heltes_ids && (
+            <p className="text-sm text-red-600">
+              {errors.allowed_heltes_ids.message}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {selectedHeltes.map((item) => (
+              <Badge
+                key={item.bteg_id}
+                variant="secondary"
+                className="text-xs pl-2 pr-1 py-0.5">
+                {item.name}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 -mr-1"
+                  onClick={() => removeHeltes(item.bteg_id)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-lg font-semibold">Биелэлт харах role</Label>
+          <Popover open={purchaseRolesOpen} onOpenChange={setPurchaseRolesOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 w-full justify-between text-sm">
+                <span className="truncate">
+                  {selectedPurchaseRoles.length === 0
+                    ? "Role сонгох..."
+                    : `${selectedPurchaseRoles.length} role сонгогдсон`}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0 max-w-md">
+              <Command>
+                <CommandInput placeholder="Role хайх..." className="h-9" />
+                <CommandList>
+                  <CommandEmpty>Role олдсонгүй</CommandEmpty>
+                  <CommandGroup>
+                    <ScrollArea className="h-64">
+                      {roles.map((role) => {
+                        const isSelected = selectedPurchaseRoleIds.includes(
+                          role.id,
+                        );
+                        return (
+                          <CommandItem
+                            key={role.id}
+                            onSelect={() => {
+                              const next = isSelected
+                                ? selectedPurchaseRoleIds.filter(
+                                    (id) => id !== role.id,
+                                  )
+                                : [...selectedPurchaseRoleIds, role.id];
+                              setValue("purchase_role_ids", next, {
+                                shouldValidate: true,
+                              });
+                            }}
+                            className="flex items-center space-x-2 text-sm py-2">
+                            <Checkbox checked={isSelected} />
+                            <span className="flex-1">{role.display_name}</span>
+                            <Check
+                              className={cn(
+                                "h-4 w-4",
+                                isSelected ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                          </CommandItem>
+                        );
+                      })}
+                    </ScrollArea>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          {errors.purchase_role_ids && (
+            <p className="text-sm text-red-600">
+              {errors.purchase_role_ids.message}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {selectedPurchaseRoles.map((role) => (
+              <Badge
+                key={role.id}
+                variant="secondary"
+                className="text-xs pl-2 pr-1 py-0.5">
+                {role.display_name}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 -mr-1"
+                  onClick={() => removePurchaseRole(role.id)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -226,10 +481,10 @@ export default function OrderProcessForm({
           {fields.map((field, index) => {
             const selectedRoleIds = watch(`steps.${index}.role_ids`) || [];
             const selectedRoles = roles.filter((r) =>
-              selectedRoleIds.includes(r.id)
+              selectedRoleIds.includes(r.id),
             );
             const requiredApprovalCount = watch(
-              `steps.${index}.required_approval_count`
+              `steps.${index}.required_approval_count`,
             );
 
             return (
@@ -312,7 +567,7 @@ export default function OrderProcessForm({
                       open
                         ? togglePopover(index)
                         : setOpenPopovers((prev) =>
-                            prev.filter((i) => i !== index)
+                            prev.filter((i) => i !== index),
                           )
                     }>
                     <PopoverTrigger asChild>
@@ -339,7 +594,7 @@ export default function OrderProcessForm({
                             <ScrollArea className="h-60">
                               {roles.map((role) => {
                                 const isSelected = selectedRoleIds.includes(
-                                  role.id
+                                  role.id,
                                 );
                                 return (
                                   <CommandItem
@@ -347,12 +602,12 @@ export default function OrderProcessForm({
                                     onSelect={() => {
                                       const newIds = isSelected
                                         ? selectedRoleIds.filter(
-                                            (id) => id !== role.id
+                                            (id) => id !== role.id,
                                           )
                                         : [...selectedRoleIds, role.id];
                                       setValue(
                                         `steps.${index}.role_ids`,
-                                        newIds
+                                        newIds,
                                       );
                                     }}
                                     className="flex items-center space-x-2 text-sm py-2">
@@ -363,7 +618,9 @@ export default function OrderProcessForm({
                                     <Check
                                       className={cn(
                                         "h-4 w-4",
-                                        isSelected ? "opacity-100" : "opacity-0"
+                                        isSelected
+                                          ? "opacity-100"
+                                          : "opacity-0",
                                       )}
                                     />
                                   </CommandItem>

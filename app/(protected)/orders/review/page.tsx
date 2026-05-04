@@ -1,15 +1,25 @@
 import { getAwaitingOrders } from "@/actions/orders";
 import { getProfileIdFromAuthUserId } from "@/actions/profile";
+import { hasPermission } from "@/actions/rbac";
+import UnauthorizedPage from "@/app/unauthorized/page";
 import { RequestedList } from "@/components/orders/requested-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, CheckCircle2, ShieldCheck } from "lucide-react";
 
 export default async function OrderReviewPage() {
+  const hasAccess = await hasPermission("order", "edit");
+  if (!hasAccess) {
+    return <UnauthorizedPage />;
+  }
   const profile_id = await getProfileIdFromAuthUserId();
   const allAwaiting = (await getAwaitingOrders(profile_id)) || [];
 
-  const pending  = allAwaiting.filter((r) => r.status === "pending" || !r.status);
-  const reviewed = allAwaiting.filter((r) => r.status && r.status !== "pending");
+  const pending = allAwaiting.filter(
+    (r) => r.status === "pending" || !r.status,
+  );
+  const reviewed = allAwaiting.filter(
+    (r) => r.status && r.status !== "pending",
+  );
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
@@ -38,8 +48,7 @@ export default async function OrderReviewPage() {
         <TabsList className="h-auto w-full gap-0 rounded-xl bg-muted p-1 sm:w-auto">
           <TabsTrigger
             value="pending"
-            className="flex h-9 items-center gap-2 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm"
-          >
+            className="flex h-9 items-center gap-2 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm">
             <Clock className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Хянах хүлээгдэж буй</span>
             <span className="sm:hidden">Хүлээгдэж буй</span>
@@ -52,8 +61,7 @@ export default async function OrderReviewPage() {
 
           <TabsTrigger
             value="reviewed"
-            className="flex h-9 items-center gap-2 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm"
-          >
+            className="flex h-9 items-center gap-2 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm">
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Миний хянасан</span>
             <span className="sm:hidden">Хянасан</span>
