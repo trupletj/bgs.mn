@@ -25,6 +25,7 @@ export interface SubOrderItem {
   created_by: number;
   reviewer_profile?: {
     name: string;
+    position_name?: string;
   };
 }
 

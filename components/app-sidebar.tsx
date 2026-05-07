@@ -62,8 +62,7 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="h-auto gap-3 rounded-xl px-2 py-2 hover:bg-sidebar-accent"
-            >
+              className="h-auto gap-3 rounded-xl px-2 py-2 hover:bg-sidebar-accent">
               <Link href="/dashboard">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 ring-1 ring-white/10">
                   <Building2 className="h-4 w-4 text-white" />
@@ -88,9 +87,10 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               {services.map((service) => {
-                const ServiceIcon = serviceIcons[service.key] ?? IconLayoutDashboard;
+                const ServiceIcon =
+                  serviceIcons[service.key] ?? IconLayoutDashboard;
                 const isActive = service.basePaths.some((base) =>
-                  pathname.startsWith(base)
+                  pathname.startsWith(base),
                 );
                 return (
                   <SidebarMenuItem key={service.key}>
@@ -98,11 +98,15 @@ export function AppSidebar({
                       asChild
                       isActive={isActive}
                       tooltip={service.title}
-                      className="h-9 gap-3 rounded-lg px-3 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-white data-[active=true]:shadow-sm"
-                    >
+                      className="h-9 gap-3 rounded-lg px-3 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-white data-[active=true]:shadow-sm">
                       <Link href={service.url}>
                         <ServiceIcon className="h-[18px] w-[18px] shrink-0" />
                         <span>{service.title}</span>
+                        {!!service.badgeCount && service.badgeCount > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground">
+                            {service.badgeCount}
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

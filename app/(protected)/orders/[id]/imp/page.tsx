@@ -333,14 +333,12 @@ function OrderItemCard({
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Package className="h-4 w-4" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 ">
               <p className="font-semibold text-foreground leading-tight">
                 {item.part_name}
               </p>
               {item.part_number && (
-                <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                  {item.part_number}
-                </p>
+                <p className="mt-0.5 font-mono text-xs ">{item.part_number}</p>
               )}
             </div>
           </div>

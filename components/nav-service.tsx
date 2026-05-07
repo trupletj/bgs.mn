@@ -10,9 +10,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import type { NavService } from "@/actions/nav";
+import type { NavService as NavServiceType } from "@/actions/nav";
 
-export function NavService({ services }: { services: NavService[] }) {
+export function NavService({ services }: { services: NavServiceType[] }) {
   const pathname = usePathname();
 
   const activeService = services.find((s) =>
@@ -39,7 +39,12 @@ export function NavService({ services }: { services: NavService[] }) {
                   className="h-8 gap-3 rounded-lg px-3 text-[13px] text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium"
                 >
                   <Link href={item.url}>
-                    <span className="ml-1">{item.title}</span>
+                    <span className="ml-1 flex-1 truncate">{item.title}</span>
+                    {!!item.badgeCount && item.badgeCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground">
+                        {item.badgeCount}
+                      </span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
