@@ -1,8 +1,10 @@
 import { getUserRoles, hasPermission } from "@/actions/rbac";
+import { getPendingOrderReviewCountForCurrentUser } from "@/actions/orders";
 
 export interface NavSubItem {
   title: string;
   url: string;
+  badgeCount?: number;
 }
 
 export interface NavService {
@@ -11,6 +13,7 @@ export interface NavService {
   url: string;
   basePaths: string[];
   items: NavSubItem[];
+  badgeCount?: number;
 }
 
 export async function getNavServices(): Promise<NavService[]> {
@@ -27,8 +30,12 @@ export async function getNavServices(): Promise<NavService[]> {
     "create",
   );
   const hasCreateOrder = await hasPermission("order", "create");
+  const hasOrderAccess = await hasPermission("order", "access");
   const hasOrderPurchase = await hasPermission("order", "purchase");
   const hasOrderReview = await hasPermission("order", "edit");
+  const pendingOrderReviewCount = hasOrderReview
+    ? await getPendingOrderReviewCountForCurrentUser()
+    : 0;
 
   const services: NavService[] = [];
 
@@ -61,22 +68,26 @@ export async function getNavServices(): Promise<NavService[]> {
     orderItems.push({ title: "Худалдан авалт", url: "/orders/purchase" });
   }
   if (hasOrderReview) {
-    orderItems.push({ title: "Хяналт", url: "/orders/review" });
+    orderItems.push({
+      title: "Хяналт",
+      url: "/orders/review",
+      badgeCount: pendingOrderReviewCount,
+    });
   }
   if (roles.some((r) => ["super_admin"].includes(r))) {
     orderItems.push({ title: "Захиалгын төрөл", url: "/order-processes" });
   }
   if (hasCreateOrder) {
-    orderItems.push({ title: "Миний захиалгууд", url: "/orders/list" });
     orderItems.push({ title: "+ Захиалга үүсгэх", url: "/orders/add" });
   }
-  if (orderItems.length > 0) {
+  if (hasOrderAccess || hasCreateOrder || orderItems.length > 0) {
     services.push({
       key: "orders",
       title: "Захиалга",
       url: "/orders",
       basePaths: ["/orders", "/order-processes"],
       items: orderItems,
+      badgeCount: pendingOrderReviewCount,
     });
   }
 

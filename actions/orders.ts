@@ -6,6 +6,7 @@ import { getProfileIdFromAuthUserId } from "./profile";
 import { getOrderProcessesForCurrentUser } from "./order-process";
 import { createClient } from "@/utils/supabase/server";
 import { createClient as client } from "@/utils/supabase/client";
+import { hasPermission } from "./rbac";
 
 interface DetailReviewer {
   status?: string | null;
@@ -64,7 +65,7 @@ export async function getOrderWithDetail(orderId: string) {
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
     .select(
-      "id, part_name, part_number, quantity, final_quantity, unit, spare_type",
+      "id, part_name, part_number, quantity, final_quantity, unit, spare_type, image_url",
     )
     .eq("order_id", orderId)
     .order("id");
@@ -239,6 +240,140 @@ export type OrderItem = {
   image_url?: string;
   spare_type: string;
 };
+
+export interface VisibleOrderListRow {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  profile?: { name?: string; department_name?: string } | null;
+}
+
+export interface VisibleOrderStatusCount {
+  status: string;
+  total: number;
+}
+
+export async function getVisibleOrdersForCurrentUser({
+  page = 1,
+  pageSize = 15,
+  search = "",
+  status = "all",
+}: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+}): Promise<{
+  orders: VisibleOrderListRow[];
+  totalCount: number;
+  statusCounts: VisibleOrderStatusCount[];
+  canAccessAllOrders: boolean;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error("Хэрэглэгчийн мэдээлэл авах үед алдаа гарлаа.");
+  }
+
+  const canAccessAllOrders = await hasPermission("order", "access");
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.max(1, pageSize);
+  const from = (safePage - 1) * safePageSize;
+  const to = from + safePageSize - 1;
+  const trimmedSearch = search.trim();
+
+  let ordersQuery = supabase
+    .from("orders")
+    .select(
+      "id, title, status, created_at, profile:created_profile(name, department_name)",
+      { count: "exact" },
+    );
+
+  if (!canAccessAllOrders) {
+    ordersQuery = ordersQuery.eq("auth_user_id", user.id);
+  }
+  if (trimmedSearch) {
+    ordersQuery = ordersQuery.ilike("title", `%${trimmedSearch}%`);
+  }
+  if (status !== "all") {
+    ordersQuery = ordersQuery.eq("status", status);
+  }
+
+  const { data, count, error } = await ordersQuery
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    throw new Error("Захиалгын жагсаалт унших үед алдаа гарлаа.");
+  }
+
+  let statusQuery = supabase.from("orders").select("status");
+
+  if (!canAccessAllOrders) {
+    statusQuery = statusQuery.eq("auth_user_id", user.id);
+  }
+
+  const { data: statusRows, error: statusError } = await statusQuery;
+
+  if (statusError) {
+    throw new Error("Захиалгын төлөвийн нэгтгэл унших үед алдаа гарлаа.");
+  }
+
+  const statusMap: Record<string, number> = {};
+  for (const row of statusRows ?? []) {
+    if (row.status) {
+      statusMap[row.status] = (statusMap[row.status] || 0) + 1;
+    }
+  }
+
+  return {
+    orders: (
+      (data ?? []) as Array<
+        Omit<VisibleOrderListRow, "profile"> & {
+          profile?:
+            | VisibleOrderListRow["profile"]
+            | VisibleOrderListRow["profile"][];
+        }
+      >
+    ).map((row) => ({
+      ...row,
+      profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
+    })),
+    totalCount: count ?? 0,
+    statusCounts: Object.entries(statusMap).map(([rowStatus, total]) => ({
+      status: rowStatus,
+      total,
+    })),
+    canAccessAllOrders,
+  };
+}
+
+export async function getPendingOrderReviewCountForCurrentUser() {
+  try {
+    const supabase = await createClient();
+    const profileId = await getProfileIdFromAuthUserId();
+    const { count, error } = await supabase
+      .from("order_step_reviewers")
+      .select("id", { count: "exact", head: true })
+      .eq("reviewer_profile_id", profileId)
+      .or("status.is.null,status.eq.pending");
+
+    if (error) {
+      console.error("Error fetching pending order review count:", error);
+      return 0;
+    }
+
+    return count ?? 0;
+  } catch (error) {
+    console.error("Error fetching pending order review count:", error);
+    return 0;
+  }
+}
 
 export type CreateOrderItemInput = Pick<
   OrderItem,
@@ -489,7 +624,9 @@ export async function createOrderWithItems({
     const allowedProcesses = await getOrderProcessesForCurrentUser();
     const requestedProcessId = String(orderData.order_process_id);
 
-    if (!allowedProcesses.some((process) => process.id === requestedProcessId)) {
+    if (
+      !allowedProcesses.some((process) => process.id === requestedProcessId)
+    ) {
       throw new Error("Энэ захиалгын төрлөөр захиалга үүсгэх эрхгүй байна.");
     }
 
@@ -586,7 +723,9 @@ export async function createOrderWithItems({
       );
 
     if (reviewerError) {
-      throw new Error(`Reviewer үүсгэхэд алдаа гарлаа: ${reviewerError.message}`);
+      throw new Error(
+        `Reviewer үүсгэхэд алдаа гарлаа: ${reviewerError.message}`,
+      );
     }
 
     reviewersCreated = true;

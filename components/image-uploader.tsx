@@ -7,11 +7,15 @@ import { toast } from "sonner";
 interface ImageUploaderProps {
   multiple?: boolean;
   onUpload: (urls: string[] | string) => void;
+  helperText?: string;
+  hideHelperText?: boolean;
 }
 
 export default function ImageUploader({
   multiple = false,
   onUpload,
+  helperText = "Заавал зураг оруулах шаардлагагүй",
+  hideHelperText = false,
 }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -38,7 +42,7 @@ export default function ImageUploader({
     file: File,
     maxWidth = 1200,
     maxHeight = 1200,
-    quality = 0.8
+    quality = 0.8,
   ): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -74,7 +78,7 @@ export default function ImageUploader({
             resolve(blob);
           },
           "image/jpeg",
-          quality
+          quality,
         );
       };
 
@@ -140,14 +144,14 @@ export default function ImageUploader({
         setProgress(0);
       }
     },
-    [multiple, onUpload, supabase.storage]
+    [multiple, onUpload, supabase.storage],
   );
 
   return (
     <div className="relative">
-      <div className="flex items-center justify-center space-x-4 mt-2">
+      <div className="mt-2 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-slate-50/60 p-4">
         <label className="cursor-pointer">
-          <span className="py-2 px-4 rounded-md bg-blue-500 text-white hover:bg-blue-600">
+          <span className="inline-flex h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
             Зураг сонгох
           </span>
           <input
@@ -159,15 +163,24 @@ export default function ImageUploader({
             className="hidden"
           />
         </label>
-        <span className="text-sm text-gray-600">
-          Заавал зураг оруулах шаардлагагүй
-        </span>
+        {!hideHelperText && helperText && (
+          <span className="text-center text-sm text-gray-600">
+            {helperText}
+          </span>
+        )}
       </div>
 
       {uploading && (
-        <div className="mt-2">
-          <progress value={progress} max="100" className="w-1/2" />
-          <span> {Math.round(progress)}%</span>
+        <div className="mt-2 w-full max-w-xs">
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-blue-600 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            {Math.round(progress)}%
+          </p>
         </div>
       )}
     </div>

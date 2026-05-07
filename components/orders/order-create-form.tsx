@@ -1,6 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +77,7 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
   const [pendingImageDeletions, setPendingImageDeletions] = useState<string[]>(
     [],
   );
@@ -161,10 +171,65 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
     ]);
   };
 
+  const getSpareTypeLabel = (value?: string) =>
+    SPARE_PART_OPTIONS.find((opt) => opt.value === value)?.label ||
+    "Сэлбэгийн төрөл сонгох";
+
+  const isItemDirty = (item: OrderItemForm, index: number) => {
+    const hasText =
+      Boolean(item.part_name?.trim()) ||
+      Boolean(item.part_number?.trim()) ||
+      Boolean(item.manufacturer?.trim()) ||
+      Boolean(item.part_description?.trim()) ||
+      Boolean(item.notes?.trim());
+
+    const hasCustomQuantity =
+      item.quantity !== "" &&
+      item.quantity !== undefined &&
+      Number(item.quantity) !== 1;
+
+    const hasCustomUnit = Boolean(item.unit && item.unit !== "piece");
+    const hasCustomSpareType = Boolean(
+      item.spare_type && item.spare_type !== "other",
+    );
+    const hasImage = Boolean(uploadedImages[index]);
+
+    return (
+      hasText ||
+      hasCustomQuantity ||
+      hasCustomUnit ||
+      hasCustomSpareType ||
+      hasImage
+    );
+  };
+
   const removeItem = (index: number) => {
     if (orderItems.length > 1) {
       setOrderItems((prev) => prev.filter((_, i) => i !== index));
+
+      setUploadedImages((prev) => {
+        const next: Record<number, string> = {};
+        Object.entries(prev).forEach(([key, value]) => {
+          const oldIndex = Number(key);
+          if (oldIndex < index) next[oldIndex] = value;
+          if (oldIndex > index) next[oldIndex - 1] = value;
+        });
+        return next;
+      });
     }
+  };
+
+  const handleDeleteItemClick = (index: number) => {
+    const item = orderItems[index];
+
+    if (!item) return;
+
+    if (isItemDirty(item, index)) {
+      setDeleteIndex(index);
+      return;
+    }
+
+    removeItem(index);
   };
 
   const handleSubmit = async () => {
@@ -198,7 +263,8 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
           description: formData.description,
           order_type: formData.order_type,
           urgency_level: formData.urgency_level,
-          requested_delivery_date: formData.requested_delivery_date || undefined,
+          requested_delivery_date:
+            formData.requested_delivery_date || undefined,
           notes: formData.notes,
           status: formData.status,
           order_process_id: formData.order_process_id,
@@ -423,165 +489,226 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
             {orderItems.map((item, index) => (
               <div
                 key={index}
-                className="border rounded-xl p-6 bg-gray-50 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold">Сэлбэг {index + 1}</h4>
+                className="rounded-2xl border bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="flex items-center justify-between gap-3 border-b bg-slate-50/70 px-5 py-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-slate-900">
+                      Сэлбэг {index + 1}
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Нэр, эдийн дугаар, тоо хэмжээ болон шаардлагатай зургийг
+                      оруулна.
+                    </p>
+                  </div>
+
                   {orderItems.length > 1 && (
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
-                      onClick={() => removeItem(index)}>
+                      onClick={() => handleDeleteItemClick(index)}>
                       <TrashIcon className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Сэлбэгийн нэр */}
-                  <div>
-                    <Label className="mb-1 block">
-                      Сэлбэгийн нэр <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      value={item.part_name}
-                      onChange={(e) =>
-                        handleItemChange(index, "part_name", e.target.value)
-                      }
-                      placeholder="Сэлбэгийн нэр эсвэл тайлбар"
-                      required
-                    />
-                  </div>
+                <div className="space-y-6 p-5">
+                  {/* Үндсэн мэдээлэл */}
+                  <section className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Үндсэн мэдээлэл
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Сэлбэгийн үндсэн мэдээллийг оруулна.
+                      </p>
+                    </div>
 
-                  {/* Эдийн дугаар */}
-                  <div>
-                    <Label className="mb-1 block">
-                      Эдийн дугаар<span className="text-red-500"> *</span>
-                    </Label>
-                    <Input
-                      value={item.part_number || ""}
-                      onChange={(e) =>
-                        handleItemChange(index, "part_number", e.target.value)
-                      }
-                      placeholder="Үйлдвэрийн эдийн дугаар"
-                      required
-                    />
-                  </div>
-
-                  {/* Үйлдвэрлэгч */}
-                  <div>
-                    <Label className="mb-1 block">Үйлдвэрлэгч</Label>
-                    <Input
-                      value={item.manufacturer || ""}
-                      onChange={(e) =>
-                        handleItemChange(index, "manufacturer", e.target.value)
-                      }
-                      placeholder="Бренд эсвэл үйлдвэрлэгч"
-                    />
-                  </div>
-
-                  {/* Тоо ширхэг */}
-                  <div>
-                    <Label className="mb-1">
-                      Тоо хэмжээ <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01" // Бутархай тоо оруулах боломжтой
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleItemChange(index, "quantity", e.target.value)
-                      }
-                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="mb-1">
-                      Нэгж <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={item.unit || "piece"}
-                      onValueChange={(value: UnitType) =>
-                        handleItemChange(index, "unit", value)
-                      }>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Нэгж сонгох" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UNIT_OPTIONS.map((unit) => (
-                          <SelectItem key={unit.value} value={unit.value}>
-                            {unit.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="mb-1">
-                      Сэлбэгийн төрөл <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={item.spare_type}
-                      onValueChange={(value: SparePartType) =>
-                        handleItemChange(index, "spare_type", value)
-                      }>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Сэлбэгийн төрөл сонгох" />
-                      </SelectTrigger>
-
-                      <SelectContent>
-                        {SPARE_PART_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Нэмэлт тайлбар */}
-                  <div className="md:col-span-1 lg:col-span-1">
-                    <Label className="mb-1 block">Нэмэлт тайлбар</Label>
-                    <Textarea
-                      value={item.part_description || ""}
-                      onChange={(e) =>
-                        handleItemChange(
-                          index,
-                          "part_description",
-                          e.target.value,
-                        )
-                      }
-                      placeholder="Техникийн үзүүлэлт гэх мэт"
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Зураг оруулах хэсэг */}
-                  <div className="md:col-span-2 lg:col-span-3 border-2 border-dashed border-border rounded-lg p-4 bg-white">
-                    <ImageUploader
-                      multiple={false}
-                      onUpload={(url) =>
-                        handleImageUpload(
-                          index,
-                          Array.isArray(url) ? url[0] : url,
-                        )
-                      }
-                    />
-
-                    {uploadedImages[index] && (
-                      <div className="mt-4">
-                        <ImageViewer
-                          images={[uploadedImages[index]]}
-                          editable
-                          onDelete={handleMarkImageForDeletion}
-                          pendingDeletion={pendingImageDeletions}
+                    <div className="space-y-4">
+                      {/* 1-р мөр: Сэлбэгийн нэр */}
+                      <div>
+                        <Label className="mb-1 block">
+                          Сэлбэгийн нэр <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          value={item.part_name}
+                          onChange={(e) =>
+                            handleItemChange(index, "part_name", e.target.value)
+                          }
+                          placeholder="Сэлбэгийн нэр эсвэл тайлбар"
+                          required
                         />
                       </div>
-                    )}
-                  </div>
+
+                      {/* 2-р мөр: Эдийн дугаар + Үйлдвэрлэгч */}
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                          <Label className="mb-1 block">
+                            Эдийн дугаар <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            value={item.part_number || ""}
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                "part_number",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Үйлдвэрийн эдийн дугаар"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="mb-1 block">Үйлдвэрлэгч</Label>
+                          <Input
+                            value={item.manufacturer || ""}
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                "manufacturer",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Бренд"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Тоо хэмжээ ба ангилал */}
+                  <section className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Тоо хэмжээ ба ангилал
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Захиалах тоо, нэгж болон сэлбэгийн төрлийг сонгоно.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div>
+                        <Label className="mb-1 block">
+                          Тоо хэмжээ <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            handleItemChange(index, "quantity", e.target.value)
+                          }
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          placeholder="0.00"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="mb-1 block">
+                          Нэгж <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={item.unit || "piece"}
+                          onValueChange={(value: UnitType) =>
+                            handleItemChange(index, "unit", value)
+                          }>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Нэгж сонгох" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {UNIT_OPTIONS.map((unit) => (
+                              <SelectItem key={unit.value} value={unit.value}>
+                                {unit.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="min-w-0">
+                        <Label className="mb-1 block">
+                          Сэлбэгийн төрөл{" "}
+                          <span className="text-red-500">*</span>
+                        </Label>
+                        <Select
+                          value={item.spare_type}
+                          onValueChange={(value: SparePartType) =>
+                            handleItemChange(index, "spare_type", value)
+                          }>
+                          <SelectTrigger className="h-10 w-full min-w-0 overflow-hidden">
+                            <span className="block truncate text-left">
+                              {getSpareTypeLabel(item.spare_type)}
+                            </span>
+                          </SelectTrigger>
+
+                          <SelectContent className="max-w-[360px]">
+                            {SPARE_PART_OPTIONS.map((opt) => (
+                              <SelectItem
+                                key={opt.value}
+                                value={opt.value}
+                                className="min-w-0">
+                                <span className="block max-w-[300px] truncate">
+                                  {opt.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Тайлбар + зураг */}
+                  <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                    <div className="lg:col-span-5">
+                      <Label className="mb-1 block">Нэмэлт тайлбар</Label>
+                      <Textarea
+                        value={item.part_description || ""}
+                        onChange={(e) =>
+                          handleItemChange(
+                            index,
+                            "part_description",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="Техникийн үзүүлэлт, зориулалт гэх мэт"
+                        rows={5}
+                        className="min-h-[132px]"
+                      />
+                    </div>
+
+                    <div className="lg:col-span-7">
+                      <Label className="mb-1 block">Зураг</Label>
+                      <div className="rounded-xl border-2 border-dashed border-border bg-slate-50/50 p-4">
+                        <ImageUploader
+                          multiple={false}
+                          hideHelperText={Boolean(uploadedImages[index])}
+                          onUpload={(url) =>
+                            handleImageUpload(
+                              index,
+                              Array.isArray(url) ? url[0] : url,
+                            )
+                          }
+                        />
+
+                        {uploadedImages[index] && (
+                          <div className="mt-4">
+                            <ImageViewer
+                              images={[uploadedImages[index]]}
+                              editable
+                              size="lg"
+                              onDelete={handleMarkImageForDeletion}
+                              pendingDeletion={pendingImageDeletions}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </div>
             ))}
@@ -643,6 +770,37 @@ export function OrderCreateForm({ orderProcesses }: OrderProcessesProps) {
           </Button>
         </div>
       </div>
+      <AlertDialog
+        open={deleteIndex !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteIndex(null);
+        }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Сэлбэг устгахдаа итгэлтэй байна уу?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Энэ сэлбэг дээр оруулсан мэдээлэл устах болно. Энэ үйлдлийг буцаах
+              боломжгүй.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Болих</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                if (deleteIndex !== null) {
+                  removeItem(deleteIndex);
+                  setDeleteIndex(null);
+                }
+              }}>
+              Тийм, устгах
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

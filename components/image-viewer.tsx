@@ -1,84 +1,131 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
-import { Trash2 } from "lucide-react";
+import { Eye, Trash2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 interface ImageViewerProps {
   images: string[] | string;
   editable?: boolean;
   onDelete?: (url: string) => void;
   pendingDeletion?: string[];
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
+
+const sizeClassMap = {
+  sm: "size-16",
+  md: "size-24",
+  lg: "size-36",
+};
 
 export default function ImageViewer({
   images,
-  editable,
+  editable = false,
   onDelete,
   pendingDeletion = [],
+  size = "md",
+  className,
 }: ImageViewerProps) {
   const [open, setOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const imageArray = Array.isArray(images) ? images : images ? [images] : [];
-
-  const visibleImages = imageArray.filter(
-    (url) => !pendingDeletion.includes(url)
+  const imageArray = useMemo(
+    () => (Array.isArray(images) ? images : images ? [images] : []),
+    [images],
   );
 
-  if (visibleImages.length === 0) return null;
+  const visibleImages = imageArray.filter(
+    (url) => !pendingDeletion.includes(url),
+  );
+
+  if (visibleImages.length === 0) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center rounded-xl border border-dashed bg-slate-50 text-slate-400",
+          sizeClassMap[size],
+          className,
+        )}>
+        <ImageIcon className="size-5" />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-wrap gap-4">
-      {imageArray.map((url, idx) => {
-        const isPendingDeletion = pendingDeletion.includes(url);
+    <>
+      <div className={cn("flex flex-wrap gap-3", className)}>
+        {imageArray.map((url) => {
+          const isPendingDeletion = pendingDeletion.includes(url);
+          const visibleIndex = visibleImages.indexOf(url);
 
-        return (
-          <div
-            key={idx}
-            className={`relative group rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 ${
-              isPendingDeletion ? "opacity-50 grayscale" : ""
-            }`}>
-            <Image
-              src={url}
-              alt={`Image ${idx + 1}`}
-              width={192}
-              height={192}
-              className="object-cover cursor-pointer"
-              onClick={() => {
-                if (!isPendingDeletion) {
-                  setCurrentIndex(idx);
-                  setOpen(true);
-                }
-              }}
-            />
-
-            {isPendingDeletion && (
-              <div className="absolute inset-0 bg-red-100 bg-opacity-50 flex items-center justify-center">
-                <span className="text-red-600 font-semibold">Устгах</span>
-              </div>
-            )}
-
-            {editable && onDelete && !isPendingDeletion && (
-              <Button
+          return (
+            <div
+              key={url}
+              className={cn(
+                "group relative overflow-hidden rounded-xl border bg-white shadow-sm ring-1 ring-slate-100 transition",
+                "hover:shadow-md",
+                sizeClassMap[size],
+                isPendingDeletion && "opacity-50 grayscale",
+              )}>
+              <button
                 type="button"
-                variant="destructive"
-                size="icon"
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-7 h-7"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(url);
+                disabled={isPendingDeletion}
+                onClick={() => {
+                  if (visibleIndex >= 0) {
+                    setCurrentIndex(visibleIndex);
+                    setOpen(true);
+                  }
                 }}
-                title="Зураг устгах">
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        );
-      })}
+                className="relative block size-full overflow-hidden"
+                aria-label="Зураг харах">
+                <Image
+                  src={url}
+                  alt="Захиалгын сэлбэгийн зураг"
+                  fill
+                  sizes="(max-width: 768px) 96px, 144px"
+                  className="object-cover transition-transform duration-200 group-hover:scale-105"
+                />
+
+                {!isPendingDeletion && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100">
+                    <div className="rounded-full bg-white/90 p-2 text-slate-900 shadow-sm">
+                      <Eye className="size-4" />
+                    </div>
+                  </div>
+                )}
+              </button>
+
+              {isPendingDeletion && (
+                <div className="absolute inset-0 flex items-center justify-center bg-red-500/15">
+                  <div className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
+                    Устгахаар тэмдэглэсэн
+                  </div>
+                </div>
+              )}
+
+              {editable && onDelete && !isPendingDeletion && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute right-1.5 top-1.5 size-7 opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(url);
+                  }}
+                  aria-label="Зураг устгах">
+                  <Trash2 className="size-4" />
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <Lightbox
         open={open}
@@ -86,6 +133,6 @@ export default function ImageViewer({
         index={currentIndex}
         slides={visibleImages.map((src) => ({ src }))}
       />
-    </div>
+    </>
   );
 }

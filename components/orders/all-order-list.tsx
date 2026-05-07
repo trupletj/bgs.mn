@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/utils/supabase/client";
+import {
+  getVisibleOrdersForCurrentUser,
+  type VisibleOrderListRow,
+  type VisibleOrderStatusCount,
+} from "@/actions/orders";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -37,31 +41,9 @@ import {
   User,
   Building2,
   Filter,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface Order {
-  id: string;
-  title: string;
-  status: string;
-  created_at: string;
-  profile?: { name?: string; department_name?: string } | null;
-}
-
-interface StatusCount {
-  status: string;
-  total: number;
-}
-
-type OrderRow = Omit<Order, "profile"> & {
-  profile?: Order["profile"] | Order["profile"][];
-};
-
-interface OrderSummaryRow {
-  status?: string | null;
-}
 
 const PAGE_SIZE = 15;
 
@@ -119,11 +101,17 @@ function formatDate(dateString: string) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function AllOrderList() {
-  const supabase = createClient();
-
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [orderStatusCounts, setOrderStatusCounts] = useState<StatusCount[]>([]);
+export default function AllOrderList({
+  canAccessAllOrders,
+  canCreateOrder,
+}: {
+  canAccessAllOrders: boolean;
+  canCreateOrder: boolean;
+}) {
+  const [orders, setOrders] = useState<VisibleOrderListRow[]>([]);
+  const [orderStatusCounts, setOrderStatusCounts] = useState<
+    VisibleOrderStatusCount[]
+  >([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 400);
   const [page, setPage] = useState(1);
@@ -137,62 +125,26 @@ export default function AllOrderList() {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from("orders")
-        .select(
-          "id, title, status, created_at, profile:created_profile(name, department_name)",
-          { count: "exact" },
-        )
-        .ilike("title", `%${debouncedSearch}%`);
+      const data = await getVisibleOrdersForCurrentUser({
+        page,
+        pageSize: PAGE_SIZE,
+        search: debouncedSearch,
+        status: selectedStatus,
+      });
 
-      if (selectedStatus !== "all") {
-        query = query.eq("status", selectedStatus);
-      }
-
-      const { data, count, error } = await query
-        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      setOrders(
-        ((data || []) as OrderRow[]).map((row) => ({
-          ...row,
-          profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
-        })),
-      );
-      setTotalCount(count ?? 0);
+      setOrders(data.orders);
+      setTotalCount(data.totalCount);
+      setOrderStatusCounts(data.statusCounts);
     } catch {
       toast.error("Захиалгын жагсаалт уншиж чадсангүй");
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, selectedStatus, supabase]);
-
-  // ── Fetch summaries ──────────────────────────────────────────────────────────
-  const fetchSummaries = useCallback(async () => {
-    const { data } = await supabase.from("orders").select("status");
-    if (!data) return;
-
-    const orderMap: Record<string, number> = {};
-
-    (data as OrderSummaryRow[]).forEach((row) => {
-      if (row.status) {
-        orderMap[row.status] = (orderMap[row.status] || 0) + 1;
-      }
-    });
-
-    setOrderStatusCounts(
-      Object.entries(orderMap).map(([status, total]) => ({ status, total })),
-    );
-  }, [supabase]);
+  }, [page, debouncedSearch, selectedStatus]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
-  useEffect(() => {
-    fetchSummaries();
-  }, [fetchSummaries]);
 
   // Reset page when filter/search changes
   useEffect(() => {
@@ -206,11 +158,6 @@ export default function AllOrderList() {
       ? null
       : ORDER_STATUS_LABELS[selectedStatus] || selectedStatus;
 
-  const getDetailHref = (order: Order) =>
-    order.status === "approved" || order.status === "changes_requested"
-      ? `/orders/${order.id}/imp`
-      : `/orders/${order.id}`;
-
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6 ">
@@ -218,27 +165,41 @@ export default function AllOrderList() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Захиалгын нэгдсэн мэдээлэл
+            {canAccessAllOrders
+              ? "Захиалгын нэгдсэн мэдээлэл"
+              : "Миний захиалгууд"}
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Системийн бүх захиалгыг харах, удирдах
+            {canAccessAllOrders
+              ? "Системийн бүх захиалгыг харах, удирдах"
+              : "Таны үүсгэсэн захиалгууд"}
           </p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Захиалгын нэрээр хайх..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 bg-card pl-9 pr-9"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-              <X className="h-3.5 w-3.5" />
-            </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          {canCreateOrder && (
+            <Button asChild className="h-9 gap-2 self-start sm:self-auto">
+              <Link href="/orders/add">
+                <Plus className="h-4 w-4" />
+                Шинэ захиалга
+              </Link>
+            </Button>
           )}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Захиалгын нэрээр хайх..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 bg-card pl-9 pr-9"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -438,7 +399,7 @@ export default function AllOrderList() {
                       variant="outline"
                       size="sm"
                       className="h-7 gap-1.5 px-3 text-xs font-medium">
-                      <Link href={getDetailHref(order)}>
+                      <Link href={`/orders/${order.id}`}>
                         Харах
                         <ArrowUpRight className="h-3 w-3" />
                       </Link>
@@ -471,7 +432,7 @@ export default function AllOrderList() {
           orders.map((order) => (
             <Link
               key={order.id}
-              href={getDetailHref(order)}
+              href={`/orders/${order.id}`}
               className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
                 <Package className="h-4 w-4" />
