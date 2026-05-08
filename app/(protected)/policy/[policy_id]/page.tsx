@@ -1,7 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, FileText, Pencil } from "lucide-react";
+import { ArrowLeft, FileText, Gavel, Pencil } from "lucide-react";
 import { hasPermission, hasRole } from "@/actions/rbac";
 import { getPolicyDetail } from "@/actions/policy-detail";
+import {
+  formatLegalActDate,
+  getPolicyRevisionMarkers,
+} from "@/actions/policy-legal-acts";
 import { PolicyDetailContent } from "@/components/policy/policy-detail-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,10 +23,11 @@ export default async function PolicyDetailPage({
 }: PolicyDetailPageProps) {
   const { policy_id } = await params;
 
-  const [policy, isEditAccess, isRating] = await Promise.all([
+  const [policy, isEditAccess, isRating, revisionMarkers] = await Promise.all([
     getPolicyDetail(policy_id),
     hasPermission("policy", "edit"),
     hasRole(["super_admin", "monitoring_emp"]),
+    getPolicyRevisionMarkers(policy_id),
   ]);
 
   if (!policy) {
@@ -96,8 +101,49 @@ export default async function PolicyDetailPage({
         </div>
       </div>
 
+      {revisionMarkers.length > 0 && (
+        <Card className="p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Gavel className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">
+              Эрх зүйн акт / шинэчлэлийн түүх
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {revisionMarkers
+              .filter((marker) => marker.target_type === "policy")
+              .map((marker) => (
+                <Button
+                  key={`${marker.legal_act.id}-${marker.target_type}`}
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="h-auto whitespace-normal py-1.5"
+                >
+                  <Link href={`/policy/legal-acts/${marker.legal_act.id}`}>
+                    <Badge variant="secondary" className="mr-1">
+                      {marker.legal_act.act_type}
+                    </Badge>
+                    {marker.legal_act.act_number} ·{" "}
+                    {formatLegalActDate(marker.legal_act.act_date)}
+                  </Link>
+                </Button>
+              ))}
+            {revisionMarkers.every((marker) => marker.target_type !== "policy") && (
+              <p className="text-sm text-muted-foreground">
+                Шинэчлэлүүдийг бүлэг болон заалтын мөр дээр харуулж байна
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Sections + Clauses */}
-      <PolicyDetailContent policy={policy} isRating={isRating} />
+      <PolicyDetailContent
+        policy={policy}
+        isRating={isRating}
+        revisionMarkers={revisionMarkers}
+      />
     </div>
   );
 }
