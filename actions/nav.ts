@@ -134,11 +134,16 @@ export async function getNavServices(): Promise<NavService[]> {
           { title: "Хэлтэс", url: "/policy/scopes/heltes" },
         ],
       },
+      { title: "Эрх зүйн акт", url: "/policy/legal-acts" },
       { title: "Журмын хэрэгжилт", url: "/policy/imp" },
     ];
 
     if (hasPolicyCreate) {
       policyItems.push({ title: "+ Журам нэмэх", url: "/policy/new" });
+      policyItems.push({
+        title: "+ Эрх зүйн акт нэмэх",
+        url: "/policy/legal-acts/new",
+      });
     }
 
     services.push({
