@@ -5,6 +5,7 @@ export interface NavSubItem {
   title: string;
   url: string;
   badgeCount?: number;
+  items?: NavSubItem[];
 }
 
 export interface NavService {
@@ -125,7 +126,15 @@ export async function getNavServices(): Promise<NavService[]> {
     roles.some((r) => ["super_admin", "hr_emp", "monitoring_emp"].includes(r))
   ) {
     const policyItems: NavSubItem[] = [
-      { title: "Журмын жагсаалт", url: "/policy/list" },
+      {
+        title: "Журмын жагсаалт",
+        url: "/policy",
+        items: [
+          { title: "Алба", url: "/policy/scopes/alba" },
+          { title: "Хэлтэс", url: "/policy/scopes/heltes" },
+        ],
+      },
+      { title: "Журмын хэрэгжилт", url: "/policy/imp" },
     ];
 
     if (hasPolicyCreate) {
