@@ -23,7 +23,27 @@ const MEAL_TYPES = [
   { id: "lunch", label: "Өдөр" },
   { id: "dinner", label: "Орой" },
   { id: "night_meal", label: "Шөнө" },
-];
+] as const;
+
+type MealTypeId = (typeof MEAL_TYPES)[number]["id"];
+type MealCounts = Record<MealTypeId, number>;
+
+type DiningHall = {
+  id: number;
+  name: string;
+};
+
+type MealLocationOverride = {
+  id: number;
+  user_id: string;
+  dining_hall_id: number;
+  meal_type: string;
+  note: string | null;
+  is_deleted: boolean | null;
+  created_at: string;
+  dining_hall: { name: string } | null;
+  users: { nice_name: string | null } | null;
+};
 
 export default async function TempKitchenPage({
   searchParams,
@@ -38,11 +58,15 @@ export default async function TempKitchenPage({
   const supabase = await createClient();
   const selectedDate =
     resolvedSearchParams.date || format(new Date(), "yyyy-MM-dd");
-  const { data: halls } = await supabase.from("dining_hall").select("*");
+  const { data: halls } = await supabase
+    .from("dining_hall")
+    .select("id, name")
+    .returns<DiningHall[]>();
   const { data: allOverrides } = await supabase
     .from("meal_location_overrides")
     .select(`*, dining_hall(name), users:user_id(nice_name)`)
-    .eq("date", selectedDate);
+    .eq("date", selectedDate)
+    .returns<MealLocationOverride[]>();
 
   // Идэвхтэй болон Устгагдсан гэж салгах
   const activeOverrides = allOverrides?.filter((o) => !o.is_deleted) || [];
@@ -52,16 +76,13 @@ export default async function TempKitchenPage({
     ?.map((hall) => {
       const counts = MEAL_TYPES.reduce((acc, meal) => {
         acc[meal.id] =
-          activeOverrides?.filter(
+          activeOverrides.filter(
             (o) => o.dining_hall_id === hall.id && o.meal_type === meal.id,
           ).length || 0;
         return acc;
-      }, {} as any);
+      }, {} as MealCounts);
 
-      const total = Object.values(counts).reduce(
-        (a: any, b: any) => a + b,
-        0,
-      ) as number;
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
       return { name: hall.name, ...counts, total };
     })
     .filter((s) => s.total > 0);
@@ -79,7 +100,7 @@ export default async function TempKitchenPage({
             <CardTitle>Түр хуваарилалт бүртгэх</CardTitle>
           </CardHeader>
           <CardContent>
-            <OverrideForm diningHalls={halls || []} />
+            <OverrideForm diningHalls={halls || []} initialDate={selectedDate} />
           </CardContent>
         </Card>
 

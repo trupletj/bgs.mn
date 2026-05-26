@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { CalendarIcon, Loader2, UserPlus, X } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -31,12 +32,16 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { UserSearchPicker } from "@/components/users/user-search-picker";
 import type { UserSearchResult } from "@/actions/users";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { createMealOverride } from "@/actions/meal-override";
+import { createMealOverrides } from "@/actions/meal-override";
+
+type DiningHall = {
+  id: number;
+  name: string;
+};
 
 const formSchema = z.object({
   selected_users: z
@@ -48,9 +53,14 @@ const formSchema = z.object({
       }),
     )
     .min(1, "Ядаж нэг ажилтан сонгоно уу"),
-  date: z.date().refine((value) => !isNaN(value.getTime()), {
-    message: "Өдөр сонгоно уу",
-  }),
+  dateRange: z
+    .object({
+      from: z.union([z.date(), z.undefined()]),
+      to: z.union([z.date(), z.undefined()]),
+    })
+    .refine((value) => value.from && !isNaN(value.from.getTime()), {
+      message: "Эхлэх өдөр сонгоно уу",
+    }),
   meal_type: z.enum([
     "breakfast",
     "morning_meal",
@@ -62,18 +72,59 @@ const formSchema = z.object({
   note: z.string().optional(),
 });
 
-export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
+function formatDateRangeLabel(range?: DateRange) {
+  if (!range?.from) return "Сонгох";
+
+  if (!range.to || range.from.getTime() === range.to.getTime()) {
+    return format(range.from, "yyyy-MM-dd");
+  }
+
+  return `${format(range.from, "yyyy-MM-dd")} - ${format(range.to, "yyyy-MM-dd")}`;
+}
+
+function getDatesInRange(range: DateRange) {
+  if (!range.from) return [];
+
+  const dates: Date[] = [];
+  const current = new Date(range.from);
+  const end = range.to ? new Date(range.to) : new Date(range.from);
+
+  current.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  while (current <= end) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+}
+
+export default function OverrideForm({
+  diningHalls,
+  initialDate,
+}: {
+  diningHalls: DiningHall[];
+  initialDate?: string;
+}) {
   const [loading, setLoading] = useState(false);
+  const defaultDate = initialDate
+    ? new Date(`${initialDate}T00:00:00`)
+    : new Date();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       selected_users: [],
-      date: new Date(),
+      dateRange: { from: defaultDate, to: defaultDate },
       meal_type: "lunch",
       note: "",
     },
   });
+  const selectedUsers = form.watch("selected_users");
+  const selectedDateRange = form.watch("dateRange");
+  const assignmentCount =
+    selectedUsers.length * getDatesInRange(selectedDateRange).length;
 
   const handleAddUser = (user: UserSearchResult) => {
     const current = form.getValues("selected_users");
@@ -99,18 +150,19 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     try {
-      const promises = values.selected_users.map((user) =>
-        createMealOverride({
+      const dates = getDatesInRange(values.dateRange);
+      const overrides = values.selected_users.flatMap((user) =>
+        dates.map((date) => ({
           user_id: user.user_id,
           bteg_id: user.bteg_id,
-          date: format(values.date, "yyyy-MM-dd"),
+          date: format(date, "yyyy-MM-dd"),
           meal_type: values.meal_type,
           dining_hall_id: parseInt(values.dining_hall_id),
           note: values.note,
-        }),
+        })),
       );
 
-      await Promise.all(promises);
+      await createMealOverrides(overrides);
 
       toast.success("Түр хуваарилалт амжилттай хадгалагдлаа");
       form.reset({
@@ -118,8 +170,9 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
         selected_users: [],
         note: "",
       });
-    } catch (error: any) {
-      toast.error(error.message || "Алдаа гарлаа");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Алдаа гарлаа";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -143,7 +196,7 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
         <div className="space-y-2">
           <FormLabel>Ажилтан нэмэх</FormLabel>
           <div className="flex flex-wrap items-center gap-2 p-2 min-h-[50px] w-full bg-background">
-            {form.watch("selected_users").map((user) => (
+            {selectedUsers.map((user) => (
               <Badge
                 key={user.user_id}
                 variant="secondary"
@@ -162,7 +215,7 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
               </Badge>
             ))}
 
-            {form.watch("selected_users").length === 0 && (
+            {selectedUsers.length === 0 && (
               <span className="text-muted-foreground text-sm">
                 Ажилтан сонгогдоогүй...
               </span>
@@ -171,7 +224,7 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
 
           <UserSearchPicker
             placeholder="Нэр, овог, утас, албан тушаал..."
-            excludeIds={form.watch("selected_users").map((u) => u.user_id)}
+            excludeIds={selectedUsers.map((u) => u.user_id)}
             onSelect={handleAddUser}
           />
           <FormMessage>
@@ -182,10 +235,10 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="date"
+            name="dateRange"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Өдөр</FormLabel>
+                <FormLabel>Өдрийн интервал</FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -195,18 +248,17 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
                           "w-full pl-3 text-left font-normal",
                           !field.value && "text-muted-foreground",
                         )}>
-                        {field.value ? (
-                          format(field.value, "yyyy-MM-dd")
-                        ) : (
-                          <span>Сонгох</span>
-                        )}
+                        <span className="truncate">
+                          {formatDateRangeLabel(field.value)}
+                        </span>
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      mode="single"
+                      mode="range"
+                      numberOfMonths={2}
                       selected={field.value}
                       onSelect={field.onChange}
                       initialFocus
@@ -291,7 +343,7 @@ export default function OverrideForm({ diningHalls }: { diningHalls: any[] }) {
           ) : (
             <UserPlus className="mr-2 h-4 w-4" />
           )}
-          Хуваарилах ({form.watch("selected_users").length})
+          Хуваарилах ({assignmentCount})
         </Button>
       </form>
     </Form>

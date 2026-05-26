@@ -251,6 +251,10 @@ Trigger:
 | `section` | Policy section | `id` | 0 | Off |
 | `clause` | Section доторх заалт | `id` | 0 | Off |
 | `clause_job_position` | Заалт-албан тушаалын холбоос | `id` | 1 | Off |
+| `legal_acts` | Даргын 03/04 тушаалын бүртгэл | `id` | - | On |
+| `legal_act_attachments` | Эрх зүйн актын private file metadata | `id` | - | On |
+| `policy_revisions` | 04 тушаалаар үүссэн журмын шинэчлэл | `id` | - | On |
+| `policy_revision_targets` | Шинэчлэгдсэн policy/section/clause холбоос | `id` | - | On |
 | `rating_session` | Үнэлгээний session | `id` | 0 | Off |
 | `rating` | Үнэлгээний мөр | `id` | 0 | Off |
 
@@ -262,8 +266,20 @@ Trigger:
 - `clause.parent_id -> clause.id`
 - `clause_job_position.clause_id -> clause.id`
 - `clause_job_position.job_position_id -> job_position.id`
+- `legal_act_attachments.legal_act_id -> legal_acts.id`
+- `policy_revisions.legal_act_id -> legal_acts.id`
+- `policy_revisions.policy_id -> policy.id`
+- `policy_revision_targets.policy_revision_id -> policy_revisions.id`
+- `policy_revision_targets.policy_id/section_id/clause_id -> policy/section/clause`
 - `rating.rating_session_id -> rating_session.id`
 - `rating.clause_job_position_id -> clause_job_position.id`
+
+Эрх зүйн актын тэмдэглэл:
+
+- `legal_acts.act_type = '03'` нь сахилгын шийтгэлийн тушаалын бүртгэл.
+- `legal_acts.act_type = '04'` нь журам шинэчлэх тушаал бөгөөд `policy_revisions` болон `policy_revision_targets`-аар журмын нэр, бүлэг, заалттай холбогдоно.
+- `policy_revision_targets.change_action` нь тухайн target дээрх audit төрлийг хадгална: `updated`, `added`, `invalidated`, `deleted`. Энэ нь бодит `policy`/`section`/`clause.is_deleted` утгыг автоматаар өөрчлөхгүй.
+- `policy-legal-acts` private bucket-д тушаалын PDF/image/doc хавсралтууд хадгалагдана. App нь signed URL үүсгэж үзүүлнэ.
 
 ## Бүлэг 8: Чөлөөний хүсэлт
 
@@ -310,6 +326,7 @@ Sync trigger тойм:
 | --- | --- | ---: | --- |
 | `order-item-bucket` | Yes | 5 MB | Захиалгын item image upload |
 | `leave-attachments` | No | - | Чөлөөний хүсэлтийн хавсралт |
+| `policy-legal-acts` | No | 20 MB | Даргын 03/04 тушаалын хавсралт |
 
 ## Migration түүх
 
