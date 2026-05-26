@@ -1,0 +1,38 @@
+name: PR → Discord thread
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  thread:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Discord thread + post PR
+        env:
+          BOT_TOKEN:  ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          NAME:   ${{ github.head_ref }}
+          TITLE:  ${{ github.event.pull_request.title }}
+          URL:    ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          # 1) public thread (type 11) үүсгэх
+          TID=$(curl -sS -X POST \
+            "https://discord.com/api/v10/channels/${CHANNEL_ID}/threads" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg n "$NAME" \
+                 '{name:$n, type:11, auto_archive_duration:10080}')" \
+            | jq -r '.id')
+          # 2) PR линкийг thread-д постлох
+          MSG="📋 **${TITLE}** — @${AUTHOR}
+          ${URL}"
+          curl -sS -X POST \
+            "https://discord.com/api/v10/channels/${TID}/messages" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg c "$MSG" '{content:$c}')"
