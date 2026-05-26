@@ -173,6 +173,9 @@ Shared form pieces (`OrgCascade`, `DevicePicker`, `UserPicker`, `ProfilePicker`,
 | `organization` / `heltes` / `alba` | Three-level org tree. `heltes.organization_id` and `alba.heltes_id`/`organization_id` store `bteg_id` TEXT — not UUIDs |
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+**Active feature**: `001-leave-requests` (Чөлөөний хүсэлт)
+- Plan: [specs/001-leave-requests/plan.md](specs/001-leave-requests/plan.md)
+- Spec: [specs/001-leave-requests/spec.md](specs/001-leave-requests/spec.md)
+- Data model: [specs/001-leave-requests/data-model.md](specs/001-leave-requests/data-model.md)
+- Contracts: [specs/001-leave-requests/contracts/](specs/001-leave-requests/contracts/)
 <!-- SPECKIT END -->
