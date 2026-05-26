@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, Star } from "lucide-react";
+import { Briefcase, Gavel, Star } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import RatingDialogContent from "../rating/RatingDialogContent";
+import type { RevisionMarker } from "@/actions/policy-legal-acts";
+import {
+  getRevisionChangeActionLabel,
+  shouldStrikeRevisionTarget,
+} from "@/lib/policy-revision-actions";
 
 interface SingleClauseProps {
   clause: {
@@ -17,15 +22,24 @@ interface SingleClauseProps {
     policy_id: string;
   };
   isRating?: boolean;
+  revisionMarkers?: RevisionMarker[];
   className?: string;
 }
 
-const SingleClause = ({ clause, isRating, className }: SingleClauseProps) => {
+const SingleClause = ({
+  clause,
+  isRating,
+  revisionMarkers = [],
+  className,
+}: SingleClauseProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const depth = (clause.reference_number.match(/\./g) ?? []).length;
   const indent = ["pl-0", "pl-6", "pl-12", "pl-18", "pl-24"][
     Math.min(depth, 4)
   ];
+  const shouldStrike = revisionMarkers.some((marker) =>
+    shouldStrikeRevisionTarget(marker.change_action),
+  );
 
   return (
     <div
@@ -33,14 +47,46 @@ const SingleClause = ({ clause, isRating, className }: SingleClauseProps) => {
         "group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/40",
         indent,
         className,
-      )}
-    >
+      )}>
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-muted-foreground">
         {clause.reference_number}
       </span>
-      <p className="flex-1 text-sm leading-relaxed text-foreground">
-        {clause.text}
-      </p>
+      <div className="min-w-0 flex-1">
+        <p
+          className={cn(
+            "text-sm leading-relaxed text-foreground",
+            shouldStrike && "line-through decoration-1",
+          )}>
+          {clause.text}
+        </p>
+        {revisionMarkers.length > 0 && (
+          <div className="mt-1 flex flex-col gap-2">
+            {revisionMarkers.map((marker) => (
+              <div
+                key={`${marker.legal_act.id}-${marker.clause_id}`}
+                className="">
+                {marker.change_note && (
+                  <div className="mb-1 rounded  text-sm ">
+                    {marker.change_note}
+                  </div>
+                )}
+
+                <Link
+                  href={`/policy/legal-acts/${marker.legal_act.id}`}
+                  className="inline-flex items-start gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                  <Gavel className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span>
+                    {marker.legal_act.act_number} тушаалаар{" "}
+                    {getRevisionChangeActionLabel(
+                      marker.change_action,
+                    ).toLowerCase()}
+                  </span>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {isRating && (
         <div className="flex shrink-0 items-center gap-2 opacity-60 transition-opacity group-hover:opacity-100">

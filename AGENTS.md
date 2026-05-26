@@ -35,6 +35,7 @@
 
 ## Recent Food Log / Supabase Notes
 - A database overview document was added at `docs/supabase-database.md`; update it when schema ownership or major table groups change.
+- `/dine` summary page had a hydration mismatch from implicit `toLocaleString()` formatting in `components/dine/food-log-summary-table.tsx`. Keep rendered timestamps deterministic: SSR now renders `---` first, then formats on client mount with `mn-MN` and `Asia/Ulaanbaatar`.
 - `meal_logs.sub_employee_id` represents гэрээт/туслан компанийн QR-based meal logs. Regular employee logs should keep using `user_id` or `bteg_id`.
 - `daily_meal_summary` now includes `sub_employee_total`, populated by `public.refresh_daily_meal_summary()`. The existing cron refreshes hourly, so avoid row-level summary refresh triggers on `meal_logs` unless real-time summary is required.
 - Relevant migrations:
@@ -59,6 +60,9 @@
 
 ## Recent Policy Notes
 - `policy_scope_targets` links policies to multiple heltes/alba targets. It is used by policy create/edit and `/policy/list` scope search.
+- `/policy/legal-acts/[id]` now has an edit flow via `/policy/legal-acts/[id]/edit`, reusing `components/policy/legal-acts/legal-act-form.tsx` with prefilled values. The delete button uses `components/policy/legal-acts/legal-act-delete-button.tsx`; keep server-only actions out of client imports and pass server actions from the page.
+- `policy_revision_targets.change_action` tracks legal-act audit actions: `updated`, `added`, `invalidated`, `deleted`. This is audit-only and must not automatically soft-delete `policy`, `section`, or `clause`. Migration: `supabase/migrations/20260523120000_add_policy_revision_target_change_action.sql`.
+- `/policy/[policy_id]` legal-act history now groups all section/clause/policy markers by legal act. Updated/invalidated/deleted section and clause markers strike through the current text and show the legal act plus `change_note` below the affected item.
 - The real clause-position table in the current database is `clause_job_position`, not `clause_position`. Some older code used the wrong name; prefer `clause_job_position` for new work.
 - `/policy/[policy_id]` displays sections as collapsible accordion items. They open by default and can be collapsed section by section.
 - Policy edit save was optimized through `actions/policy-document.ts` and `/api/policy/document`: editing sends one policy document payload instead of many section/clause requests.
