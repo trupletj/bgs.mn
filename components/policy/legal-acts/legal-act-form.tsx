@@ -24,6 +24,10 @@ import type {
   PolicyPickerPolicy,
   RevisionTargetType,
 } from "@/actions/policy-legal-acts";
+import {
+  REVISION_CHANGE_ACTION_LABELS,
+  type RevisionChangeAction,
+} from "@/lib/policy-revision-actions";
 
 interface SelectedTarget {
   key: string;
@@ -32,18 +36,84 @@ interface SelectedTarget {
   sectionId?: string;
   clauseId?: string;
   label: string;
+  changeAction: RevisionChangeAction;
   changeNote: string;
+}
+
+export interface LegalActFormInitialData {
+  id: string;
+  act_type: LegalActType;
+  act_number: string;
+  act_date: string;
+  title: string;
+  body_text: string | null;
+  notes: string | null;
+  policy_id?: string | null;
+  summary?: string | null;
+  revision_targets?: LegalActCreateTarget[];
+}
+
+interface LegalActFormProps {
+  policies: PolicyPickerPolicy[];
+  initialData?: LegalActFormInitialData;
+  mode?: "create" | "edit";
 }
 
 function targetKey(targetType: RevisionTargetType, id: string) {
   return `${targetType}:${id}`;
 }
 
-export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
+function getInitialTargetKey(target: LegalActCreateTarget) {
+  if (target.targetType === "policy" && target.policyId) {
+    return targetKey("policy", target.policyId);
+  }
+  if (target.targetType === "section" && target.sectionId) {
+    return targetKey("section", target.sectionId);
+  }
+  if (target.targetType === "clause" && target.clauseId) {
+    return targetKey("clause", target.clauseId);
+  }
+  return null;
+}
+
+function buildInitialTargets(
+  targets: LegalActCreateTarget[] | undefined,
+): SelectedTarget[] {
+  const selectedTargets: SelectedTarget[] = [];
+
+  for (const target of targets ?? []) {
+    const key = getInitialTargetKey(target);
+    if (!key) continue;
+
+    selectedTargets.push({
+      key,
+      targetType: target.targetType,
+      policyId: target.policyId ?? undefined,
+      sectionId: target.sectionId ?? undefined,
+      clauseId: target.clauseId ?? undefined,
+      label: "",
+      changeAction: target.changeAction ?? "updated",
+      changeNote: target.changeNote ?? "",
+    });
+  }
+
+  return selectedTargets;
+}
+
+export function LegalActForm({
+  policies,
+  initialData,
+  mode = "create",
+}: LegalActFormProps) {
   const router = useRouter();
-  const [actType, setActType] = useState<LegalActType>("04");
-  const [policyId, setPolicyId] = useState("");
-  const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>([]);
+  const [actType, setActType] = useState<LegalActType>(
+    initialData?.act_type ?? "04",
+  );
+  const [policyId, setPolicyId] = useState(initialData?.policy_id ?? "");
+  const [policySearch, setPolicySearch] = useState("");
+  const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>(
+    buildInitialTargets(initialData?.revision_targets),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedPolicy = useMemo(
@@ -51,18 +121,44 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
     [policies, policyId],
   );
 
+  const filteredPolicies = useMemo(() => {
+    const keyword = policySearch.trim().toLowerCase();
+
+    if (!keyword) return policies;
+
+    return policies.filter((policy) => {
+      const referenceCode = policy.reference_code?.toLowerCase() ?? "";
+      const name = policy.name.toLowerCase();
+
+      return referenceCode.includes(keyword) || name.includes(keyword);
+    });
+  }, [policies, policySearch]);
+
   const targetMap = useMemo(
     () => new Map(selectedTargets.map((target) => [target.key, target])),
     [selectedTargets],
   );
 
-  const toggleTarget = (target: Omit<SelectedTarget, "changeNote">) => {
+  const toggleTarget = (
+    target: Omit<SelectedTarget, "changeAction" | "changeNote">,
+  ) => {
     setSelectedTargets((prev) => {
       if (prev.some((item) => item.key === target.key)) {
         return prev.filter((item) => item.key !== target.key);
       }
-      return [...prev, { ...target, changeNote: "" }];
+      return [...prev, { ...target, changeAction: "updated", changeNote: "" }];
     });
+  };
+
+  const updateTargetAction = (
+    key: string,
+    changeAction: RevisionChangeAction,
+  ) => {
+    setSelectedTargets((prev) =>
+      prev.map((target) =>
+        target.key === key ? { ...target, changeAction } : target,
+      ),
+    );
   };
 
   const updateTargetNote = (key: string, changeNote: string) => {
@@ -75,6 +171,7 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
 
   const handlePolicyChange = (value: string) => {
     setPolicyId(value);
+    setPolicySearch("");
     setSelectedTargets([]);
   };
 
@@ -84,13 +181,18 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
       policyId: target.policyId,
       sectionId: target.sectionId,
       clauseId: target.clauseId,
+      changeAction: target.changeAction,
       changeNote: target.changeNote,
     }));
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
-    const toastId = toast.loading("Эрх зүйн акт хадгалж байна...");
+    const toastId = toast.loading(
+      mode === "edit"
+        ? "Эрх зүйн акт шинэчилж байна..."
+        : "Эрх зүйн акт хадгалж байна...",
+    );
 
     try {
       if (actType === "04" && (!policyId || selectedTargets.length === 0)) {
@@ -102,16 +204,25 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
       formData.set("policy_id", policyId);
       formData.set("revision_targets", JSON.stringify(buildTargets()));
 
-      const response = await fetch("/api/policy/legal-acts", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        mode === "edit" && initialData?.id
+          ? `/api/policy/legal-acts/${initialData.id}`
+          : "/api/policy/legal-acts",
+        {
+          method: mode === "edit" ? "PATCH" : "POST",
+          body: formData,
+        },
+      );
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Эрх зүйн акт хадгалахад алдаа гарлаа");
       }
 
-      toast.success("Эрх зүйн акт хадгалагдлаа");
+      toast.success(
+        mode === "edit"
+          ? "Эрх зүйн акт шинэчлэгдлээ"
+          : "Эрх зүйн акт хадгалагдлаа",
+      );
       router.push(`/policy/legal-acts/${result.id}`);
       router.refresh();
     } catch (error) {
@@ -128,7 +239,9 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <div className="space-y-2">
             <Label>Тушаалын төрөл</Label>
-            <Select value={actType} onValueChange={(value) => setActType(value as LegalActType)}>
+            <Select
+              value={actType}
+              onValueChange={(value) => setActType(value as LegalActType)}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -142,11 +255,23 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="act_number">Тушаалын дугаар</Label>
-              <Input id="act_number" name="act_number" required placeholder="Жишээ: 04/2026-12" />
+              <Input
+                id="act_number"
+                name="act_number"
+                required
+                defaultValue={initialData?.act_number ?? ""}
+                placeholder="Жишээ: 04/2026-12"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="act_date">Огноо</Label>
-              <Input id="act_date" name="act_date" type="date" required />
+              <Input
+                id="act_date"
+                name="act_date"
+                type="date"
+                required
+                defaultValue={initialData?.act_date ?? ""}
+              />
             </div>
           </div>
         </div>
@@ -158,6 +283,7 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
             name="title"
             required
             maxLength={300}
+            defaultValue={initialData?.title ?? ""}
             placeholder="Тушаалын гарчиг"
           />
         </div>
@@ -168,6 +294,7 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
             id="body_text"
             name="body_text"
             rows={6}
+            defaultValue={initialData?.body_text ?? ""}
             placeholder="Тушаалын агуулгыг гараар оруулж болно"
           />
         </div>
@@ -187,7 +314,12 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Тэмдэглэл</Label>
-            <Input id="notes" name="notes" placeholder="Дотоод тайлбар" />
+            <Input
+              id="notes"
+              name="notes"
+              defaultValue={initialData?.notes ?? ""}
+              placeholder="Дотоод тайлбар"
+            />
           </div>
         </div>
       </Card>
@@ -202,12 +334,30 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                   <SelectValue placeholder="Журам сонгох" />
                 </SelectTrigger>
                 <SelectContent>
-                  {policies.map((policy) => (
-                    <SelectItem key={policy.id} value={policy.id}>
-                      {policy.reference_code ? `${policy.reference_code} · ` : ""}
-                      {policy.name}
-                    </SelectItem>
-                  ))}
+                  <div className="sticky top-0 z-10 bg-popover p-2">
+                    <Input
+                      value={policySearch}
+                      onChange={(event) => setPolicySearch(event.target.value)}
+                      placeholder="Журмын нэр, кодоор хайх..."
+                      className="h-9"
+                      onKeyDown={(event) => event.stopPropagation()}
+                    />
+                  </div>
+
+                  {filteredPolicies.length > 0 ? (
+                    filteredPolicies.map((policy) => (
+                      <SelectItem key={policy.id} value={policy.id}>
+                        {policy.reference_code
+                          ? `${policy.reference_code} · `
+                          : ""}
+                        {policy.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      Илэрц олдсонгүй
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -217,6 +367,7 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                 id="summary"
                 name="summary"
                 rows={3}
+                defaultValue={initialData?.summary ?? ""}
                 placeholder="Журам шинэчлэх болсон үндсэн тайлбар"
               />
             </div>
@@ -228,15 +379,26 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                 <h2 className="text-sm font-semibold text-foreground">
                   Шинэчлэгдсэн зүйлс
                 </h2>
-                <Badge variant="outline">{selectedTargets.length} сонгосон</Badge>
+                <Badge variant="outline">
+                  {selectedTargets.length} сонгосон
+                </Badge>
               </div>
 
               <div className="rounded-md border">
                 <TargetRow
-                  checked={targetMap.has(targetKey("policy", selectedPolicy.id))}
+                  checked={targetMap.has(
+                    targetKey("policy", selectedPolicy.id),
+                  )}
                   label="Журмын нэр / ерөнхий мэдээлэл"
                   badge="Журам"
-                  note={targetMap.get(targetKey("policy", selectedPolicy.id))?.changeNote ?? ""}
+                  note={
+                    targetMap.get(targetKey("policy", selectedPolicy.id))
+                      ?.changeNote ?? ""
+                  }
+                  action={
+                    targetMap.get(targetKey("policy", selectedPolicy.id))
+                      ?.changeAction ?? "updated"
+                  }
                   onToggle={() =>
                     toggleTarget({
                       key: targetKey("policy", selectedPolicy.id),
@@ -251,6 +413,12 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                       event.target.value,
                     )
                   }
+                  onActionChange={(value) =>
+                    updateTargetAction(
+                      targetKey("policy", selectedPolicy.id),
+                      value,
+                    )
+                  }
                 />
 
                 {selectedPolicy.sections.map((section) => (
@@ -259,7 +427,14 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                       checked={targetMap.has(targetKey("section", section.id))}
                       label={`${section.reference_number}. ${section.text}`}
                       badge="Бүлэг"
-                      note={targetMap.get(targetKey("section", section.id))?.changeNote ?? ""}
+                      note={
+                        targetMap.get(targetKey("section", section.id))
+                          ?.changeNote ?? ""
+                      }
+                      action={
+                        targetMap.get(targetKey("section", section.id))
+                          ?.changeAction ?? "updated"
+                      }
                       onToggle={() =>
                         toggleTarget({
                           key: targetKey("section", section.id),
@@ -275,6 +450,9 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                           event.target.value,
                         )
                       }
+                      onActionChange={(value) =>
+                        updateTargetAction(targetKey("section", section.id), value)
+                      }
                     />
                     {section.clauses.map((clause) => (
                       <TargetRow
@@ -283,7 +461,14 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                         label={`${clause.reference_number}. ${clause.text}`}
                         badge="Заалт"
                         className="pl-9"
-                        note={targetMap.get(targetKey("clause", clause.id))?.changeNote ?? ""}
+                        note={
+                          targetMap.get(targetKey("clause", clause.id))
+                            ?.changeNote ?? ""
+                        }
+                        action={
+                          targetMap.get(targetKey("clause", clause.id))
+                            ?.changeAction ?? "updated"
+                        }
                         onToggle={() =>
                           toggleTarget({
                             key: targetKey("clause", clause.id),
@@ -300,6 +485,9 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
                             event.target.value,
                           )
                         }
+                        onActionChange={(value) =>
+                          updateTargetAction(targetKey("clause", clause.id), value)
+                        }
                       />
                     ))}
                   </div>
@@ -308,19 +496,27 @@ export function LegalActForm({ policies }: { policies: PolicyPickerPolicy[] }) {
             </div>
           ) : (
             <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              Журам сонгосны дараа бүлэг, заалтын target гарна
+              Журам сонгосны дараа бүлэг, заалт харагдана.
             </div>
           )}
         </Card>
       )}
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+          disabled={isSubmitting}>
           Цуцлах
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Хадгалах
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+          {mode === "edit" ? "Шинэчлэх" : "Хадгалах"}
         </Button>
       </div>
     </form>
@@ -331,37 +527,66 @@ function TargetRow({
   checked,
   label,
   badge,
+  action,
   note,
   className,
   onToggle,
+  onActionChange,
   onNoteChange,
 }: {
   checked: boolean;
   label: string;
   badge: string;
+  action: RevisionChangeAction;
   note: string;
   className?: string;
   onToggle: () => void;
+  onActionChange: React.Dispatch<RevisionChangeAction>;
   onNoteChange: React.ChangeEventHandler<HTMLInputElement>;
 }) {
   return (
     <div className={`border-b px-3 py-2 last:border-b-0 ${className ?? ""}`}>
       <div className="flex items-start gap-3">
-        <Checkbox checked={checked} onCheckedChange={onToggle} className="mt-1" />
+        <Checkbox
+          checked={checked}
+          onCheckedChange={onToggle}
+          className="mt-1"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <Badge variant="secondary" className="shrink-0">
               {badge}
             </Badge>
-            <p className="min-w-0 text-sm leading-relaxed text-foreground">{label}</p>
+            <p className="min-w-0 text-sm leading-relaxed text-foreground">
+              {label}
+            </p>
           </div>
           {checked && (
-            <Input
-              value={note}
-              onChange={onNoteChange}
-              placeholder="Энэ хэсэг хэрхэн шинэчлэгдсэнийг товч бичих"
-              className="mt-2"
-            />
+            <div className="mt-2 grid gap-2 sm:grid-cols-[220px_1fr]">
+              <Select
+                value={action}
+                onValueChange={(value) =>
+                  onActionChange(value as RevisionChangeAction)
+                }>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(REVISION_CHANGE_ACTION_LABELS).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+              <Input
+                value={note}
+                onChange={onNoteChange}
+                placeholder="Энэ хэсэг хэрхэн өөрчлөгдсөнийг товч бичих"
+              />
+            </div>
           )}
         </div>
       </div>

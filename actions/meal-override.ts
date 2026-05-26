@@ -3,14 +3,50 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getProfileIdFromAuthUserId } from "./profile";
+import { searchUsers as _searchUsers } from "./users";
 
-export async function createMealOverride(formData: any) {
+type MealOverrideInput = {
+  user_id: string;
+  bteg_id?: string | null;
+  date: string;
+  meal_type: string;
+  dining_hall_id: number;
+  note?: string | null;
+};
+
+type MealOverrideUpdateInput = {
+  meal_type: string;
+  dining_hall_id: string;
+  note?: string | null;
+};
+
+export async function createMealOverride(formData: MealOverrideInput) {
   const supabase = await createClient();
   const profile_id = await getProfileIdFromAuthUserId();
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("meal_location_overrides")
     .insert([{ ...formData, created_by: profile_id }]);
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dine/temp-kitchen");
+  return { success: true };
+}
+
+export async function createMealOverrides(overrides: MealOverrideInput[]) {
+  if (overrides.length === 0) {
+    throw new Error("Бүртгэх хуваарилалт олдсонгүй");
+  }
+
+  const supabase = await createClient();
+  const profile_id = await getProfileIdFromAuthUserId();
+
+  const { error } = await supabase.from("meal_location_overrides").insert(
+    overrides.map((override) => ({
+      ...override,
+      created_by: profile_id,
+    })),
+  );
 
   if (error) throw new Error(error.message);
   revalidatePath("/dine/temp-kitchen");
@@ -30,8 +66,6 @@ export async function deleteOverride(id: number) {
   revalidatePath("/dine/temp-kitchen");
 }
 // Centralized in actions/users.ts; map to shape this caller expects.
-import { searchUsers as _searchUsers } from "./users";
-
 export async function searchUsers(query: string) {
   if (!query || query.length < 2) return [];
   const results = await _searchUsers(query, 15);
@@ -45,7 +79,10 @@ export async function searchUsers(query: string) {
   }));
 }
 
-export async function updateMealOverride(id: number, values: any) {
+export async function updateMealOverride(
+  id: number,
+  values: MealOverrideUpdateInput,
+) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("meal_location_overrides")

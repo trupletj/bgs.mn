@@ -77,6 +77,22 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   extend_lunch: "С/ өдөр",
 };
 
+const UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("mn-MN", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Ulaanbaatar",
+});
+
+function formatUpdatedAt(value: string | null | undefined) {
+  if (!value) return "---";
+  return UPDATED_AT_FORMATTER.format(new Date(value));
+}
+
 export default function FoodLogSummaryTable({
   initialData,
   initialDate,
@@ -85,6 +101,7 @@ export default function FoodLogSummaryTable({
   const [data, setData] = useState<DailyMealSummary[]>(initialData);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [formattedUpdatedAt, setFormattedUpdatedAt] = useState("---");
 
   // Мөр дэлгэхтэй холбоотой төлөвүүд
   const [expandedHallId, setExpandedHallId] = useState<number | null>(null);
@@ -95,6 +112,10 @@ export default function FoodLogSummaryTable({
     [],
   );
   const [loadingExpected, setLoadingExpected] = useState(false);
+
+  useEffect(() => {
+    setFormattedUpdatedAt(formatUpdatedAt(data[0]?.updated_at));
+  }, [data]);
 
   useEffect(() => {
     if (selectedDate === initialDate) return;
@@ -564,10 +585,7 @@ export default function FoodLogSummaryTable({
       <DuplicateMealHallReport date={selectedDate} />
 
       <div className="text-[10px] text-slate-400 italic">
-        Сүүлд шинэчлэгдсэн:{" "}
-        {data[0]?.updated_at
-          ? new Date(data[0].updated_at).toLocaleString()
-          : "---"}
+        Сүүлд шинэчлэгдсэн: {formattedUpdatedAt}
       </div>
       <MealLogsDetailModal
         isOpen={modalConfig.isOpen}

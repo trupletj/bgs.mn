@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/actions/rbac";
-import { getProfileIdFromAuthUserId } from "@/actions/profile";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
 import type { LegalActCreateTarget, LegalActType } from "@/actions/policy-legal-acts";
 import { normalizeRevisionChangeAction } from "@/lib/policy-revision-actions";
 
@@ -47,13 +46,17 @@ function validateFile(file: File | null) {
   return file;
 }
 
-export async function POST(request: Request) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
-    const canCreate = await hasPermission("policy", "create");
-    if (!canCreate) {
-      return NextResponse.json({ error: "Эрх зүйн акт үүсгэх эрхгүй байна" }, { status: 403 });
+    const canEdit = await hasPermission("policy", "edit");
+    if (!canEdit) {
+      return NextResponse.json({ error: "Эрх зүйн акт засах эрхгүй байна" }, { status: 403 });
     }
 
+    const { id } = await params;
     const formData = await request.formData();
     const actType = String(formData.get("act_type") ?? "") as LegalActType;
     const actNumber = String(formData.get("act_number") ?? "").trim();
@@ -76,28 +79,63 @@ export async function POST(request: Request) {
       throw new Error("04 тушаалд журам болон шинэчлэгдсэн target заавал сонгоно уу");
     }
 
-    const supabase = await createClient();
-    const profileId = await getProfileIdFromAuthUserId();
+    const supabase = getSupabaseAdmin();
+    const { data: existingRevisions, error: existingError } = await supabase
+      .from("policy_revisions")
+      .select("id, policy_id")
+      .eq("legal_act_id", id);
+
+    if (existingError) {
+      throw new Error(`Одоогийн шинэчлэл авахад алдаа: ${existingError.message}`);
+    }
+
+    const previousPolicyIds = Array.from(
+      new Set((existingRevisions ?? []).map((revision) => revision.policy_id)),
+    );
+
     const { data: legalAct, error: actError } = await supabase
       .from("legal_acts")
-      .insert({
+      .update({
         act_type: actType,
         act_number: actNumber,
         act_date: actDate,
         title,
         body_text: bodyText || null,
         notes: notes || null,
-        created_by: profileId,
-        is_deleted: false,
       })
+      .eq("id", id)
+      .eq("is_deleted", false)
       .select("id")
       .single();
 
-    if (actError) throw new Error(`Эрх зүйн акт үүсгэхэд алдаа: ${actError.message}`);
+    if (actError || !legalAct) {
+      throw new Error(actError?.message || "Эрх зүйн акт олдсонгүй");
+    }
+
+    if ((existingRevisions ?? []).length > 0) {
+      const revisionIds = (existingRevisions ?? []).map((revision) => revision.id);
+      const { error: targetDeleteError } = await supabase
+        .from("policy_revision_targets")
+        .delete()
+        .in("policy_revision_id", revisionIds);
+
+      if (targetDeleteError) {
+        throw new Error(`Хуучин target устгахад алдаа: ${targetDeleteError.message}`);
+      }
+
+      const { error: revisionDeleteError } = await supabase
+        .from("policy_revisions")
+        .delete()
+        .eq("legal_act_id", id);
+
+      if (revisionDeleteError) {
+        throw new Error(`Хуучин шинэчлэл устгахад алдаа: ${revisionDeleteError.message}`);
+      }
+    }
 
     if (file) {
       const safeName = sanitizeFileName(file.name);
-      const storagePath = `${legalAct.id}/${Date.now()}-${safeName}`;
+      const storagePath = `${id}/${Date.now()}-${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from(BUCKET)
         .upload(storagePath, Buffer.from(await file.arrayBuffer()), {
@@ -110,7 +148,7 @@ export async function POST(request: Request) {
       const { error: attachmentError } = await supabase
         .from("legal_act_attachments")
         .insert({
-          legal_act_id: legalAct.id,
+          legal_act_id: id,
           bucket: BUCKET,
           storage_path: storagePath,
           file_name: file.name,
@@ -127,7 +165,7 @@ export async function POST(request: Request) {
       const { data: revision, error: revisionError } = await supabase
         .from("policy_revisions")
         .insert({
-          legal_act_id: legalAct.id,
+          legal_act_id: id,
           policy_id: policyId,
           summary: summary || null,
         })
@@ -158,10 +196,13 @@ export async function POST(request: Request) {
     }
 
     revalidatePath("/policy/legal-acts");
-    revalidatePath(`/policy/legal-acts/${legalAct.id}`);
+    revalidatePath(`/policy/legal-acts/${id}`);
+    previousPolicyIds.forEach((previousPolicyId) => {
+      if (previousPolicyId) revalidatePath(`/policy/${previousPolicyId}`);
+    });
     if (policyId) revalidatePath(`/policy/${policyId}`);
 
-    return NextResponse.json({ id: legalAct.id }, { status: 201 });
+    return NextResponse.json({ id });
   } catch (error) {
     return NextResponse.json(
       { error: (error as Error).message },
