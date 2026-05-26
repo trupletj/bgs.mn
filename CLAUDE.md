@@ -171,3 +171,8 @@ Shared form pieces (`OrgCascade`, `DevicePicker`, `UserPicker`, `ProfilePicker`,
 | `device_requests` | Multi-type IT requests (new/replace/transfer/decommission/repair); `req_*_bteg` are TEXT, `created_by`/`assigned_to` are integer FKs to `profile` |
 | `device_request_comments` / `device_request_status_history` | Discussion thread + status transition log per request |
 | `organization` / `heltes` / `alba` | Three-level org tree. `heltes.organization_id` and `alba.heltes_id`/`organization_id` store `bteg_id` TEXT — not UUIDs |
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
