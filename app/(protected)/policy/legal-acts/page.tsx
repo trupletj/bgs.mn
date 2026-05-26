@@ -26,7 +26,9 @@ interface LegalActsPageProps {
 
 export const revalidate = 0;
 
-export default async function LegalActsPage({ searchParams }: LegalActsPageProps) {
+export default async function LegalActsPage({
+  searchParams,
+}: LegalActsPageProps) {
   const [{ type }, canAccess, canCreate] = await Promise.all([
     searchParams,
     hasPermission("policy", "access"),
@@ -53,32 +55,46 @@ export default async function LegalActsPage({ searchParams }: LegalActsPageProps
             Даргын 03, 04 тушаалын бүртгэл
           </p>
         </div>
-        {canCreate && (
-          <Button asChild>
-            <Link href="/policy/legal-acts/new">
-              <Plus className="h-4 w-4" />
-              Эрх зүйн акт нэмэх
-            </Link>
-          </Button>
-        )}
       </div>
 
-      <Card className="flex flex-wrap gap-2 p-3">
-        <Button asChild variant={activeType === "all" ? "default" : "outline"} size="sm">
-          <Link href="/policy/legal-acts">Бүгд</Link>
+      <Card className="flex flex-row items-center gap-2 p-3">
+        <Button
+          asChild
+          variant={activeType === "all" ? "default" : "outline"}
+          size="sm"
+          className="w-auto flex-none">
+          <Link href="/policy/legal-acts" className="w-auto">
+            Бүгд
+          </Link>
         </Button>
-        <Button asChild variant={activeType === "04" ? "default" : "outline"} size="sm">
-          <Link href="/policy/legal-acts?type=04">04 - Журам шинэчлэх</Link>
+
+        <Button
+          asChild
+          variant={activeType === "04" ? "default" : "outline"}
+          size="sm"
+          className="w-auto flex-none">
+          <Link href="/policy/legal-acts?type=04" className="w-auto">
+            04 - Журам шинэчлэх
+          </Link>
         </Button>
-        <Button asChild variant={activeType === "03" ? "default" : "outline"} size="sm">
-          <Link href="/policy/legal-acts?type=03">03 - Сахилгын шийтгэл</Link>
+
+        <Button
+          asChild
+          variant={activeType === "03" ? "default" : "outline"}
+          size="sm"
+          className="w-auto flex-none">
+          <Link href="/policy/legal-acts?type=03" className="w-auto">
+            03 - Сахилгын шийтгэл
+          </Link>
         </Button>
       </Card>
 
       {legalActs.length === 0 ? (
         <Card className="items-center gap-2 px-4 py-16 text-center">
           <Search className="h-8 w-8 text-muted-foreground/50" />
-          <p className="font-semibold text-foreground">Эрх зүйн акт олдсонгүй</p>
+          <p className="font-semibold text-foreground">
+            Эрх зүйн акт олдсонгүй
+          </p>
           <p className="text-sm text-muted-foreground">
             Эхний тушаалыг бүртгэснээр энд харагдана
           </p>
@@ -100,17 +116,21 @@ export default async function LegalActsPage({ searchParams }: LegalActsPageProps
                   <TableCell>
                     <Link
                       href={`/policy/legal-acts/${act.id}`}
-                      className="flex min-w-0 flex-col gap-1 hover:text-primary"
-                    >
+                      className="flex min-w-0 flex-col gap-1 hover:text-primary">
                       <div className="flex items-center gap-2">
-                        <Badge variant={act.act_type === "04" ? "default" : "secondary"}>
+                        <Badge
+                          variant={
+                            act.act_type === "04" ? "default" : "secondary"
+                          }>
                           {act.act_type}
                         </Badge>
                         <span className="font-mono text-xs text-muted-foreground">
                           {act.act_number}
                         </span>
                       </div>
-                      <span className="font-semibold text-foreground">{act.title}</span>
+                      <span className="font-semibold text-foreground">
+                        {act.title}
+                      </span>
                       <span className="text-xs text-muted-foreground">
                         {getLegalActTypeLabel(act.act_type)}
                       </span>
@@ -124,7 +144,9 @@ export default async function LegalActsPage({ searchParams }: LegalActsPageProps
                       <div className="flex flex-col gap-1">
                         {act.policies.slice(0, 2).map((policy) => (
                           <span key={policy.id} className="text-sm">
-                            {policy.reference_code ? `${policy.reference_code} · ` : ""}
+                            {policy.reference_code
+                              ? `${policy.reference_code} · `
+                              : ""}
                             {policy.name}
                           </span>
                         ))}

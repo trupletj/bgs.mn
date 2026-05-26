@@ -278,6 +278,7 @@ Trigger:
 
 - `legal_acts.act_type = '03'` нь сахилгын шийтгэлийн тушаалын бүртгэл.
 - `legal_acts.act_type = '04'` нь журам шинэчлэх тушаал бөгөөд `policy_revisions` болон `policy_revision_targets`-аар журмын нэр, бүлэг, заалттай холбогдоно.
+- `policy_revision_targets.change_action` нь тухайн target дээрх audit төрлийг хадгална: `updated`, `added`, `invalidated`, `deleted`. Энэ нь бодит `policy`/`section`/`clause.is_deleted` утгыг автоматаар өөрчлөхгүй.
 - `policy-legal-acts` private bucket-д тушаалын PDF/image/doc хавсралтууд хадгалагдана. App нь signed URL үүсгэж үзүүлнэ.
 
 ## Бүлэг 8: Чөлөөний хүсэлт

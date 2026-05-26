@@ -1,8 +1,12 @@
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { hasPermission } from "@/actions/rbac";
 import { sortByReferenceNumber } from "@/lib/policy-utils";
+import {
+  normalizeRevisionChangeAction,
+  type RevisionChangeAction,
+} from "@/lib/policy-revision-actions";
+export type { RevisionChangeAction } from "@/lib/policy-revision-actions";
 
 export type LegalActType = "03" | "04";
 export type RevisionTargetType = "policy" | "section" | "clause";
@@ -29,18 +33,31 @@ export interface LegalActListItem {
   created_at: string;
   revision_count: number;
   attachment_count: number;
-  policies: { id: string; name: string | null; reference_code: string | null }[];
+  policies: {
+    id: string;
+    name: string | null;
+    reference_code: string | null;
+  }[];
 }
 
 export interface LegalActRevisionTarget {
   id: string;
   target_type: RevisionTargetType;
+  change_action: RevisionChangeAction;
   policy_id: string | null;
   section_id: string | null;
   clause_id: string | null;
   change_note: string | null;
-  section?: { id: string; reference_number: string | null; text: string | null } | null;
-  clause?: { id: string; reference_number: string | null; text: string | null } | null;
+  section?: {
+    id: string;
+    reference_number: string | null;
+    text: string | null;
+  } | null;
+  clause?: {
+    id: string;
+    reference_number: string | null;
+    text: string | null;
+  } | null;
 }
 
 export interface LegalActRevision {
@@ -48,7 +65,11 @@ export interface LegalActRevision {
   legal_act_id: string;
   policy_id: string;
   summary: string | null;
-  policy?: { id: string; name: string | null; reference_code: string | null } | null;
+  policy?: {
+    id: string;
+    name: string | null;
+    reference_code: string | null;
+  } | null;
   targets: LegalActRevisionTarget[];
 }
 
@@ -68,6 +89,7 @@ export interface LegalActDetail {
 
 export interface RevisionMarker {
   target_type: RevisionTargetType;
+  change_action: RevisionChangeAction;
   policy_id: string | null;
   section_id: string | null;
   clause_id: string | null;
@@ -103,6 +125,7 @@ export interface PolicyPickerPolicy {
 
 export interface LegalActCreateTarget {
   targetType: RevisionTargetType;
+  changeAction?: RevisionChangeAction | null;
   policyId?: string | null;
   sectionId?: string | null;
   clauseId?: string | null;
@@ -138,10 +161,18 @@ interface LegalActRevisionRow {
   policy_id: string;
   summary: string | null;
   policy: LegalActRevision["policy"] | LegalActRevision["policy"][] | null;
-  targets?: (Omit<LegalActRevisionTarget, "section" | "clause"> & {
-    section?: LegalActRevisionTarget["section"] | LegalActRevisionTarget["section"][] | null;
-    clause?: LegalActRevisionTarget["clause"] | LegalActRevisionTarget["clause"][] | null;
-  })[] | null;
+  targets?:
+    | (Omit<LegalActRevisionTarget, "section" | "clause"> & {
+        section?:
+          | LegalActRevisionTarget["section"]
+          | LegalActRevisionTarget["section"][]
+          | null;
+        clause?:
+          | LegalActRevisionTarget["clause"]
+          | LegalActRevisionTarget["clause"][]
+          | null;
+      })[]
+    | null;
 }
 
 interface PolicyRevisionMarkerRevisionRow {
@@ -152,6 +183,7 @@ interface PolicyRevisionMarkerRevisionRow {
 interface PolicyRevisionMarkerTargetRow {
   policy_revision_id: string;
   target_type: RevisionTargetType;
+  change_action: RevisionChangeAction | null;
   policy_id: string | null;
   section_id: string | null;
   clause_id: string | null;
@@ -188,7 +220,10 @@ function formatDate(value: string | null | undefined) {
 
 function normalizeLegalAct(row: LegalActListRow): LegalActListItem {
   const revisions = row.revisions ?? [];
-  const policiesById = new Map<string, { id: string; name: string | null; reference_code: string | null }>();
+  const policiesById = new Map<
+    string,
+    { id: string; name: string | null; reference_code: string | null }
+  >();
 
   revisions.forEach((revision) => {
     const policy = Array.isArray(revision.policy)
@@ -253,12 +288,15 @@ export async function getLegalActs(type?: LegalActType | "all") {
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(`Эрх зүйн актын жагсаалт авахад алдаа: ${error.message}`);
+  if (error)
+    throw new Error(`Эрх зүйн актын жагсаалт авахад алдаа: ${error.message}`);
 
   return ((data ?? []) as LegalActListRow[]).map(normalizeLegalAct);
 }
 
-export async function getLegalActDetail(id: string): Promise<LegalActDetail | null> {
+export async function getLegalActDetail(
+  id: string,
+): Promise<LegalActDetail | null> {
   const canAccess = await hasPermission("policy", "access");
   if (!canAccess) return null;
 
@@ -275,7 +313,7 @@ export async function getLegalActDetail(id: string): Promise<LegalActDetail | nu
           id, legal_act_id, policy_id, summary,
           policy:policy_id(id, name, reference_code),
           targets:policy_revision_targets(
-            id, target_type, policy_id, section_id, clause_id, change_note,
+            id, target_type, change_action, policy_id, section_id, clause_id, change_note,
             section:section_id(id, reference_number, text),
             clause:clause_id(id, reference_number, text)
           )
@@ -292,15 +330,24 @@ export async function getLegalActDetail(id: string): Promise<LegalActDetail | nu
   return {
     ...data,
     attachments: data.attachments ?? [],
-    revisions: ((data.revisions ?? []) as unknown as LegalActRevisionRow[]).map((revision) => ({
-      ...revision,
-      policy: Array.isArray(revision.policy) ? revision.policy[0] : revision.policy,
-      targets: (revision.targets ?? []).map((target) => ({
-        ...target,
-        section: Array.isArray(target.section) ? target.section[0] : target.section,
-        clause: Array.isArray(target.clause) ? target.clause[0] : target.clause,
-      })),
-    })),
+    revisions: ((data.revisions ?? []) as unknown as LegalActRevisionRow[]).map(
+      (revision) => ({
+        ...revision,
+        policy: Array.isArray(revision.policy)
+          ? revision.policy[0]
+          : revision.policy,
+        targets: (revision.targets ?? []).map((target) => ({
+          ...target,
+          change_action: normalizeRevisionChangeAction(target.change_action),
+          section: Array.isArray(target.section)
+            ? target.section[0]
+            : target.section,
+          clause: Array.isArray(target.clause)
+            ? target.clause[0]
+            : target.clause,
+        })),
+      }),
+    ),
   } as LegalActDetail;
 }
 
@@ -319,7 +366,8 @@ export async function getPolicyRevisionMarkers(policyId: string) {
     )
     .eq("policy_id", policyId);
 
-  if (revisionError) throw new Error(`Журмын шинэчлэл авахад алдаа: ${revisionError.message}`);
+  if (revisionError)
+    throw new Error(`Журмын шинэчлэл авахад алдаа: ${revisionError.message}`);
 
   const revisionRows = (revisions ?? []) as PolicyRevisionMarkerRevisionRow[];
   const revisionIds = revisionRows.map((revision) => revision.id);
@@ -335,10 +383,15 @@ export async function getPolicyRevisionMarkers(policyId: string) {
 
   const { data: targets, error: targetError } = await supabase
     .from("policy_revision_targets")
-    .select("policy_revision_id, target_type, policy_id, section_id, clause_id, change_note")
+    .select(
+      "policy_revision_id, target_type, change_action, policy_id, section_id, clause_id, change_note",
+    )
     .in("policy_revision_id", revisionIds);
 
-  if (targetError) throw new Error(`Журмын шинэчлэлийн target авахад алдаа: ${targetError.message}`);
+  if (targetError)
+    throw new Error(
+      `Журмын шинэчлэлийн target авахад алдаа: ${targetError.message}`,
+    );
 
   return ((targets ?? []) as PolicyRevisionMarkerTargetRow[])
     .map((target) => {
@@ -346,6 +399,7 @@ export async function getPolicyRevisionMarkers(policyId: string) {
       if (!legalAct) return null;
       return {
         target_type: target.target_type,
+        change_action: normalizeRevisionChangeAction(target.change_action),
         policy_id: target.policy_id,
         section_id: target.section_id,
         clause_id: target.clause_id,
@@ -357,8 +411,11 @@ export async function getPolicyRevisionMarkers(policyId: string) {
 }
 
 export async function getPolicyPickerData(): Promise<PolicyPickerPolicy[]> {
-  const canCreate = await hasPermission("policy", "create");
-  if (!canCreate) return [];
+  const [canCreate, canEdit] = await Promise.all([
+    hasPermission("policy", "create"),
+    hasPermission("policy", "edit"),
+  ]);
+  if (!canCreate && !canEdit) return [];
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -403,8 +460,6 @@ export async function getPolicyPickerData(): Promise<PolicyPickerPolicy[]> {
 }
 
 export async function deleteLegalAct(formData: FormData) {
-  "use server";
-
   const canDelete = await hasPermission("policy", "delete");
   if (!canDelete) throw new Error("Эрх зүйн акт устгах эрхгүй байна");
 
@@ -419,6 +474,5 @@ export async function deleteLegalAct(formData: FormData) {
 
   if (error) throw new Error(`Эрх зүйн акт устгахад алдаа: ${error.message}`);
 
-  revalidatePath("/policy/legal-acts");
   redirect("/policy/legal-acts");
 }
