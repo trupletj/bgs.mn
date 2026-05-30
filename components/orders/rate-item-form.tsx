@@ -34,6 +34,7 @@ import {
 import {
   ArrowRight,
   CheckCircle2,
+  ChevronLeft,
   MessageSquare,
   MoreHorizontal,
   RotateCcw,
@@ -243,7 +244,8 @@ function QtyChangeHistory({
   value: string;
   isChanged: boolean;
   isSubmitting: boolean;
-  onQuantityChange: (value: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onQuantityChange(value: string): void;
   onReset: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -304,19 +306,29 @@ function QtyChangeHistory({
           )}
 
           {/* Expanded/full history or latest only */}
-          {visibleHistory.map((historyItem) => (
+          {visibleHistory.map((historyItem, index) => (
             <div key={historyItem.id} className="flex items-start gap-2">
-              <QtyHistoryNode
-                historyItem={historyItem}
-                onClick={() => {
-                  if (expanded && canCollapse) {
-                    setExpanded(false);
-                  }
-                }}
-              />
-              <QtyArrow />
+              <QtyHistoryNode historyItem={historyItem} />
+              {!(expanded && canCollapse && index === visibleHistory.length - 1) && (
+                <QtyArrow />
+              )}
             </div>
           ))}
+
+          {expanded && canCollapse && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="group flex w-16 shrink-0 flex-col items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Өмнөх өөрчлөлтүүдийг хураах">
+              <div className="flex h-10 min-w-10 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-800 shadow-sm transition hover:bg-amber-100">
+                <ChevronLeft className="size-4" />
+              </div>
+              <span className="mt-1 max-w-16 truncate text-[11px] font-medium text-amber-700 group-hover:text-amber-900">
+                Хураах
+              </span>
+            </button>
+          )}
 
           {/* Current input */}
           <div className="flex w-32 shrink-0 flex-col items-center">
