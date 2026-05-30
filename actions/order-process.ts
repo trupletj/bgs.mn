@@ -625,6 +625,17 @@ export async function getOrderItemsForOrderProcess(orderId: string) {
   const supabase = await createClient();
   await assertCanAccessOrderPurchase(Number(orderId));
 
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("title, requested_delivery_date")
+    .eq("id", orderId)
+    .single();
+
+  if (orderError) {
+    console.error(orderError);
+    throw new Error("Захиалгын мэдээлэл татахад алдаа гарлаа");
+  }
+
   const { data, error } = await supabase
     .from("order_items")
     .select(
@@ -655,7 +666,11 @@ export async function getOrderItemsForOrderProcess(orderId: string) {
     throw new Error("Өгөгдөл татахад алдаа гарлаа");
   }
 
-  return data || [];
+  return (data || []).map((item) => ({
+    ...item,
+    order_title: order?.title ?? null,
+    order_requested_delivery_date: order?.requested_delivery_date ?? null,
+  }));
 }
 
 export async function assertCanAccessOrderPurchase(orderId: number) {
