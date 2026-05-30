@@ -40,9 +40,57 @@ export async function createMealOverrides(overrides: MealOverrideInput[]) {
 
   const supabase = await createClient();
   const profile_id = await getProfileIdFromAuthUserId();
+  const uniqueOverrides = Array.from(
+    new Map(
+      overrides.map((override) => [
+        `${override.user_id}|${override.date}|${override.meal_type}`,
+        override,
+      ]),
+    ).values(),
+  );
+  const overrideKeys = new Set(
+    uniqueOverrides.map(
+      (override) =>
+        `${override.user_id}|${override.date}|${override.meal_type}`,
+    ),
+  );
+  const userIds = [
+    ...new Set(uniqueOverrides.map((override) => override.user_id)),
+  ];
+  const dates = [...new Set(uniqueOverrides.map((override) => override.date))];
+  const mealTypes = [
+    ...new Set(uniqueOverrides.map((override) => override.meal_type)),
+  ];
+
+  const { data: existingOverrides, error: existingError } = await supabase
+    .from("meal_location_overrides")
+    .select("id, user_id, date, meal_type")
+    .eq("is_deleted", false)
+    .in("user_id", userIds)
+    .in("date", dates)
+    .in("meal_type", mealTypes);
+
+  if (existingError) throw new Error(existingError.message);
+
+  const existingIdsToDelete = (existingOverrides || [])
+    .filter((override) =>
+      overrideKeys.has(
+        `${override.user_id}|${override.date}|${override.meal_type}`,
+      ),
+    )
+    .map((override) => override.id);
+
+  if (existingIdsToDelete.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("meal_location_overrides")
+      .update({ is_deleted: true })
+      .in("id", existingIdsToDelete);
+
+    if (deleteError) throw new Error(deleteError.message);
+  }
 
   const { error } = await supabase.from("meal_location_overrides").insert(
-    overrides.map((override) => ({
+    uniqueOverrides.map((override) => ({
       ...override,
       created_by: profile_id,
     })),
