@@ -36,8 +36,12 @@ import {
   Package,
   ChevronDown,
   ClipboardList,
+  CalendarDays,
+  Factory,
+  FileText,
 } from "lucide-react";
-import { UNIT_OPTIONS } from "@/types";
+import ImageViewer from "@/components/image-viewer";
+import { getSparePartLabel, UNIT_OPTIONS } from "@/types/types";
 import {
   getOrderItemsForOrderProcess,
   updateFulfillmentStatus,
@@ -69,8 +73,16 @@ type OrderProcessItem = {
   id: number;
   part_name: string;
   part_number?: string | null;
+  part_description?: string | null;
+  manufacturer?: string | null;
+  quantity: number | string;
   unit: string;
-  final_quantity: number;
+  final_quantity: number | string | null;
+  notes?: string | null;
+  spare_type?: string | null;
+  image_url?: string | null;
+  order_title?: string | null;
+  order_requested_delivery_date?: string | null;
   order_fulfillment: FulfillmentRow[];
 };
 
@@ -129,6 +141,21 @@ function formatDateTime(dt: string) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function formatDate(dateString?: string | null) {
+  if (!dateString) return "—";
+  const dateOnly = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateOnly) return `${dateOnly[1]}.${dateOnly[2]}.${dateOnly[3]}`;
+
+  const d = new Date(dateString);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatQuantity(value?: number | string | null) {
+  if (value === null || value === undefined || value === "") return "—";
+  return Number(value).toLocaleString("mn-MN");
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OrderImplementationPage() {
@@ -153,11 +180,16 @@ export default function OrderImplementationPage() {
   }, [load]);
 
   const totalItems = items.length;
+  const orderTitle = items.find((item) => item.order_title)?.order_title;
+  const requestedDeliveryDate = items.find(
+    (item) => item.order_requested_delivery_date,
+  )?.order_requested_delivery_date;
   const fullyCompleted = items.filter((item) => {
+    const targetQuantity = Number(item.final_quantity ?? item.quantity ?? 0);
     const done = item.order_fulfillment
       .filter((f) => COMPLETED_STATUSES.includes(f.status?.toLowerCase()))
       .reduce((s, f) => s + Number(f.quantity || 0), 0);
-    return item.final_quantity > 0 && done >= item.final_quantity;
+    return targetQuantity > 0 && done >= targetQuantity;
   }).length;
 
   if (loading) return <PageSkeleton />;
@@ -176,35 +208,49 @@ export default function OrderImplementationPage() {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
-              Захиалга
+              Захиалгын биелэлт
             </p>
             <h1 className="mt-0.5 text-2xl font-bold tracking-tight">
-              Захиалгын биелэлт
+              {orderTitle || "Захиалга"}
             </h1>
           </div>
           {totalItems > 0 && (
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 sm:min-w-[160px]">
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Нийт биелэлт</p>
-                <p className="text-lg font-bold tabular-nums">
-                  {fullyCompleted}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {" "}
-                    / {totalItems}
-                  </span>
-                </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 sm:min-w-[180px]">
+                <CalendarDays className="h-5 w-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">
+                    Хэрэгцээт огноо
+                  </p>
+                  <p className="font-semibold tabular-nums">
+                    {formatDate(requestedDeliveryDate)}
+                  </p>
+                </div>
               </div>
-              <div
-                className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                  fullyCompleted === totalItems
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-blue-50 text-blue-700",
-                )}>
-                {totalItems > 0
-                  ? Math.round((fullyCompleted / totalItems) * 100)
-                  : 0}
-                %
+
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 sm:min-w-[160px]">
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Нийт биелэлт</p>
+                  <p className="text-lg font-bold tabular-nums">
+                    {fullyCompleted}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {" "}
+                      / {totalItems}
+                    </span>
+                  </p>
+                </div>
+                <div
+                  className={cn(
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                    fullyCompleted === totalItems
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-blue-50 text-blue-700",
+                  )}>
+                  {totalItems > 0
+                    ? Math.round((fullyCompleted / totalItems) * 100)
+                    : 0}
+                  %
+                </div>
               </div>
             </div>
           )}
@@ -260,14 +306,15 @@ function OrderItemCard({
   const [statusChangeComment, setStatusChangeComment] = useState("");
 
   const unit = getUnitLabel(item.unit);
+  const targetQuantity = Number(item.final_quantity ?? item.quantity ?? 0);
 
   const totalCompleted = item.order_fulfillment
     .filter((f) => COMPLETED_STATUSES.includes(f.status?.toLowerCase()))
     .reduce((s, f) => s + Number(f.quantity || 0), 0);
 
   const percent =
-    item.final_quantity > 0
-      ? Math.min(100, Math.round((totalCompleted / item.final_quantity) * 100))
+    targetQuantity > 0
+      ? Math.min(100, Math.round((totalCompleted / targetQuantity) * 100))
       : 0;
 
   const toggleHistory = (id: string) => {
@@ -349,7 +396,8 @@ function OrderItemCard({
               <div className="flex items-center justify-between text-xs mb-1">
                 <span className="text-muted-foreground">Биелэлт</span>
                 <span className="font-semibold tabular-nums">
-                  {totalCompleted} / {item.final_quantity} {unit}
+                  {formatQuantity(totalCompleted)} /{" "}
+                  {formatQuantity(targetQuantity)} {unit}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -377,6 +425,48 @@ function OrderItemCard({
               )}>
               {percent}%
             </div>
+          </div>
+        </div>
+
+        {/* Item details */}
+        <div className="border-b border-border/60 px-5 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <InlineItemInfo
+                icon={Package}
+                label="Төрөл"
+                value={getSparePartLabel(item.spare_type ?? undefined)}
+              />
+              {item.manufacturer && (
+                <InlineItemInfo
+                  icon={Factory}
+                  label="Үйлдвэрлэгч"
+                  value={item.manufacturer}
+                />
+              )}
+              {item.part_description && (
+                <InlineItemInfo
+                  icon={FileText}
+                  label="Тайлбар"
+                  value={item.part_description}
+                  wide
+                />
+              )}
+              {item.notes && (
+                <InlineItemInfo
+                  icon={ClipboardList}
+                  label="Тэмдэглэл"
+                  value={item.notes}
+                  wide
+                />
+              )}
+            </div>
+
+            {item.image_url && (
+              <div className="shrink-0 lg:pl-4">
+                <ImageViewer images={[item.image_url]} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -688,6 +778,37 @@ function OrderItemCard({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function InlineItemInfo({
+  icon: Icon,
+  label,
+  value,
+  wide = false,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-1.5",
+        wide ? "max-w-full sm:max-w-[360px]" : "max-w-full sm:max-w-[220px]",
+      )}>
+      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="shrink-0 text-xs text-muted-foreground">{label}:</span>
+      <span
+        title={value}
+        className={cn(
+          "min-w-0 truncate text-sm font-medium text-foreground",
+          wide && "sm:max-w-[280px]",
+        )}>
+        {value}
+      </span>
+    </div>
   );
 }
 

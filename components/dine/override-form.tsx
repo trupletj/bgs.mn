@@ -31,7 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserSearchPicker } from "@/components/users/user-search-picker";
 import type { UserSearchResult } from "@/actions/users";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,14 @@ type DiningHall = {
   id: number;
   name: string;
 };
+
+const MEAL_TYPES = [
+  { id: "breakfast", label: "Өглөөний цай" },
+  { id: "morning_meal", label: "Өглөөний хоол" },
+  { id: "lunch", label: "Өдрийн хоол" },
+  { id: "dinner", label: "Оройн хоол" },
+  { id: "night_meal", label: "Шөнийн хоол" },
+] as const;
 
 const formSchema = z.object({
   selected_users: z
@@ -61,13 +71,17 @@ const formSchema = z.object({
     .refine((value) => value.from && !isNaN(value.from.getTime()), {
       message: "Эхлэх өдөр сонгоно уу",
     }),
-  meal_type: z.enum([
-    "breakfast",
-    "morning_meal",
-    "lunch",
-    "dinner",
-    "night_meal",
-  ]),
+  meal_types: z
+    .array(
+      z.enum([
+        "breakfast",
+        "morning_meal",
+        "lunch",
+        "dinner",
+        "night_meal",
+      ]),
+    )
+    .min(1, "Ядаж нэг хоолны төрөл сонгоно уу"),
   dining_hall_id: z.string().min(1, "Гал тогоо сонгоно уу"),
   note: z.string().optional(),
 });
@@ -117,14 +131,17 @@ export default function OverrideForm({
     defaultValues: {
       selected_users: [],
       dateRange: { from: defaultDate, to: defaultDate },
-      meal_type: "lunch",
+      meal_types: ["lunch"],
       note: "",
     },
   });
   const selectedUsers = form.watch("selected_users");
   const selectedDateRange = form.watch("dateRange");
+  const selectedMealTypes = form.watch("meal_types");
   const assignmentCount =
-    selectedUsers.length * getDatesInRange(selectedDateRange).length;
+    selectedUsers.length *
+    getDatesInRange(selectedDateRange).length *
+    selectedMealTypes.length;
 
   const handleAddUser = (user: UserSearchResult) => {
     const current = form.getValues("selected_users");
@@ -152,14 +169,16 @@ export default function OverrideForm({
     try {
       const dates = getDatesInRange(values.dateRange);
       const overrides = values.selected_users.flatMap((user) =>
-        dates.map((date) => ({
-          user_id: user.user_id,
-          bteg_id: user.bteg_id,
-          date: format(date, "yyyy-MM-dd"),
-          meal_type: values.meal_type,
-          dining_hall_id: parseInt(values.dining_hall_id),
-          note: values.note,
-        })),
+        dates.flatMap((date) =>
+          values.meal_types.map((mealType) => ({
+            user_id: user.user_id,
+            bteg_id: user.bteg_id,
+            date: format(date, "yyyy-MM-dd"),
+            meal_type: mealType,
+            dining_hall_id: parseInt(values.dining_hall_id),
+            note: values.note,
+          })),
+        ),
       );
 
       await createMealOverrides(overrides);
@@ -272,26 +291,36 @@ export default function OverrideForm({
 
           <FormField
             control={form.control}
-            name="meal_type"
+            name="meal_types"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Хоолны төрөл</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="breakfast">Өглөөний цай</SelectItem>
-                    <SelectItem value="morning_meal">Өглөөний хоол</SelectItem>
-                    <SelectItem value="lunch">Өдрийн хоол</SelectItem>
-                    <SelectItem value="dinner">Оройн хоол</SelectItem>
-                    <SelectItem value="night_meal">Шөнийн хоол</SelectItem>
-                  </SelectContent>
-                </Select>
+                <ScrollArea className="h-[132px] rounded-md border">
+                  <div className="flex flex-col gap-1 p-2">
+                    {MEAL_TYPES.map((mealType) => (
+                      <FormItem
+                        key={mealType.id}
+                        className="flex flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value?.includes(mealType.id)}
+                            onCheckedChange={(checked) => {
+                              const current = field.value || [];
+                              field.onChange(
+                                checked
+                                  ? [...current, mealType.id]
+                                  : current.filter((id) => id !== mealType.id),
+                              );
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="flex-1 cursor-pointer text-sm font-normal">
+                          {mealType.label}
+                        </FormLabel>
+                      </FormItem>
+                    ))}
+                  </div>
+                </ScrollArea>
                 <FormMessage />
               </FormItem>
             )}
