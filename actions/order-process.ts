@@ -84,6 +84,8 @@ interface NestedOrderProcessRow {
     | null;
 }
 
+const PURCHASE_ALLOWED_ORDER_STATUSES = ["approved", "changes_requested"];
+
 export async function createOrderProcess(
   formData: OrderProcessFormData,
 ): Promise<OrderProcessResult> {
@@ -675,22 +677,29 @@ export async function getOrderItemsForOrderProcess(orderId: string) {
 
 export async function assertCanAccessOrderPurchase(orderId: number) {
   const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("order_process_id, status")
+    .eq("id", orderId)
+    .single();
+
+  if (error || !data?.order_process_id) {
+    throw new Error("Захиалга олдсонгүй");
+  }
+
+  if (!PURCHASE_ALLOWED_ORDER_STATUSES.includes(String(data.status))) {
+    throw new Error(
+      "Батлагдаагүй захиалгын худалдан авалт, биелэлт рүү хандах боломжгүй",
+    );
+  }
+
   const { isSuperAdmin, processIds } =
     await getPurchaseAllowedProcessIdsForCurrentUser();
 
   if (isSuperAdmin) return;
   if (processIds.length === 0) {
     throw new Error("Энэ захиалгын биелэлтийг харах эрхгүй байна");
-  }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select("order_process_id")
-    .eq("id", orderId)
-    .single();
-
-  if (error || !data?.order_process_id) {
-    throw new Error("Захиалга олдсонгүй");
   }
 
   if (!processIds.includes(Number(data.order_process_id))) {
