@@ -7,7 +7,6 @@ import {
   User,
   Calendar,
   Clock,
-  Hash,
   Building2,
   Phone,
   Briefcase,
@@ -21,6 +20,7 @@ import ImageViewer from "@/components/image-viewer";
 import { OrderWorkflow } from "./order-workflow";
 import { getSparePartLabel, UNIT_OPTIONS } from "@/types/types";
 import { cn } from "@/lib/utils";
+import { OrderPurchaseSummaryPanel } from "@/components/orders/purchase/order-purchase-summary-panel";
 
 // ─── Status / type configs ───────────────────────────────────────────────────
 
@@ -122,6 +122,7 @@ interface OrderDetailItem {
 
 interface OrderDetail {
   order: {
+    id?: number | string;
     order_number: string;
     order_type: string;
     title: string;
@@ -373,6 +374,10 @@ export function NewOrderDetailView({ orderDetails }: Props) {
               })}
             </div>
           </section>
+
+          {order.id && (
+            <OrderPurchaseSummaryPanel orderId={order.id} items={items} />
+          )}
         </div>
 
         {/* ── Right sidebar ────────────────────────────────────────── */}

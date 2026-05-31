@@ -56,6 +56,7 @@
 - `/orders` is the all-orders view and now redirects to `/orders/list` when `hasPermission("order", "access")` is false. Keep `/orders/list` as the regular user's own-orders fallback.
 - Order process access control uses order type reviewer/purchase visibility rules. Super admin should be treated as all-access for order process filtering unless a task explicitly narrows that behavior.
 - Purchase workflow is intentionally lightweight for now: fulfillment registration drives purchase status. Items without fulfillment are shown as `Захиалга хийгдээгүй`; any fulfillment in progress means `Захиалга хийгдэж байна`; all items completed/received means `Захиалга хэрэгжсэн`.
+- Purchase quote and purchase document workflow notes are tracked in `docs/order-purchase-workflow-notes.md`. Read that before changing `/orders/[id]/imp`, `actions/order-purchases.ts`, or `components/orders/purchase/`.
 - `changes_requested` status name is intentionally kept as-is because renaming it would touch many places.
 
 ## Recent Policy Notes
