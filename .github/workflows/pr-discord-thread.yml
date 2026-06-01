@@ -1,0 +1,71 @@
+name: PR → Discord thread
+on:
+  pull_request:
+    types: [opened, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to create Discord thread for"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  thread:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve PR metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUM="${{ inputs.pr_number }}"
+            DATA=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" \
+              --json title,url,headRefName,author)
+            echo "title=$(echo "$DATA" | jq -r '.title')"        >> "$GITHUB_OUTPUT"
+            echo "url=$(echo "$DATA" | jq -r '.url')"            >> "$GITHUB_OUTPUT"
+            echo "name=$(echo "$DATA" | jq -r '.headRefName')"   >> "$GITHUB_OUTPUT"
+            echo "author=$(echo "$DATA" | jq -r '.author.login')" >> "$GITHUB_OUTPUT"
+          else
+            echo "title=${{ github.event.pull_request.title }}"   >> "$GITHUB_OUTPUT"
+            echo "url=${{ github.event.pull_request.html_url }}"  >> "$GITHUB_OUTPUT"
+            echo "name=${{ github.head_ref }}"                    >> "$GITHUB_OUTPUT"
+            echo "author=${{ github.event.pull_request.user.login }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create Discord thread + post PR
+        env:
+          BOT_TOKEN:  ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          NAME:   ${{ steps.pr.outputs.name }}
+          TITLE:  ${{ steps.pr.outputs.title }}
+          URL:    ${{ steps.pr.outputs.url }}
+          AUTHOR: ${{ steps.pr.outputs.author }}
+        run: |
+          set -euo pipefail
+          : "${BOT_TOKEN:?DISCORD_BOT_TOKEN secret тогтоогдоогүй}"
+          : "${CHANNEL_ID:?DISCORD_CHANNEL_ID secret тогтоогдоогүй}"
+          # 1) public thread (type 11) үүсгэх
+          RESP=$(curl -sS -X POST \
+            "https://discord.com/api/v10/channels/${CHANNEL_ID}/threads" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg n "$NAME" \
+                 '{name:$n, type:11, auto_archive_duration:10080}')")
+          TID=$(echo "$RESP" | jq -e -r '.id // empty') || {
+            echo "::error::Discord thread create failed: $RESP"; exit 1; }
+          # 2) PR линкийг thread-д постлох
+          MSG="📋 **${TITLE}** — @${AUTHOR}
+          ${URL}"
+          POST=$(curl -sS -X POST \
+            "https://discord.com/api/v10/channels/${TID}/messages" \
+            -H "Authorization: Bot ${BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg c "$MSG" '{content:$c}')")
+          echo "$POST" | jq -e '.id' >/dev/null || {
+            echo "::error::Discord message post failed: $POST"; exit 1; }
+          echo "✓ Thread created: $TID"
