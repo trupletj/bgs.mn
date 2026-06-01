@@ -7,15 +7,16 @@ import {
   assertCanAccessOrderItemPurchase,
   assertCanAccessOrderPurchase,
 } from "./order-process";
+import { hasPermission } from "./rbac";
+import {
+  DOCUMENT_UPLOAD_MAX_BYTES,
+  getFileTooLargeMessage,
+  PURCHASE_DOCUMENT_ALLOWED_MIME_TYPES,
+} from "@/lib/file-upload-limits";
 
 const PURCHASE_DOCUMENT_BUCKET = "order-purchase-documents";
 const PURCHASE_QUOTE_BUCKET = "order-purchase-quotes";
-const ALLOWED_DOCUMENT_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+const ALLOWED_DOCUMENT_TYPES = new Set(PURCHASE_DOCUMENT_ALLOWED_MIME_TYPES);
 
 const MOVEMENT_STATUSES = new Set([
   "purchased",
@@ -106,6 +107,7 @@ export interface CreatePurchaseBatchResult {
 export async function getOrderPurchaseBatches(orderId: string | number) {
   const numericOrderId = Number(orderId);
   await assertCanAccessOrderPurchase(numericOrderId);
+  const canViewPrices = await hasPermission("order", "view_price");
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -186,7 +188,18 @@ export async function getOrderPurchaseBatches(orderId: string | number) {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  if (canViewPrices) return data ?? [];
+
+  return (data ?? []).map((batch) => ({
+    ...batch,
+    order_purchase_lines: batch.order_purchase_lines.map((line) => ({
+      ...line,
+      unit_price: null,
+      vat_amount: null,
+      discount_amount: null,
+      currency: null,
+    })),
+  }));
 }
 
 export async function getOrderPurchaseQuotes(orderId: string | number) {
@@ -263,6 +276,9 @@ function getFiles(formData: FormData, key: string) {
 }
 
 function assertAllowedFile(file: File) {
+  if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+    throw new Error(getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES));
+  }
   if (!ALLOWED_DOCUMENT_TYPES.has(file.type)) {
     throw new Error(`${file.name} файл зөвшөөрөгдөх төрөл биш байна`);
   }

@@ -44,6 +44,11 @@ import {
 } from "@/actions/order-purchases";
 import { cn } from "@/lib/utils";
 import {
+  DOCUMENT_UPLOAD_MAX_BYTES,
+  getFileSizeLimitMessage,
+  getFileTooLargeMessage,
+} from "@/lib/file-upload-limits";
+import {
   Building2,
   ClipboardList,
   ExternalLink,
@@ -85,6 +90,15 @@ function buildLineInput(
   };
 
   return { ...next, [field]: value };
+}
+
+function filterAllowedSizeFiles(files: FileList | null) {
+  return Array.from(files ?? []).filter((file) => {
+    if (file.size <= DOCUMENT_UPLOAD_MAX_BYTES) return true;
+
+    toast.error(getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES));
+    return false;
+  });
 }
 
 export function PurchaseQuoteManager({
@@ -514,13 +528,17 @@ export function PurchaseQuoteManager({
                 multiple
                 accept="application/pdf,image/jpeg,image/png,image/webp"
                 onChange={(event) => {
+                  const files = filterAllowedSizeFiles(event.target.files);
                   setQuoteFiles((prev) => [
                     ...prev,
-                    ...Array.from(event.target.files ?? []),
+                    ...files,
                   ]);
                   event.currentTarget.value = "";
                 }}
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {getFileSizeLimitMessage(DOCUMENT_UPLOAD_MAX_BYTES)}
+              </p>
               <SelectedFileList
                 files={quoteFiles}
                 onRemove={(index) =>
