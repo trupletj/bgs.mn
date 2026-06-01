@@ -147,11 +147,15 @@ interface OrderDetail {
 
 interface Props {
   orderDetails: OrderDetail;
+  canViewPrices?: boolean;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function NewOrderDetailView({ orderDetails }: Props) {
+export function NewOrderDetailView({
+  orderDetails,
+  canViewPrices = false,
+}: Props) {
   const { order, profile, items, reviewers } = orderDetails;
 
   const isSettled =
@@ -376,7 +380,11 @@ export function NewOrderDetailView({ orderDetails }: Props) {
           </section>
 
           {order.id && (
-            <OrderPurchaseSummaryPanel orderId={order.id} items={items} />
+            <OrderPurchaseSummaryPanel
+              orderId={order.id}
+              items={items}
+              canViewPrices={canViewPrices}
+            />
           )}
         </div>
 

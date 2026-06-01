@@ -4,17 +4,14 @@ import { hasPermission } from "@/actions/rbac";
 import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
 import type { LegalActCreateTarget, LegalActType } from "@/actions/policy-legal-acts";
 import { normalizeRevisionChangeAction } from "@/lib/policy-revision-actions";
+import {
+  DOCUMENT_UPLOAD_MAX_BYTES,
+  LEGAL_ACT_ALLOWED_MIME_TYPES,
+  getFileTooLargeMessage,
+} from "@/lib/file-upload-limits";
 
 const BUCKET = "policy-legal-acts";
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
+const ALLOWED_MIME_TYPES = new Set(LEGAL_ACT_ALLOWED_MIME_TYPES);
 
 function sanitizeFileName(name: string) {
   const clean = name
@@ -37,8 +34,8 @@ function parseTargets(value: FormDataEntryValue | null): LegalActCreateTarget[] 
 
 function validateFile(file: File | null) {
   if (!file || file.size === 0) return null;
-  if (file.size > MAX_FILE_BYTES) {
-    throw new Error("Файлын хэмжээ 20MB-аас их байна");
+  if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+    throw new Error(getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES));
   }
   if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
     throw new Error("Зөвхөн PDF, зураг эсвэл Word document хавсаргана уу");

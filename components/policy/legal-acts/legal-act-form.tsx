@@ -28,6 +28,11 @@ import {
   REVISION_CHANGE_ACTION_LABELS,
   type RevisionChangeAction,
 } from "@/lib/policy-revision-actions";
+import {
+  DOCUMENT_UPLOAD_MAX_BYTES,
+  getFileSizeLimitMessage,
+  getFileTooLargeMessage,
+} from "@/lib/file-upload-limits";
 
 interface SelectedTarget {
   key: string;
@@ -175,6 +180,16 @@ export function LegalActForm({
     setSelectedTargets([]);
   };
 
+  const handleAttachmentChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file || file.size <= DOCUMENT_UPLOAD_MAX_BYTES) return;
+
+    toast.error(getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES));
+    event.currentTarget.value = "";
+  };
+
   const buildTargets = (): LegalActCreateTarget[] =>
     selectedTargets.map((target) => ({
       targetType: target.targetType,
@@ -200,6 +215,13 @@ export function LegalActForm({
       }
 
       const formData = new FormData(event.currentTarget);
+      const attachment = formData.get("attachment");
+      if (attachment instanceof File && attachment.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+        throw new Error(
+          getFileTooLargeMessage(attachment.name, DOCUMENT_UPLOAD_MAX_BYTES),
+        );
+      }
+
       formData.set("act_type", actType);
       formData.set("policy_id", policyId);
       formData.set("revision_targets", JSON.stringify(buildTargets()));
@@ -308,9 +330,13 @@ export function LegalActForm({
                 name="attachment"
                 type="file"
                 accept=".pdf,.doc,.docx,image/png,image/jpeg,image/webp"
+                onChange={handleAttachmentChange}
               />
               <FileUp className="h-4 w-4 text-muted-foreground" />
             </div>
+            <p className="text-xs text-muted-foreground">
+              {getFileSizeLimitMessage(DOCUMENT_UPLOAD_MAX_BYTES)}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Тэмдэглэл</Label>

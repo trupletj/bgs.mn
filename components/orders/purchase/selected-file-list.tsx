@@ -3,6 +3,7 @@
 import type React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatFileSize } from "@/lib/file-upload-limits";
 
 export function SelectedFileList({
   files,
@@ -41,9 +42,3 @@ type SelectedFileListProps = {
   files: File[];
   onRemove: React.Dispatch<number>;
 };
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}

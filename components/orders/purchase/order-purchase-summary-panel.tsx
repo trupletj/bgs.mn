@@ -45,9 +45,11 @@ type ItemPurchaseSummary = {
 export function OrderPurchaseSummaryPanel({
   orderId,
   items,
+  canViewPrices = false,
 }: {
   orderId: string | number;
   items: OrderPurchaseSummaryItem[];
+  canViewPrices?: boolean;
 }) {
   const [batches, setBatches] = useState<PurchaseBatchRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,12 +133,14 @@ export function OrderPurchaseSummaryPanel({
               value={formatQuantity(totalPurchased)}
               detail="Нийт ширхэг"
             />
-            <SummaryMetric
-              icon={CircleDollarSign}
-              label="Зарцуулалт"
-              value={formatCurrencyTotals(totalSpend)}
-              detail=""
-            />
+            {canViewPrices && (
+              <SummaryMetric
+                icon={CircleDollarSign}
+                label="Зарцуулалт"
+                value={formatCurrencyTotals(totalSpend)}
+                detail=""
+              />
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -173,9 +177,11 @@ export function OrderPurchaseSummaryPanel({
                 </div>
                 <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                   <PurchaseStatusBadgeList statusTotals={row.statusTotals} />
-                  <p className="text-xs font-semibold tabular-nums text-muted-foreground">
-                    {formatCurrencyTotals(row.spendByCurrency)}
-                  </p>
+                  {canViewPrices && (
+                    <p className="text-xs font-semibold tabular-nums text-muted-foreground">
+                      {formatCurrencyTotals(row.spendByCurrency)}
+                    </p>
+                  )}
                 </div>
               </button>
             ))}
@@ -208,12 +214,14 @@ export function OrderPurchaseSummaryPanel({
                   quantity={selectedRow.purchasedQuantity}
                   unit={selectedRow.unit}
                 />
-                <div>
-                  <p className="text-xs text-muted-foreground">Зарцуулалт</p>
-                  <p className="font-semibold tabular-nums">
-                    {formatCurrencyTotals(selectedRow.spendByCurrency)}
-                  </p>
-                </div>
+                {canViewPrices && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Зарцуулалт</p>
+                    <p className="font-semibold tabular-nums">
+                      {formatCurrencyTotals(selectedRow.spendByCurrency)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -231,8 +239,13 @@ export function OrderPurchaseSummaryPanel({
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                               <p className="font-semibold tabular-nums">
-                                {formatQuantity(quantity)} {selectedRow.unit} x{" "}
-                                {formatMoney(unitPrice, line.currency)}
+                                {formatQuantity(quantity)} {selectedRow.unit}
+                                {canViewPrices && (
+                                  <>
+                                    {" "}
+                                    x {formatMoney(unitPrice, line.currency)}
+                                  </>
+                                )}
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {batch.order_suppliers?.name ?? "Компани"}
@@ -241,9 +254,11 @@ export function OrderPurchaseSummaryPanel({
                                   : ""}
                               </p>
                             </div>
-                            <p className="font-semibold tabular-nums">
-                              {formatMoney(spendTotal, line.currency)}
-                            </p>
+                            {canViewPrices && (
+                              <p className="font-semibold tabular-nums">
+                                {formatMoney(spendTotal, line.currency)}
+                              </p>
+                            )}
                           </div>
                           <div className="mt-3">
                             <PurchaseStatusBadgeList
