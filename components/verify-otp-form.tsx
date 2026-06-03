@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/input-otp";
 import { Loader2, ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { postTokensToParent, withEmbedParam } from "@/lib/embed";
 
 const FormSchema = z.object({
   pin: z.string().min(6, { message: "Нэвтрэх код 6 оронтой байх ёстой." }),
@@ -31,6 +32,7 @@ function VerifyOtpFormInner() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const phone = searchParams.get("phone") || "";
+  const embed = searchParams.get("embed") === "1";
   const router = useRouter();
 
   const form = useForm<z.infer<typeof FormSchema>>({
@@ -42,7 +44,7 @@ function VerifyOtpFormInner() {
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data: verifyData, error } = await supabase.auth.verifyOtp({
         phone,
         token: data.pin,
         type: "sms",
@@ -50,6 +52,11 @@ function VerifyOtpFormInner() {
 
       if (error) {
         toast.error("Код буруу эсвэл хугацаа нь дууссан байна.");
+        return;
+      }
+
+      if (embed && verifyData.session) {
+        postTokensToParent(verifyData.session);
         return;
       }
 
@@ -67,7 +74,7 @@ function VerifyOtpFormInner() {
   return (
     <div className="w-full">
       <Link
-        href="/"
+        href={withEmbedParam("/", embed)}
         className="mb-8 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
