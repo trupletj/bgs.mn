@@ -344,8 +344,6 @@ export default function RateOrderForm({
     try {
       setLoading(true);
       setError(null);
-      console.log("order_instance_id", order_instance_id);
-      console.log("reviewer_profile_id", profile_id);
 
       const { data: reviewer, error: reviewerError } = await supabase
         .from("order_step_reviewers")
@@ -410,7 +408,6 @@ export default function RateOrderForm({
       if (instanceError || !instance?.orders) {
         throw new Error("Захиалгын мэдээлэл авахад алдаа гарлаа");
       }
-      console.log("instances:", instance);
 
       const { data: steps, error: stepsError } = await supabase
         .from("order_steps")
@@ -450,11 +447,9 @@ export default function RateOrderForm({
       const orderData = Array.isArray(instance.orders)
         ? instance.orders[0]
         : instance.orders;
-      console.log("orderData:", orderData);
       const profileData = Array.isArray(orderData.profile)
         ? orderData.profile[0]
         : orderData.profile;
-      console.log("profileData:", profileData);
 
       setOrder({
         id: orderData.id,

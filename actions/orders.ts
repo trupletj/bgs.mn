@@ -54,7 +54,6 @@ async function currentUserHasOrderAccessPermission(profileId: number) {
     console.error("Order detail role access check error:", roleError);
     return false;
   }
-  console.log("User roles for order access check:", roleRows);
 
   if (roleRows.length === 0) return false;
 
