@@ -30,7 +30,8 @@ async function getCroppedBlob(src: string, area: Area): Promise<Blob> {
     i.src = src;
   });
 
-  const scale = area.width > MAX_OUTPUT_WIDTH ? MAX_OUTPUT_WIDTH / area.width : 1;
+  const scale =
+    area.width > MAX_OUTPUT_WIDTH ? MAX_OUTPUT_WIDTH / area.width : 1;
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(area.width * scale);
   canvas.height = Math.round(area.height * scale);
@@ -128,8 +129,7 @@ export function BannerImageField({ value, onChange }: BannerImageFieldProps) {
       {value ? (
         <div
           className="relative w-full overflow-hidden rounded-xl border bg-muted"
-          style={{ aspectRatio: String(BANNER_ASPECT) }}
-        >
+          style={{ aspectRatio: String(BANNER_ASPECT) }}>
           <Image src={value} alt="banner" fill className="object-cover" />
         </div>
       ) : null}
@@ -141,20 +141,24 @@ export function BannerImageField({ value, onChange }: BannerImageFieldProps) {
         className="hidden"
         onChange={onFile}
       />
-      <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => fileRef.current?.click()}>
         <ImagePlus className="size-4" />
         {value ? "Зураг солих" : "Зураг сонгож тохируулах"}
       </Button>
 
-      <Dialog open={!!srcToCrop} onOpenChange={(o) => !o && !uploading && setSrcToCrop(null)}>
+      <Dialog
+        open={!!srcToCrop}
+        onOpenChange={(o) => !o && !uploading && setSrcToCrop(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Зургийг banner-т тааруулах</DialogTitle>
           </DialogHeader>
           <div
             className="relative w-full overflow-hidden rounded-lg bg-black/80"
-            style={{ height: 280 }}
-          >
+            style={{ height: 280 }}>
             {srcToCrop ? (
               <Cropper
                 image={srcToCrop}
@@ -168,7 +172,9 @@ export function BannerImageField({ value, onChange }: BannerImageFieldProps) {
             ) : null}
           </div>
           <div className="flex items-center gap-3 pt-1">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Томруулах</span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              Томруулах
+            </span>
             <input
               type="range"
               min={1}
@@ -184,11 +190,13 @@ export function BannerImageField({ value, onChange }: BannerImageFieldProps) {
               type="button"
               variant="outline"
               onClick={() => setSrcToCrop(null)}
-              disabled={uploading}
-            >
+              disabled={uploading}>
               Болих
             </Button>
-            <Button type="button" onClick={confirmCrop} disabled={uploading || !areaPixels}>
+            <Button
+              type="button"
+              onClick={confirmCrop}
+              disabled={uploading || !areaPixels}>
               {uploading ? "Хадгалж байна..." : "Хэрэглэх"}
             </Button>
           </DialogFooter>
