@@ -16,7 +16,9 @@ import {
 
 const PURCHASE_DOCUMENT_BUCKET = "order-purchase-documents";
 const PURCHASE_QUOTE_BUCKET = "order-purchase-quotes";
-const ALLOWED_DOCUMENT_TYPES = new Set(PURCHASE_DOCUMENT_ALLOWED_MIME_TYPES);
+const ALLOWED_DOCUMENT_TYPES = new Set<string>(
+  PURCHASE_DOCUMENT_ALLOWED_MIME_TYPES,
+);
 
 const MOVEMENT_STATUSES = new Set([
   "purchased",
@@ -104,10 +106,16 @@ export interface CreatePurchaseBatchResult {
   error?: string;
 }
 
-export async function getOrderPurchaseBatches(orderId: string | number) {
+export async function getOrderPurchaseBatches(
+  orderId: string | number,
+  canViewPrices?: boolean,
+) {
   const numericOrderId = Number(orderId);
-  await assertCanAccessOrderPurchase(numericOrderId);
-  const canViewPrices = await hasPermission("order", "view_price");
+  console.log("🔴 getOrderPurchaseBatches called with:", {
+    orderId,
+    numericOrderId,
+    canViewPrices,
+  });
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -187,19 +195,27 @@ export async function getOrderPurchaseBatches(orderId: string | number) {
     .eq("order_id", numericOrderId)
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error(error.message);
-  if (canViewPrices) return data ?? [];
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) return [];
 
-  return (data ?? []).map((batch) => ({
-    ...batch,
-    order_purchase_lines: batch.order_purchase_lines.map((line) => ({
-      ...line,
-      unit_price: null,
-      vat_amount: null,
-      discount_amount: null,
-      currency: null,
-    })),
-  }));
+  if (!canViewPrices) {
+    const mapped = (data ?? []).map((batch) => ({
+      ...batch,
+      order_purchase_lines: batch.order_purchase_lines.map((line) => ({
+        ...line,
+        unit_price: null,
+        vat_amount: null,
+        discount_amount: null,
+        currency: null,
+      })),
+    }));
+
+    return mapped;
+  }
+
+  return data;
 }
 
 export async function getOrderPurchaseQuotes(orderId: string | number) {
@@ -261,12 +277,14 @@ function cleanText(value: FormDataEntryValue | null) {
 }
 
 function sanitizeFileName(name: string) {
-  return name
-    .normalize("NFKD")
-    .replace(/[^\w.\-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 120) || "document";
+  return (
+    name
+      .normalize("NFKD")
+      .replace(/[^\w.\-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 120) || "document"
+  );
 }
 
 function getFiles(formData: FormData, key: string) {
@@ -277,7 +295,9 @@ function getFiles(formData: FormData, key: string) {
 
 function assertAllowedFile(file: File) {
   if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
-    throw new Error(getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES));
+    throw new Error(
+      getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES),
+    );
   }
   if (!ALLOWED_DOCUMENT_TYPES.has(file.type)) {
     throw new Error(`${file.name} файл зөвшөөрөгдөх төрөл биш байна`);
@@ -303,7 +323,9 @@ function parseLines(raw: string): PurchaseLineInput[] {
     const unitPrice = Number(row.unitPrice);
     const vatAmount = Number(row.vatAmount ?? 0);
     const discountAmount = Number(row.discountAmount ?? 0);
-    const currency = String(row.currency ?? "MNT").trim().toUpperCase();
+    const currency = String(row.currency ?? "MNT")
+      .trim()
+      .toUpperCase();
 
     if (!Number.isFinite(orderItemId) || orderItemId <= 0) {
       throw new Error(`${index + 1}-р мөрийн бараа буруу байна`);
@@ -438,12 +460,14 @@ export async function createOrderPurchaseBatch(
 
     await Promise.all(
       Array.from(new Set(lines.map((line) => line.orderItemId))).map((id) =>
-        assertCanAccessOrderItemPurchase(id)
+        assertCanAccessOrderItemPurchase(id),
       ),
     );
 
     const profileId = await getProfileIdFromAuthUserId();
-    const lineItemIds = Array.from(new Set(lines.map((line) => line.orderItemId)));
+    const lineItemIds = Array.from(
+      new Set(lines.map((line) => line.orderItemId)),
+    );
     const { data: orderItems, error: itemError } = await supabase
       .from("order_items")
       .select(
@@ -470,20 +494,21 @@ export async function createOrderPurchaseBatch(
     for (const line of lines) {
       const item = itemMap.get(line.orderItemId);
       if (!item || Number(item.order_id) !== orderId) {
-        throw new Error("Purchase line-ийн бараа энэ захиалгад хамаарахгүй байна");
+        throw new Error(
+          "Purchase line-ийн бараа энэ захиалгад хамаарахгүй байна",
+        );
       }
 
       const targetQuantity = Number(item.final_quantity ?? item.quantity ?? 0);
-      const purchasedQuantity = ((item.order_purchase_lines ?? []) as Array<{
-        quantity?: number | string | null;
-      }>).reduce((sum, purchaseLine) => {
+      const purchasedQuantity = (
+        (item.order_purchase_lines ?? []) as Array<{
+          quantity?: number | string | null;
+        }>
+      ).reduce((sum, purchaseLine) => {
         return sum + Number(purchaseLine.quantity ?? 0);
       }, 0);
 
-      const remainingQuantity = Math.max(
-        0,
-        targetQuantity - purchasedQuantity,
-      );
+      const remainingQuantity = Math.max(0, targetQuantity - purchasedQuantity);
 
       if (line.quantity > remainingQuantity) {
         const itemLabel = `${item.part_name ?? "Бараа"}${
@@ -527,7 +552,8 @@ export async function createOrderPurchaseBatch(
             upsert: false,
           });
 
-        if (uploadError) throw new Error(`Файл хуулахад алдаа: ${uploadError.message}`);
+        if (uploadError)
+          throw new Error(`Файл хуулахад алдаа: ${uploadError.message}`);
 
         documentRows.push({
           purchase_batch_id: batch.id,
@@ -565,18 +591,19 @@ export async function createOrderPurchaseBatch(
 
     if (lineError) throw new Error(lineError.message);
 
-    const { data: insertedFulfillments, error: fulfillmentError } = await supabase
-      .from("order_fulfillment")
-      .insert(
-        (insertedLines ?? []).map((line) => ({
-          order_item_id: line.order_item_id,
-          purchase_line_id: line.id,
-          quantity: line.quantity,
-          status: "purchased",
-          notes: "Худалдан авалт бүртгэв",
-        })),
-      )
-      .select("id, quantity");
+    const { data: insertedFulfillments, error: fulfillmentError } =
+      await supabase
+        .from("order_fulfillment")
+        .insert(
+          (insertedLines ?? []).map((line) => ({
+            order_item_id: line.order_item_id,
+            purchase_line_id: line.id,
+            quantity: line.quantity,
+            status: "purchased",
+            notes: "Худалдан авалт бүртгэв",
+          })),
+        )
+        .select("id, quantity");
 
     if (fulfillmentError) throw new Error(fulfillmentError.message);
 
@@ -592,7 +619,8 @@ export async function createOrderPurchaseBatch(
         })),
       );
 
-    if (fulfillmentHistoryError) throw new Error(fulfillmentHistoryError.message);
+    if (fulfillmentHistoryError)
+      throw new Error(fulfillmentHistoryError.message);
 
     revalidatePath(`/orders/${orderId}/imp`);
     revalidatePath("/orders/purchase");
@@ -632,11 +660,13 @@ export async function createOrderPurchaseQuote(
     await assertCanAccessOrderPurchase(orderId);
     await Promise.all(
       Array.from(new Set(lines.map((line) => line.orderItemId))).map((id) =>
-        assertCanAccessOrderItemPurchase(id)
+        assertCanAccessOrderItemPurchase(id),
       ),
     );
 
-    const lineItemIds = Array.from(new Set(lines.map((line) => line.orderItemId)));
+    const lineItemIds = Array.from(
+      new Set(lines.map((line) => line.orderItemId)),
+    );
     const { data: orderItems, error: itemError } = await supabase
       .from("order_items")
       .select("id, order_id")
@@ -779,7 +809,11 @@ export async function transitionPurchaseFulfillmentChunk(input: {
     : purchaseLine?.order_purchase_batches;
   const ownerOrderId = Number(batch?.order_id ?? orderItem?.order_id);
 
-  if (fulfillmentError || !fulfillment || ownerOrderId !== Number(input.orderId)) {
+  if (
+    fulfillmentError ||
+    !fulfillment ||
+    ownerOrderId !== Number(input.orderId)
+  ) {
     throw new Error("Биелэлтийн мөр олдсонгүй");
   }
 
@@ -790,7 +824,9 @@ export async function transitionPurchaseFulfillmentChunk(input: {
 
   const fulfillmentQuantity = Number(fulfillment.quantity);
   if (quantity > fulfillmentQuantity) {
-    throw new Error(`Шилжүүлэх тоо мөрийн үлдэгдлээс хэтэрлээ. Үлдэгдэл: ${fulfillmentQuantity}`);
+    throw new Error(
+      `Шилжүүлэх тоо мөрийн үлдэгдлээс хэтэрлээ. Үлдэгдэл: ${fulfillmentQuantity}`,
+    );
   }
 
   const profileId = await getProfileIdFromAuthUserId();
