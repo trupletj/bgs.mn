@@ -14,7 +14,7 @@ import {
   type Icon,
 } from "@tabler/icons-react";
 import { usePathname } from "next/navigation";
-import { Building2 } from "lucide-react";
+import Link from "next/link";
 
 import { NavService } from "@/components/nav-service";
 import { NavUser } from "@/components/nav-user";
@@ -30,7 +30,10 @@ import {
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
 import type { NavService as NavServiceType } from "@/actions/nav";
-import Link from "next/link";
+
+// Brand components импортлох
+import { BgsWordmark } from "@/components/brand/bgs-wordmark";
+import { ORBIT_COLORS } from "@/components/brand/orbit-mark"; // C-г ашиглахын тулд оруулж ирнэ
 
 const serviceIcons: Record<string, Icon> = {
   dashboard: IconLayoutDashboard,
@@ -62,16 +65,20 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="h-auto gap-3 rounded-xl px-2 py-2 hover:bg-sidebar-accent">
-              <Link href="/dashboard">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 ring-1 ring-white/10">
-                  <Building2 className="h-4 w-4 text-white" />
-                </div>
-                <div className="grid leading-none">
-                  <span className="text-sm font-semibold text-sidebar-foreground">
-                    BGS систем
-                  </span>
-                  <span className="text-[10px] text-sidebar-foreground/40">
+              className="h-auto gap-3 rounded-xl px-2 py-2 hover:bg-sidebar-accent transition-colors">
+              <Link href="/dashboard" className="flex items-center gap-3">
+                <AppIcon
+                  px={36}
+                  radiusPct={22.5}
+                  bg={ORBIT_COLORS.paper}
+                  ring={ORBIT_COLORS.ink}
+                  node={ORBIT_COLORS.accent}
+                  gap={ORBIT_COLORS.ink}
+                />
+
+                <div className="flex flex-col justify-center gap-1">
+                  <BgsWordmark size={18} color={ORBIT_COLORS.paper} />
+                  <span className="text-[10px] font-medium uppercase tracking-widest ">
                     Удирдлагын платформ
                   </span>
                 </div>
@@ -98,12 +105,12 @@ export function AppSidebar({
                       asChild
                       isActive={isActive}
                       tooltip={service.title}
-                      className="h-9 gap-3 rounded-lg px-3 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-white data-[active=true]:shadow-sm">
+                      className="h-9 gap-3 rounded-lg px-3 text-[13px] font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-sm">
                       <Link href={service.url}>
                         <ServiceIcon className="h-[18px] w-[18px] shrink-0" />
                         <span>{service.title}</span>
                         {!!service.badgeCount && service.badgeCount > 0 && (
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground">
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground ml-auto">
                             {service.badgeCount}
                           </span>
                         )}
@@ -124,5 +131,43 @@ export function AppSidebar({
         <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+// AppIcon component-ийг яг хэвээр нь үлдээв
+function AppIcon({
+  px,
+  radiusPct,
+  bg,
+  ring,
+  node,
+  gap,
+}: {
+  px: number;
+  radiusPct: number;
+  bg: string;
+  ring: string;
+  node: string;
+  gap: string;
+}) {
+  return (
+    <div
+      style={{
+        width: px,
+        height: px,
+        background: bg,
+        borderRadius: (radiusPct / 100) * px,
+        boxShadow: "0 4px 14px rgba(0,0,0,0.06)", // Сүүдрийг бага зэрэг зөөллөв
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}>
+      <svg width={px * 0.6} height={px * 0.6} viewBox="0 0 120 120" fill="none">
+        <circle cx="60" cy="60" r="44" stroke={ring} strokeWidth="11.4" />
+        <circle cx="91.1" cy="28.9" r="20" fill={gap} />
+        <circle cx="91.1" cy="28.9" r="13" fill={node} />
+      </svg>
+    </div>
   );
 }
