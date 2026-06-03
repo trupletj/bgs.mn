@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PURCHASE_MOVEMENT_LABELS } from "@/components/orders/purchase/utils";
 import { format } from "date-fns";
 import { mn } from "date-fns/locale";
 
@@ -38,7 +39,7 @@ const getStatusLabel = (status?: string | null) => {
     cancelled: "Цуцлагдсан",
     rejected: "Татгалзсан",
   };
-  return map[status] || status;
+  return PURCHASE_MOVEMENT_LABELS[status] || map[status] || status;
 };
 
 // Төлөвийн хайрцаг (Design-ыг ижил байлгах хэсэг)
@@ -106,13 +107,12 @@ export function FulfillmentHistory({
         {/* --- Диаграмм хэсэг --- */}
         <TabsContent value="diagram" className="mt-0">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-4">
-            {/* Анхны төлөв */}
-            <div className="flex items-center gap-3">
-              <StatusBox
-                label={getStatusLabel(history[0].old_status) || "Эхлэл"}
-              />
-              <ArrowRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-            </div>
+            {history[0]?.old_status && (
+              <div className="flex items-center gap-3">
+                <StatusBox label={getStatusLabel(history[0].old_status)} />
+                <ArrowRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+              </div>
+            )}
 
             {/* Түүхийн урсгал */}
             {history.map((item, index) => (
@@ -185,7 +185,7 @@ export function FulfillmentHistory({
                     key={h.id}
                     className="hover:bg-slate-50/50 border-slate-100">
                     <TableCell className="py-2.5 text-[11px] text-muted-foreground">
-                      {getStatusLabel(h.old_status)}
+                      {getStatusLabel(h.old_status) || "—"}
                     </TableCell>
                     <TableCell className="py-2.5 text-[11px] font-semibold text-blue-600">
                       {getStatusLabel(h.new_status)}

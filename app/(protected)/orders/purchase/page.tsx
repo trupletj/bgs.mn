@@ -52,6 +52,15 @@ interface PurchaseOrderItem {
     quantity?: number | null;
     status?: string | null;
   }>;
+  order_purchase_lines?: Array<{
+    id: number;
+    quantity?: number | null;
+    order_fulfillment?: Array<{
+      id: number;
+      quantity?: number | null;
+      status?: string | null;
+    }>;
+  }>;
 }
 
 type PurchaseStatus = "not_ordered" | "ordering" | "completed";
@@ -134,11 +143,13 @@ const COMPLETED_FULFILLMENT_STATUSES = new Set([
 ]);
 
 function getPurchaseStatus(items: PurchaseOrderItem[] = []): PurchaseStatus {
-  const hasAnyFulfillment = items.some(
-    (item) => (item.order_fulfillment?.length ?? 0) > 0,
+  const hasAnyPurchase = items.some(
+    (item) =>
+      (item.order_fulfillment?.length ?? 0) > 0 ||
+      (item.order_purchase_lines?.length ?? 0) > 0,
   );
 
-  if (!hasAnyFulfillment) return "not_ordered";
+  if (!hasAnyPurchase) return "not_ordered";
 
   const allItemsCompleted =
     items.length > 0 &&
@@ -222,6 +233,15 @@ export default async function OrderPurchasePage({
           id,
           quantity,
           status
+        ),
+        order_purchase_lines (
+          id,
+          quantity,
+          order_fulfillment (
+            id,
+            quantity,
+            status
+          )
         )
       )
     `,
@@ -258,10 +278,6 @@ export default async function OrderPurchasePage({
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  const approved = orders.filter((o) => o.status === "approved");
-  const changesRequested = orders.filter(
-    (o) => o.status === "changes_requested",
-  );
   const purchaseCounts = sortedOrders.reduce(
     (acc, order) => {
       acc[order.purchaseStatus] += 1;

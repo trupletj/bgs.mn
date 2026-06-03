@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,10 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { createFulfillment } from "@/actions/fulfillment";
 import {
   ArrowLeft,
-  Plus,
   Clock,
   Truck,
   CheckCircle2,
@@ -41,55 +38,60 @@ import {
   FileText,
 } from "lucide-react";
 import ImageViewer from "@/components/image-viewer";
-import { getSparePartLabel, UNIT_OPTIONS } from "@/types/types";
-import {
-  getOrderItemsForOrderProcess,
-  updateFulfillmentStatus,
-} from "@/actions/order-process";
+import { getSparePartLabel } from "@/types/types";
+import { getOrderItemsForOrderProcess } from "@/actions/order-process";
 import { FulfillmentHistory } from "@/components/orders/fulfillment-history";
 import { cn } from "@/lib/utils";
+import { PurchaseBatchForm } from "@/components/orders/purchase/purchase-batch-form";
+import { PurchaseImplementationDashboard } from "@/components/orders/purchase/purchase-implementation-dashboard";
+import { PurchaseBatchList } from "@/components/orders/purchase/purchase-batch-list";
+import { PurchaseQuoteManager } from "@/components/orders/purchase/purchase-quote-manager";
+import type {
+  OrderProcessItem,
+  PurchaseBatchRow,
+  PurchaseQuoteRow,
+} from "@/components/orders/purchase/types";
+import {
+  formatDate,
+  formatQuantity,
+  getUnitLabel,
+  NEXT_FULFILLMENT_STATUS_OPTIONS,
+  PURCHASE_MOVEMENT_LABELS,
+} from "@/components/orders/purchase/utils";
+import {
+  getOrderPurchaseBatches,
+  getOrderPurchaseQuotes,
+  transitionPurchaseFulfillmentChunk,
+} from "@/actions/order-purchases";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS = [
-  { value: "ordered", label: "Захиалсан" },
-  { value: "shipped", label: "Хүргэлтэд гарсан" },
-  { value: "received", label: "Хүлээн авсан" },
-  { value: "completed", label: "Дууссан" },
-  { value: "cancelled", label: "Цуцлагдсан" },
-];
-
 const COMPLETED_STATUSES = ["received", "completed", "done"];
-
-type FulfillmentRow = {
-  id: string;
-  quantity: number | string | null;
-  status: string;
-  notes?: string | null;
-  created_at: string;
-};
-
-type OrderProcessItem = {
-  id: number;
-  part_name: string;
-  part_number?: string | null;
-  part_description?: string | null;
-  manufacturer?: string | null;
-  quantity: number | string;
-  unit: string;
-  final_quantity: number | string | null;
-  notes?: string | null;
-  spare_type?: string | null;
-  image_url?: string | null;
-  order_title?: string | null;
-  order_requested_delivery_date?: string | null;
-  order_fulfillment: FulfillmentRow[];
-};
 
 const STATUS_CONFIG: Record<
   string,
   { color: string; icon: React.ReactNode; text: string }
 > = {
+  purchased: {
+    color: "bg-blue-50 text-blue-700 border-blue-200",
+    icon: <Clock className="h-3 w-3" />,
+    text: PURCHASE_MOVEMENT_LABELS.purchased,
+  },
+  at_warehouse: {
+    color: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    icon: <Package className="h-3 w-3" />,
+    text: PURCHASE_MOVEMENT_LABELS.at_warehouse,
+  },
+  in_delivery: {
+    color: "bg-amber-50 text-amber-700 border-amber-200",
+    icon: <Truck className="h-3 w-3" />,
+    text: PURCHASE_MOVEMENT_LABELS.in_delivery,
+  },
+  at_mine: {
+    color: "bg-violet-50 text-violet-700 border-violet-200",
+    icon: <Factory className="h-3 w-3" />,
+    text: PURCHASE_MOVEMENT_LABELS.at_mine,
+  },
   received: {
     color: "bg-emerald-50 text-emerald-700 border-emerald-200",
     icon: <CheckCircle2 className="h-3 w-3" />,
@@ -98,7 +100,7 @@ const STATUS_CONFIG: Record<
   completed: {
     color: "bg-emerald-50 text-emerald-700 border-emerald-200",
     icon: <CheckCircle2 className="h-3 w-3" />,
-    text: "Дууссан",
+    text: PURCHASE_MOVEMENT_LABELS.completed,
   },
   done: {
     color: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -132,28 +134,9 @@ function getStatusCfg(status: string) {
   );
 }
 
-function getUnitLabel(value: string) {
-  return UNIT_OPTIONS.find((o) => o.value === value)?.label ?? value ?? "ш";
-}
-
 function formatDateTime(dt: string) {
   const d = new Date(dt);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function formatDate(dateString?: string | null) {
-  if (!dateString) return "—";
-  const dateOnly = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (dateOnly) return `${dateOnly[1]}.${dateOnly[2]}.${dateOnly[3]}`;
-
-  const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return "—";
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function formatQuantity(value?: number | string | null) {
-  if (value === null || value === undefined || value === "") return "—";
-  return Number(value).toLocaleString("mn-MN");
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -162,14 +145,29 @@ export default function OrderImplementationPage() {
   const params = useParams();
   const orderId = params.id as string;
   const [items, setItems] = useState<OrderProcessItem[]>([]);
+  const [purchaseBatches, setPurchaseBatches] = useState<PurchaseBatchRow[]>(
+    [],
+  );
+  const [purchaseQuotes, setPurchaseQuotes] = useState<PurchaseQuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const data = await getOrderItemsForOrderProcess(orderId);
+      setLoadError(null);
+      const [data, batches, quotes] = await Promise.all([
+        getOrderItemsForOrderProcess(orderId),
+        getOrderPurchaseBatches(orderId),
+        getOrderPurchaseQuotes(orderId),
+      ]);
       setItems(data as OrderProcessItem[]);
-    } catch {
-      toast.error("Өгөгдөл татахад алдаа гарлаа");
+      setPurchaseBatches(batches as unknown as PurchaseBatchRow[]);
+      setPurchaseQuotes(quotes as unknown as PurchaseQuoteRow[]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Өгөгдөл татахад алдаа гарлаа";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -193,6 +191,27 @@ export default function OrderImplementationPage() {
   }).length;
 
   if (loading) return <PageSkeleton />;
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col gap-6 p-4 lg:p-6">
+        <Link
+          href="/orders/purchase"
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />
+          Жагсаалт руу буцах
+        </Link>
+
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-4 py-16 text-center">
+          <XCircle className="mb-3 h-10 w-10 text-muted-foreground/30" />
+          <p className="font-medium">Хандах боломжгүй</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            {loadError}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
@@ -257,6 +276,33 @@ export default function OrderImplementationPage() {
         </div>
       </div>
 
+      <PurchaseImplementationDashboard
+        items={items}
+        batches={purchaseBatches}
+      />
+
+      <PurchaseQuoteManager
+        orderId={orderId}
+        items={items}
+        quotes={purchaseQuotes}
+        purchaseBatches={purchaseBatches}
+        onRefresh={load}
+      />
+
+      <PurchaseBatchForm
+        orderId={orderId}
+        items={items}
+        purchaseBatches={purchaseBatches}
+        purchaseQuotes={purchaseQuotes}
+        onRefresh={load}
+      />
+
+      <PurchaseBatchList
+        orderId={orderId}
+        batches={purchaseBatches}
+        onRefresh={load}
+      />
+
       {/* Items */}
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card py-16 text-center">
@@ -282,7 +328,9 @@ export default function OrderImplementationPage() {
   );
 }
 
-// ─── Item Card ────────────────────────────────────────────────────────────────
+// ─── Purchase batches ────────────────────────────────────────────────────────
+
+// ─── Item Card// ─── Item Card ────────────────────────────────────────────────────────────────
 
 function OrderItemCard({
   item,
@@ -293,16 +341,14 @@ function OrderItemCard({
   orderId: string;
   onRefresh: () => void;
 }) {
-  const [qtyInput, setQtyInput] = useState("");
-  const [notes, setNotes] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState("ordered");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [pendingChange, setPendingChange] = useState<{
     id: string;
     old: string;
     next: string;
+    maxQuantity: number;
   } | null>(null);
+  const [statusChangeQuantity, setStatusChangeQuantity] = useState("");
   const [statusChangeComment, setStatusChangeComment] = useState("");
 
   const unit = getUnitLabel(item.unit);
@@ -329,44 +375,37 @@ function OrderItemCard({
     });
   };
 
-  const handleAdd = async () => {
-    const qty = Number(qtyInput);
-    if (!qty || qty <= 0) return toast.error("Зөв тоо оруулна уу");
-    setIsAdding(true);
-    try {
-      await createFulfillment({
-        orderItemId: item.id,
-        quantity: qty,
-        notes: notes.trim() || undefined,
-        path: `/orders/${orderId}/implementation`,
-        status: selectedStatus,
-      });
-      toast.success("Шинэ биелэлт бүртгэгдлээ");
-      setQtyInput("");
-      setNotes("");
-      onRefresh();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Алдаа гарлаа");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
   const confirmStatusChange = async () => {
     if (!pendingChange) return;
+    const quantity = Number(statusChangeQuantity);
+    if (
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      quantity > pendingChange.maxQuantity
+    ) {
+      toast.error(
+        `Шилжүүлэх тоо ${formatQuantity(
+          pendingChange.maxQuantity,
+        )}-ээс хэтрэхгүй байх ёстой`,
+      );
+      return;
+    }
+
     try {
-      await updateFulfillmentStatus({
-        fulfillmentId: pendingChange.id,
-        newStatus: pendingChange.next,
-        oldStatus: pendingChange.old,
-        reason: statusChangeComment.trim() || "Хэрэглэгч өөрчилсөн",
+      await transitionPurchaseFulfillmentChunk({
+        fulfillmentId: Number(pendingChange.id),
+        orderId: Number(orderId),
+        status: pendingChange.next,
+        quantity,
+        note: statusChangeComment.trim() || "Хэрэглэгч өөрчилсөн",
       });
       toast.success("Статус шинэчлэгдлээ");
       onRefresh();
-    } catch {
-      toast.error("Алдаа гарлаа");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Алдаа гарлаа");
     } finally {
       setPendingChange(null);
+      setStatusChangeQuantity("");
       setStatusChangeComment("");
     }
   };
@@ -491,6 +530,11 @@ function OrderItemCard({
                     {item.order_fulfillment.map((f, idx) => {
                       const scfg = getStatusCfg(f.status);
                       const isOpen = expandedIds.has(f.id);
+                      const quantity = Number(f.quantity || 0);
+                      const nextOptions =
+                        NEXT_FULFILLMENT_STATUS_OPTIONS[
+                          f.status?.toLowerCase()
+                        ] ?? [];
                       return (
                         <React.Fragment key={f.id}>
                           <tr
@@ -500,7 +544,7 @@ function OrderItemCard({
                               {idx + 1}
                             </td>
                             <td className="px-4 py-3 font-semibold tabular-nums">
-                              {f.quantity}{" "}
+                              {formatQuantity(quantity)}{" "}
                               <span className="font-normal text-muted-foreground">
                                 {unit}
                               </span>
@@ -526,22 +570,25 @@ function OrderItemCard({
                               className="px-4 py-3 text-right"
                               onClick={(e) => e.stopPropagation()}>
                               <Select
-                                value={f.status}
+                                value=""
+                                disabled={nextOptions.length === 0}
                                 onValueChange={(next) => {
                                   if (next !== f.status) {
                                     setPendingChange({
                                       id: f.id,
                                       old: f.status,
                                       next,
+                                      maxQuantity: quantity,
                                     });
+                                    setStatusChangeQuantity(String(quantity));
                                     setStatusChangeComment("");
                                   }
                                 }}>
                                 <SelectTrigger className="h-7 w-36 text-xs">
-                                  <SelectValue />
+                                  <SelectValue placeholder="Шилжүүлэх" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {STATUS_OPTIONS.map((o) => (
+                                  {nextOptions.map((o) => (
                                     <SelectItem
                                       key={o.value}
                                       value={o.value}
@@ -574,6 +621,10 @@ function OrderItemCard({
                 {item.order_fulfillment.map((f) => {
                   const scfg = getStatusCfg(f.status);
                   const isOpen = expandedIds.has(f.id);
+                  const quantity = Number(f.quantity || 0);
+                  const nextOptions =
+                    NEXT_FULFILLMENT_STATUS_OPTIONS[f.status?.toLowerCase()] ??
+                    [];
                   return (
                     <div
                       key={f.id}
@@ -584,7 +635,7 @@ function OrderItemCard({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-semibold tabular-nums">
-                              {f.quantity} {unit}
+                              {formatQuantity(quantity)} {unit}
                             </span>
                             <Badge
                               variant="outline"
@@ -607,22 +658,25 @@ function OrderItemCard({
                         </div>
                         <div onClick={(e) => e.stopPropagation()}>
                           <Select
-                            value={f.status}
+                            value=""
+                            disabled={nextOptions.length === 0}
                             onValueChange={(next) => {
                               if (next !== f.status) {
                                 setPendingChange({
                                   id: f.id,
                                   old: f.status,
                                   next,
+                                  maxQuantity: quantity,
                                 });
+                                setStatusChangeQuantity(String(quantity));
                                 setStatusChangeComment("");
                               }
                             }}>
                             <SelectTrigger className="h-7 w-28 text-xs">
-                              <SelectValue />
+                              <SelectValue placeholder="Шилжүүлэх" />
                             </SelectTrigger>
                             <SelectContent>
-                              {STATUS_OPTIONS.map((o) => (
+                              {nextOptions.map((o) => (
                                 <SelectItem
                                   key={o.value}
                                   value={o.value}
@@ -652,76 +706,11 @@ function OrderItemCard({
             </>
           ) : (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-center">
-              <ClipboardList className="mb-2 h-7 w-7 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">
                 Биелэлт бүртгэгдээгүй байна
               </p>
             </div>
           )}
-
-          {/* Add fulfillment form */}
-          <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Шинэ биелэлт нэмэх
-            </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Тоо хэмжээ ({unit})
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={qtyInput}
-                  onChange={(e) => setQtyInput(e.target.value)}
-                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                  className="h-9"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Статус
-                </label>
-                <Select
-                  value={selectedStatus}
-                  onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Тэмдэглэл
-                </label>
-                <Input
-                  placeholder="Нэмэлт мэдээлэл..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-            </div>
-
-            <Button
-              onClick={handleAdd}
-              disabled={isAdding || !qtyInput.trim()}
-              size="sm"
-              className="mt-3">
-              <Plus className="h-4 w-4" />
-              {isAdding ? "Хадгалж байна..." : "Биелэлт бүртгэх"}
-            </Button>
-          </div>
         </div>
       </section>
 
@@ -731,6 +720,7 @@ function OrderItemCard({
         onOpenChange={(open) => {
           if (!open) {
             setPendingChange(null);
+            setStatusChangeQuantity("");
             setStatusChangeComment("");
           }
         }}>
@@ -742,32 +732,55 @@ function OrderItemCard({
                 <>
                   Статусыг{" "}
                   <span className="font-semibold text-foreground">
-                    {
-                      STATUS_OPTIONS.find((o) => o.value === pendingChange.old)
-                        ?.label
-                    }
+                    {PURCHASE_MOVEMENT_LABELS[pendingChange.old] ??
+                      getStatusCfg(pendingChange.old).text}
                   </span>{" "}
                   →{" "}
                   <span className="font-semibold text-foreground">
-                    {
-                      STATUS_OPTIONS.find((o) => o.value === pendingChange.next)
-                        ?.label
-                    }
+                    {PURCHASE_MOVEMENT_LABELS[pendingChange.next] ??
+                      getStatusCfg(pendingChange.next).text}
                   </span>{" "}
-                  болгож өөрчлөхдөө итгэлтэй байна уу?
+                  төлөв рүү шилжүүлэхдээ итгэлтэй байна уу?
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Тайлбар
-            </label>
-            <Input
-              value={statusChangeComment}
-              onChange={(event) => setStatusChangeComment(event.target.value)}
-              placeholder="Төлөв өөрчилсөн тайлбар..."
-            />
+          <div className="grid gap-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Шилжүүлэх тоо
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max={pendingChange?.maxQuantity}
+                value={statusChangeQuantity}
+                onChange={(event) =>
+                  setStatusChangeQuantity(event.target.value)
+                }
+                placeholder="Тоо хэмжээ"
+              />
+              {pendingChange && (
+                <p className="text-xs text-muted-foreground">
+                  Энэ мөрөөс хамгийн ихдээ{" "}
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {formatQuantity(pendingChange.maxQuantity)} {unit}
+                  </span>{" "}
+                  шилжүүлнэ. Бага тоо оруулбал үлдсэн тоо хуучин төлөв дээрээ
+                  үлдэнэ.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Тайлбар
+              </label>
+              <Input
+                value={statusChangeComment}
+                onChange={(event) => setStatusChangeComment(event.target.value)}
+                placeholder="Төлөв өөрчилсөн тайлбар..."
+              />
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Болих</AlertDialogCancel>

@@ -7,7 +7,6 @@ import {
   XCircle,
   AlertCircle,
   Clock,
-  User,
   ArrowRight,
   ChevronDown,
   GitBranch,
@@ -36,9 +35,17 @@ interface Step {
   reviewers: Reviewer[];
 }
 
+interface OrderWorkflowItem {
+  id: number | string;
+  part_name: string;
+  quantity: number;
+  unit: string;
+  description?: string | null;
+}
+
 interface OrderWorkflowProps {
   reviewers: Reviewer[];
-  items: any[];
+  items: OrderWorkflowItem[];
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; dot: string; badge: string }> = {
@@ -117,19 +124,23 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
   const toggle = (id: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   };
 
   if (steps.length === 0) {
     return (
-      <section className="rounded-xl border border-border bg-card">
-        <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3.5">
+      <section className="flex h-[28rem] flex-col overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-5 py-3.5">
           <GitBranch className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Баталгаажуулалтын явц</h2>
         </div>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-5 py-12 text-center">
           <Clock className="mb-2 h-8 w-8 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">Явцын түүх байхгүй</p>
         </div>
@@ -138,8 +149,8 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3.5">
+    <section className="flex h-[28rem] flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-5 py-3.5">
         <GitBranch className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold">Баталгаажуулалтын явц</h2>
         <span className="ml-auto rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
@@ -147,7 +158,7 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
         </span>
       </div>
 
-      <div className="p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
         <div className="relative flex flex-col gap-0">
           {steps.map((step, si) => {
             const overall = stepStatus(step.reviewers);
@@ -259,7 +270,7 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                                   </p>
                                   <div className="flex flex-col gap-1.5">
                                     {r.sub_order_items!.map((sub) => {
-                                      const orig = items.find((it) => it.id === sub.order_item_id);
+                                      const orig = items.find((it) => String(it.id) === String(sub.order_item_id));
                                       const unit = getUnitLabel(orig?.unit || "");
                                       return (
                                         <div
@@ -282,7 +293,7 @@ export function OrderWorkflow({ reviewers, items }: OrderWorkflowProps) {
                                       );
                                     })}
                                   </div>
-                                  {r.sub_order_items!.some((s) => items.find((it) => it.id === s.order_item_id)?.description) && (
+                                  {r.sub_order_items!.some((s) => items.find((it) => String(it.id) === String(s.order_item_id))?.description) && (
                                     <div className="mt-2 space-y-1">
                                       {r.sub_order_items!.filter((s) => s.description).map((sub) => (
                                         <p key={sub.id} className="text-xs text-muted-foreground pl-2 border-l-2 border-amber-300">

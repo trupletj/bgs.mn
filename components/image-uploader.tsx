@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, type Dispatch } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import {
+  getFileSizeLimitMessage,
+  getFileTooLargeMessage,
+  IMAGE_UPLOAD_MAX_BYTES,
+} from "@/lib/file-upload-limits";
 
 interface ImageUploaderProps {
   multiple?: boolean;
-  onUpload: (urls: string[] | string) => void;
+  onUpload: Dispatch<string[] | string>;
   helperText?: string;
   hideHelperText?: boolean;
 }
@@ -22,11 +27,10 @@ export default function ImageUploader({
   const supabase = createClient();
 
   const validateFile = (file: File) => {
-    const maxSize = 5 * 1024 * 1024; // 5MB
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
-    if (file.size > maxSize) {
-      toast.error("Зургийн хэмжээ 5MB-аас их байж болохгүй.");
+    if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+      toast.error(getFileTooLargeMessage(file.name, IMAGE_UPLOAD_MAX_BYTES));
       return false;
     }
 
@@ -168,6 +172,9 @@ export default function ImageUploader({
             {helperText}
           </span>
         )}
+        <span className="text-center text-xs text-muted-foreground">
+          {getFileSizeLimitMessage(IMAGE_UPLOAD_MAX_BYTES)}
+        </span>
       </div>
 
       {uploading && (
