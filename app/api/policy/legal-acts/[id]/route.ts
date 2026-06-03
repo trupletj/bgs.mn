@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/actions/rbac";
 import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
-import type { LegalActCreateTarget, LegalActType } from "@/actions/policy-legal-acts";
+import type {
+  LegalActCreateTarget,
+  LegalActType,
+} from "@/actions/policy-legal-acts";
 import { normalizeRevisionChangeAction } from "@/lib/policy-revision-actions";
 import {
   DOCUMENT_UPLOAD_MAX_BYTES,
@@ -11,7 +14,7 @@ import {
 } from "@/lib/file-upload-limits";
 
 const BUCKET = "policy-legal-acts";
-const ALLOWED_MIME_TYPES = new Set(LEGAL_ACT_ALLOWED_MIME_TYPES);
+const ALLOWED_MIME_TYPES = new Set<String>(LEGAL_ACT_ALLOWED_MIME_TYPES);
 
 function sanitizeFileName(name: string) {
   const clean = name
@@ -22,7 +25,9 @@ function sanitizeFileName(name: string) {
   return clean || "attachment";
 }
 
-function parseTargets(value: FormDataEntryValue | null): LegalActCreateTarget[] {
+function parseTargets(
+  value: FormDataEntryValue | null,
+): LegalActCreateTarget[] {
   if (!value || typeof value !== "string") return [];
   try {
     const parsed = JSON.parse(value);
@@ -35,7 +40,9 @@ function parseTargets(value: FormDataEntryValue | null): LegalActCreateTarget[] 
 function validateFile(file: File | null) {
   if (!file || file.size === 0) return null;
   if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
-    throw new Error(getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES));
+    throw new Error(
+      getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES),
+    );
   }
   if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
     throw new Error("Зөвхөн PDF, зураг эсвэл Word document хавсаргана уу");
@@ -50,7 +57,10 @@ export async function PATCH(
   try {
     const canEdit = await hasPermission("policy", "edit");
     if (!canEdit) {
-      return NextResponse.json({ error: "Эрх зүйн акт засах эрхгүй байна" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Эрх зүйн акт засах эрхгүй байна" },
+        { status: 403 },
+      );
     }
 
     const { id } = await params;
@@ -73,7 +83,9 @@ export async function PATCH(
       throw new Error("Тушаалын дугаар, огноо, гарчиг заавал оруулна уу");
     }
     if (actType === "04" && (!policyId || revisionTargets.length === 0)) {
-      throw new Error("04 тушаалд журам болон шинэчлэгдсэн target заавал сонгоно уу");
+      throw new Error(
+        "04 тушаалд журам болон шинэчлэгдсэн target заавал сонгоно уу",
+      );
     }
 
     const supabase = getSupabaseAdmin();
@@ -83,7 +95,9 @@ export async function PATCH(
       .eq("legal_act_id", id);
 
     if (existingError) {
-      throw new Error(`Одоогийн шинэчлэл авахад алдаа: ${existingError.message}`);
+      throw new Error(
+        `Одоогийн шинэчлэл авахад алдаа: ${existingError.message}`,
+      );
     }
 
     const previousPolicyIds = Array.from(
@@ -110,14 +124,18 @@ export async function PATCH(
     }
 
     if ((existingRevisions ?? []).length > 0) {
-      const revisionIds = (existingRevisions ?? []).map((revision) => revision.id);
+      const revisionIds = (existingRevisions ?? []).map(
+        (revision) => revision.id,
+      );
       const { error: targetDeleteError } = await supabase
         .from("policy_revision_targets")
         .delete()
         .in("policy_revision_id", revisionIds);
 
       if (targetDeleteError) {
-        throw new Error(`Хуучин target устгахад алдаа: ${targetDeleteError.message}`);
+        throw new Error(
+          `Хуучин target устгахад алдаа: ${targetDeleteError.message}`,
+        );
       }
 
       const { error: revisionDeleteError } = await supabase
@@ -126,7 +144,9 @@ export async function PATCH(
         .eq("legal_act_id", id);
 
       if (revisionDeleteError) {
-        throw new Error(`Хуучин шинэчлэл устгахад алдаа: ${revisionDeleteError.message}`);
+        throw new Error(
+          `Хуучин шинэчлэл устгахад алдаа: ${revisionDeleteError.message}`,
+        );
       }
     }
 
@@ -140,7 +160,8 @@ export async function PATCH(
           upsert: false,
         });
 
-      if (uploadError) throw new Error(`Файл хуулахад алдаа: ${uploadError.message}`);
+      if (uploadError)
+        throw new Error(`Файл хуулахад алдаа: ${uploadError.message}`);
 
       const { error: attachmentError } = await supabase
         .from("legal_act_attachments")
@@ -154,7 +175,9 @@ export async function PATCH(
         });
 
       if (attachmentError) {
-        throw new Error(`Хавсралтын metadata хадгалахад алдаа: ${attachmentError.message}`);
+        throw new Error(
+          `Хавсралтын metadata хадгалахад алдаа: ${attachmentError.message}`,
+        );
       }
     }
 
@@ -170,7 +193,9 @@ export async function PATCH(
         .single();
 
       if (revisionError) {
-        throw new Error(`Журмын шинэчлэл хадгалахад алдаа: ${revisionError.message}`);
+        throw new Error(
+          `Журмын шинэчлэл хадгалахад алдаа: ${revisionError.message}`,
+        );
       }
 
       const targetRows = revisionTargets.map((target) => ({
@@ -188,7 +213,9 @@ export async function PATCH(
         .insert(targetRows);
 
       if (targetError) {
-        throw new Error(`Шинэчлэгдсэн target хадгалахад алдаа: ${targetError.message}`);
+        throw new Error(
+          `Шинэчлэгдсэн target хадгалахад алдаа: ${targetError.message}`,
+        );
       }
     }
 

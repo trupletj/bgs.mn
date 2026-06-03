@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { CircleDollarSign, PackageCheck, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -53,7 +54,6 @@ export function OrderPurchaseSummaryPanel({
 }) {
   const [batches, setBatches] = useState<PurchaseBatchRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasAccess, setHasAccess] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<number | string | null>(
     null,
   );
@@ -64,15 +64,14 @@ export function OrderPurchaseSummaryPanel({
     async function loadPurchases() {
       try {
         setLoading(true);
-        const data = await getOrderPurchaseBatches(orderId);
+        const data = await getOrderPurchaseBatches(orderId, canViewPrices);
+
         if (!cancelled) {
           setBatches(data as unknown as PurchaseBatchRow[]);
-          setHasAccess(true);
         }
       } catch {
         if (!cancelled) {
           setBatches([]);
-          setHasAccess(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -105,8 +104,6 @@ export function OrderPurchaseSummaryPanel({
   const purchasedItemCount = rows.filter(
     (row) => row.purchasedQuantity > 0,
   ).length;
-
-  if (!hasAccess || (!loading && batches.length === 0)) return null;
 
   return (
     <>
@@ -144,47 +141,65 @@ export function OrderPurchaseSummaryPanel({
           </div>
 
           <div className="flex flex-col gap-2">
-            {rows.map((row) => (
-              <button
-                key={row.item.id}
-                type="button"
-                className="rounded-lg border border-border/60 p-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => setSelectedItemId(row.item.id)}>
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium leading-tight">
-                      {row.item.part_name}
-                    </p>
-                    {row.item.part_number && (
-                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                        {row.item.part_number}
+            {rows.map((row) => {
+              const hasLines = row.lines.length > 0;
+              const isClickable = canViewPrices && hasLines;
+
+              const Component = isClickable ? "button" : "div";
+
+              return (
+                <Component
+                  key={row.item.id}
+                  type={isClickable ? "button" : undefined}
+                  className={cn(
+                    "rounded-lg border border-border/60 p-3 text-left transition-colors",
+                    isClickable &&
+                      "hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
+                    !isClickable && "cursor-default",
+                  )}
+                  onClick={
+                    isClickable
+                      ? () => setSelectedItemId(row.item.id)
+                      : undefined
+                  }
+                  tabIndex={isClickable ? 0 : -1}
+                  aria-disabled={!isClickable}>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium leading-tight">
+                        {row.item.part_name}
+                      </p>
+                      {row.item.part_number && (
+                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                          {row.item.part_number}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <QuantityText
+                        label="Шаардлагатай"
+                        quantity={row.requiredQuantity}
+                        unit={row.unit}
+                      />
+                      <QuantityText
+                        label="Худалдан авсан"
+                        quantity={row.purchasedQuantity}
+                        unit={row.unit}
+                        strong
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                    <PurchaseStatusBadgeList statusTotals={row.statusTotals} />
+                    {canViewPrices && (
+                      <p className="text-xs font-semibold tabular-nums text-muted-foreground">
+                        {formatCurrencyTotals(row.spendByCurrency)}
                       </p>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <QuantityText
-                      label="Шаардлагатай"
-                      quantity={row.requiredQuantity}
-                      unit={row.unit}
-                    />
-                    <QuantityText
-                      label="Худалдан авсан"
-                      quantity={row.purchasedQuantity}
-                      unit={row.unit}
-                      strong
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                  <PurchaseStatusBadgeList statusTotals={row.statusTotals} />
-                  {canViewPrices && (
-                    <p className="text-xs font-semibold tabular-nums text-muted-foreground">
-                      {formatCurrencyTotals(row.spendByCurrency)}
-                    </p>
-                  )}
-                </div>
-              </button>
-            ))}
+                </Component>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -305,7 +320,10 @@ function buildRows(
     for (const line of batch.order_purchase_lines) {
       const key = String(line.order_item_id);
       const row = rowMap.get(key);
-      if (!row) continue;
+
+      if (!row) {
+        continue;
+      }
 
       const quantity = Number(line.quantity || 0);
       const unitPrice = Number(line.unit_price || 0);
@@ -337,7 +355,9 @@ function buildRows(
 }
 
 function buildLineStatusTotals(line: PurchaseLineRow) {
-  return line.order_fulfillment.reduce<StatusTotals>((totals, fulfillment) => {
+  const fulfillments = line.order_fulfillment || [];
+
+  return fulfillments.reduce<StatusTotals>((totals, fulfillment) => {
     const status = fulfillment.status || "unknown";
     totals[status] = (totals[status] ?? 0) + Number(fulfillment.quantity || 0);
     return totals;

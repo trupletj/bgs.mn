@@ -61,6 +61,7 @@ export function PurchaseStatusBadgeList({
   statusTotals: PurchaseStatusTotals;
   emptyText?: string;
 }) {
+  console.log("statusTotals ", statusTotals);
   const visibleStatuses = PURCHASE_STATUS_ORDER.filter(
     (status) => (statusTotals[status] ?? 0) > 0,
   );

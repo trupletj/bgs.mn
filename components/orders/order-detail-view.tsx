@@ -125,6 +125,7 @@ interface OrderDetail {
     id?: number | string;
     order_number: string;
     order_type: string;
+    order_process_id?: number | string | null;
     title: string;
     status: string;
     description?: string | null;
