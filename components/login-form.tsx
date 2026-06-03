@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle } from "lucide-react";
+import { withEmbedParam } from "@/lib/embed";
 
-export function RequestOtpForm({
+function RequestOtpFormInner({
   className,
   ...props
 }: React.ComponentProps<"div">) {
@@ -19,6 +20,8 @@ export function RequestOtpForm({
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const embed = searchParams.get("embed") === "1";
 
   const onRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +54,7 @@ export function RequestOtpForm({
         return;
       }
 
-      router.push(`/otp?phone=${phone}&register=${register}`);
+      router.push(withEmbedParam(`/otp?phone=${phone}&register=${register}`, embed));
     } catch (err: any) {
       setError(err.message || "Гэнэтийн алдаа гарлаа");
       setIsLoading(false);
@@ -123,5 +126,13 @@ export function RequestOtpForm({
         </Button>
       </form>
     </div>
+  );
+}
+
+export function RequestOtpForm(props: React.ComponentProps<"div">) {
+  return (
+    <Suspense fallback={<div className={cn("w-full", props.className)} />}>
+      <RequestOtpFormInner {...props} />
+    </Suspense>
   );
 }

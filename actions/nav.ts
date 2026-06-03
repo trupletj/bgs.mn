@@ -30,6 +30,9 @@ export async function getNavServices(): Promise<NavService[]> {
     "job_description",
     "create",
   );
+  const hasNewsManage = await hasPermission("news", "create");
+  const hasNotificationCreate = await hasPermission("notification", "create");
+  const hasBannerManage = await hasPermission("banner", "create");
   const hasCreateOrder = await hasPermission("order", "create");
   const hasOrderAccess = await hasPermission("order", "access");
   const hasOrderPurchase = await hasPermission("order", "purchase");
@@ -195,6 +198,26 @@ export async function getNavServices(): Promise<NavService[]> {
         { title: "Хүсэлтүүд", url: "/devices/requests" },
         { title: "Тайлан", url: "/devices/report" },
       ],
+    });
+  }
+
+  if (hasNewsManage || hasNotificationCreate || hasBannerManage) {
+    const contentItems: NavSubItem[] = [];
+    if (hasNewsManage) {
+      contentItems.push({ title: "Мэдээ", url: "/news" });
+    }
+    if (hasBannerManage) {
+      contentItems.push({ title: "Баннер", url: "/banners" });
+    }
+    if (hasNotificationCreate) {
+      contentItems.push({ title: "Мэдэгдэл", url: "/notifications" });
+    }
+    services.push({
+      key: "content",
+      title: "Контент",
+      url: contentItems[0]?.url ?? "/news",
+      basePaths: ["/news", "/banners", "/notifications"],
+      items: contentItems,
     });
   }
 
