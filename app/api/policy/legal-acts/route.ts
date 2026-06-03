@@ -3,19 +3,19 @@ import { revalidatePath } from "next/cache";
 import { hasPermission } from "@/actions/rbac";
 import { getProfileIdFromAuthUserId } from "@/actions/profile";
 import { createClient } from "@/utils/supabase/server";
-import type { LegalActCreateTarget, LegalActType } from "@/actions/policy-legal-acts";
+import type {
+  LegalActCreateTarget,
+  LegalActType,
+} from "@/actions/policy-legal-acts";
 import { normalizeRevisionChangeAction } from "@/lib/policy-revision-actions";
+import {
+  DOCUMENT_UPLOAD_MAX_BYTES,
+  LEGAL_ACT_ALLOWED_MIME_TYPES,
+  getFileTooLargeMessage,
+} from "@/lib/file-upload-limits";
 
 const BUCKET = "policy-legal-acts";
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
+const ALLOWED_MIME_TYPES = new Set<String>(LEGAL_ACT_ALLOWED_MIME_TYPES);
 
 function sanitizeFileName(name: string) {
   const clean = name
@@ -26,7 +26,9 @@ function sanitizeFileName(name: string) {
   return clean || "attachment";
 }
 
-function parseTargets(value: FormDataEntryValue | null): LegalActCreateTarget[] {
+function parseTargets(
+  value: FormDataEntryValue | null,
+): LegalActCreateTarget[] {
   if (!value || typeof value !== "string") return [];
   try {
     const parsed = JSON.parse(value);
@@ -38,8 +40,10 @@ function parseTargets(value: FormDataEntryValue | null): LegalActCreateTarget[] 
 
 function validateFile(file: File | null) {
   if (!file || file.size === 0) return null;
-  if (file.size > MAX_FILE_BYTES) {
-    throw new Error("Файлын хэмжээ 20MB-аас их байна");
+  if (file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+    throw new Error(
+      getFileTooLargeMessage(file.name, DOCUMENT_UPLOAD_MAX_BYTES),
+    );
   }
   if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
     throw new Error("Зөвхөн PDF, зураг эсвэл Word document хавсаргана уу");
@@ -51,7 +55,10 @@ export async function POST(request: Request) {
   try {
     const canCreate = await hasPermission("policy", "create");
     if (!canCreate) {
-      return NextResponse.json({ error: "Эрх зүйн акт үүсгэх эрхгүй байна" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Эрх зүйн акт үүсгэх эрхгүй байна" },
+        { status: 403 },
+      );
     }
 
     const formData = await request.formData();
@@ -73,7 +80,9 @@ export async function POST(request: Request) {
       throw new Error("Тушаалын дугаар, огноо, гарчиг заавал оруулна уу");
     }
     if (actType === "04" && (!policyId || revisionTargets.length === 0)) {
-      throw new Error("04 тушаалд журам болон шинэчлэгдсэн target заавал сонгоно уу");
+      throw new Error(
+        "04 тушаалд журам болон шинэчлэгдсэн target заавал сонгоно уу",
+      );
     }
 
     const supabase = await createClient();
@@ -93,7 +102,8 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    if (actError) throw new Error(`Эрх зүйн акт үүсгэхэд алдаа: ${actError.message}`);
+    if (actError)
+      throw new Error(`Эрх зүйн акт үүсгэхэд алдаа: ${actError.message}`);
 
     if (file) {
       const safeName = sanitizeFileName(file.name);
@@ -105,7 +115,8 @@ export async function POST(request: Request) {
           upsert: false,
         });
 
-      if (uploadError) throw new Error(`Файл хуулахад алдаа: ${uploadError.message}`);
+      if (uploadError)
+        throw new Error(`Файл хуулахад алдаа: ${uploadError.message}`);
 
       const { error: attachmentError } = await supabase
         .from("legal_act_attachments")
@@ -119,7 +130,9 @@ export async function POST(request: Request) {
         });
 
       if (attachmentError) {
-        throw new Error(`Хавсралтын metadata хадгалахад алдаа: ${attachmentError.message}`);
+        throw new Error(
+          `Хавсралтын metadata хадгалахад алдаа: ${attachmentError.message}`,
+        );
       }
     }
 
@@ -135,7 +148,9 @@ export async function POST(request: Request) {
         .single();
 
       if (revisionError) {
-        throw new Error(`Журмын шинэчлэл хадгалахад алдаа: ${revisionError.message}`);
+        throw new Error(
+          `Журмын шинэчлэл хадгалахад алдаа: ${revisionError.message}`,
+        );
       }
 
       const targetRows = revisionTargets.map((target) => ({
@@ -153,7 +168,9 @@ export async function POST(request: Request) {
         .insert(targetRows);
 
       if (targetError) {
-        throw new Error(`Шинэчлэгдсэн target хадгалахад алдаа: ${targetError.message}`);
+        throw new Error(
+          `Шинэчлэгдсэн target хадгалахад алдаа: ${targetError.message}`,
+        );
       }
     }
 

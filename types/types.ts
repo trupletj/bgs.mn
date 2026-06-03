@@ -191,12 +191,13 @@ export function getUnitOptionLabel(value?: string) {
 }
 
 export const UNIT_OPTIONS = [
-  { value: "piece", label: "Ширхэг", type: "count" },
-  { value: "meter", label: "Метр (м)", type: "length" },
-  { value: "square_meter", label: "Квадрат метр (м²)", type: "area" },
-  { value: "cubic_meter", label: "Куб метр (м³)", type: "volume" },
-  { value: "kilogram", label: "Килограмм (кг)", type: "weight" },
-  { value: "gram", label: "Грам (г)", type: "weight" },
+  { value: "piece", label: "ш", type: "count" },
+  { value: "meter", label: "Метр", type: "length" },
+  { value: "square_meter", label: "м²", type: "area" },
+  { value: "cubic_meter", label: "м³", type: "volume" },
+  { value: "kilogram", label: "кг", type: "weight" },
+  { value: "tonn", label: "тонн", type: "weight" },
+  { value: "gram", label: "Грам (гр)", type: "weight" },
   { value: "liter", label: "Литр (л)", type: "volume" },
   { value: "set", label: "Баглаа/Сэт", type: "count" },
   { value: "package", label: "Багц", type: "count" },
