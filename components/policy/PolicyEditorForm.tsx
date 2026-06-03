@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import { Button } from "@/components/ui/button";
 import ClauseItemEdit from "./ClauseItemEdit";
 import { Clause, Section } from "@/types/clause";
@@ -70,19 +69,19 @@ export default function PolicyEditerForm({
     })) || [],
   );
   const [isProcessing, setIsProcessing] = useState(false);
-  const updateClauseNumbers = useCallback((
-    clauses: Clause[],
-    parentRef: string,
-  ): Clause[] => {
-    return clauses.map((clause, idx) => ({
-      ...clause,
-      referenceNumber: `${parentRef}.${idx + 1}`,
-      children: updateClauseNumbers(
-        clause.children ?? [],
-        `${parentRef}.${idx + 1}`,
-      ),
-    }));
-  }, []);
+  const updateClauseNumbers = useCallback(
+    (clauses: Clause[], parentRef: string): Clause[] => {
+      return clauses.map((clause, idx) => ({
+        ...clause,
+        referenceNumber: `${parentRef}.${idx + 1}`,
+        children: updateClauseNumbers(
+          clause.children ?? [],
+          `${parentRef}.${idx + 1}`,
+        ),
+      }));
+    },
+    [],
+  );
 
   const addSection = useCallback(() => {
     if (isProcessing) return;
@@ -124,21 +123,23 @@ export default function PolicyEditerForm({
     [isProcessing, initialData?.id, updateClauseNumbers],
   );
 
-  const deleteSection = useCallback((sectionIndex: number) => {
-    if (!confirm("Бүлгийг устгахдаа итгэлтэй байна уу?")) return;
-    setIsProcessing(true);
-    setSections((prev) => {
-      return prev
-        .filter((_, idx) => idx !== sectionIndex)
-        .map((s, idx) => ({
-          ...s,
-          referenceNumber: `${idx + 1}`,
-          clauses: updateClauseNumbers(s.clauses, `${idx + 1}`),
-        }));
-    });
-    console.log("Section deleted (UI only)");
-    setIsProcessing(false);
-  }, [updateClauseNumbers]);
+  const deleteSection = useCallback(
+    (sectionIndex: number) => {
+      if (!confirm("Бүлгийг устгахдаа итгэлтэй байна уу?")) return;
+      setIsProcessing(true);
+      setSections((prev) => {
+        return prev
+          .filter((_, idx) => idx !== sectionIndex)
+          .map((s, idx) => ({
+            ...s,
+            referenceNumber: `${idx + 1}`,
+            clauses: updateClauseNumbers(s.clauses, `${idx + 1}`),
+          }));
+      });
+      setIsProcessing(false);
+    },
+    [updateClauseNumbers],
+  );
 
   const addClause = useCallback(
     (sectionIndex: number) => {
@@ -205,10 +206,6 @@ export default function PolicyEditerForm({
           };
         }
         newSections[sectionIndex] = section;
-        console.log("Clause inserted before:", {
-          section: section.referenceNumber,
-          clause: newClause.referenceNumber,
-        });
         return newSections;
       });
       setIsProcessing(false);
@@ -242,10 +239,6 @@ export default function PolicyEditerForm({
           ...(parentClause.children ?? []),
           newSubClause,
         ];
-        console.log("New sub-clause added:", {
-          parentClause: parentClause.referenceNumber,
-          subClause: newSubClause.referenceNumber,
-        });
         return newSections;
       });
       setIsProcessing(false);
@@ -258,10 +251,6 @@ export default function PolicyEditerForm({
       setSections((prev) => {
         const newSections = JSON.parse(JSON.stringify(prev));
         newSections[sectionIndex] = { ...newSections[sectionIndex], text };
-        console.log("Section text updated:", {
-          referenceNumber: newSections[sectionIndex].referenceNumber,
-          text: text.substring(0, 20) + (text.length > 20 ? "..." : ""),
-        });
         return newSections;
       });
     },
@@ -282,10 +271,6 @@ export default function PolicyEditerForm({
           ...current[path[path.length - 1]],
           text,
         };
-        console.log("Clause text updated:", {
-          referenceNumber: current[path[path.length - 1]].referenceNumber,
-          text: text.substring(0, 20) + (text.length > 20 ? "..." : ""),
-        });
         return newSections;
       });
     },
@@ -309,10 +294,6 @@ export default function PolicyEditerForm({
           ...current[path[path.length - 1]],
           positions,
         };
-        console.log("Clause positions updated:", {
-          referenceNumber: current[path[path.length - 1]].referenceNumber,
-          positions: positions.length,
-        });
         return newSections;
       });
     },
@@ -351,10 +332,6 @@ export default function PolicyEditerForm({
           };
         }
         newSections[sectionIndex] = section;
-        console.log("Clause deleted:", {
-          referenceNumber: deletedClause.referenceNumber,
-          remainingClauses: current.length,
-        });
         return newSections;
       });
       setIsProcessing(false);
@@ -397,11 +374,6 @@ export default function PolicyEditerForm({
 
       toast.success(`Журам амжилттай засварлагдлаа`);
       toast.dismiss(toastId);
-      console.log("Form submission successful", {
-        id: policy.id,
-        sections: policy.sectionCount,
-        clauses: policy.clauseCount,
-      });
       onSuccess();
     } catch (error) {
       console.error("Submission error:", error);

@@ -76,8 +76,6 @@ export function JobDescriptionSheet({
         }
 
         if (jobDescriptions) {
-          console.log("[v0] Job description fetched:", jobDescriptions);
-
           const supervisorIds = jobDescriptions.supervisor_pos_id
             ? Array.isArray(jobDescriptions.supervisor_pos_id)
               ? jobDescriptions.supervisor_pos_id

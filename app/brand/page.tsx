@@ -2,11 +2,7 @@ import { OrbitMark, ORBIT_COLORS } from "@/components/brand/orbit-mark";
 import { BgsWordmark } from "@/components/brand/bgs-wordmark";
 import { BgsLockup } from "@/components/brand/bgs-lockup";
 import { BrandDownloads } from "@/components/brand/svg-exports";
-import {
-  spaceGrotesk,
-  manrope,
-  jetbrainsMono,
-} from "@/lib/brand-fonts";
+import { spaceGrotesk, manrope, jetbrainsMono } from "@/lib/brand-fonts";
 
 const C = ORBIT_COLORS;
 
@@ -113,8 +109,7 @@ function ConstructionGrid() {
           id="g"
           width={s / 10}
           height={s / 10}
-          patternUnits="userSpaceOnUse"
-        >
+          patternUnits="userSpaceOnUse">
           <path
             d={`M ${s / 10} 0 L 0 0 0 ${s / 10}`}
             fill="none"
@@ -129,7 +124,7 @@ function ConstructionGrid() {
         cy={cy}
         r={r}
         stroke={C.ink}
-        strokeWidth={s * 0.095 / (s / 120)}
+        strokeWidth={(s * 0.095) / (s / 120)}
       />
       <circle cx={nx} cy={ny} r={20 * (s / 120)} fill={C.paper} />
       <circle cx={nx} cy={ny} r={13 * (s / 120)} fill={C.accent} />
@@ -181,8 +176,7 @@ function ClearspaceGuide() {
         y="104"
         fontFamily="var(--font-jetbrains-mono), monospace"
         fontSize="9"
-        fill="#8a8276"
-      >
+        fill="#8a8276">
         ½x
       </text>
     </svg>
@@ -224,14 +218,8 @@ function AppIcon({
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-      }}
-    >
-      <svg
-        width={px * 0.6}
-        height={px * 0.6}
-        viewBox="0 0 120 120"
-        fill="none"
-      >
+      }}>
+      <svg width={px * 0.6} height={px * 0.6} viewBox="0 0 120 120" fill="none">
         <circle cx="60" cy="60" r="44" stroke={ring} strokeWidth="11.4" />
         <circle cx="91.1" cy="28.9" r="20" fill={gap} />
         <circle cx="91.1" cy="28.9" r="13" fill={node} />
@@ -253,8 +241,7 @@ export default function BrandSheetPage() {
               letterSpacing: "0.3em",
               textTransform: "uppercase",
               color: C.accent,
-            }}
-          >
+            }}>
             Brand mark · Orbit
           </div>
           <h1
@@ -264,8 +251,7 @@ export default function BrandSheetPage() {
               fontSize: 46,
               letterSpacing: "-0.02em",
               margin: "14px 0 0",
-            }}
-          >
+            }}>
             BGS
           </h1>
           <p
@@ -275,8 +261,7 @@ export default function BrandSheetPage() {
               fontSize: 15,
               lineHeight: 1.6,
               margin: "14px 0 0",
-            }}
-          >
+            }}>
             Систем, сүлжээ, тэлэлтийг илэрхийлсэн цагираг тэмдэг. Нэг тогтвортой
             бүтэц, нэг хөдөлгөөнт зангилаа.
           </p>
@@ -287,8 +272,7 @@ export default function BrandSheetPage() {
               top: "50%",
               transform: "translateY(-50%)",
               opacity: 0.96,
-            }}
-          >
+            }}>
             <OrbitMark
               size={300}
               variant="reversed"
@@ -312,8 +296,7 @@ export default function BrandSheetPage() {
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
               gap: 18,
-            }}
-          >
+            }}>
             <div style={{ ...styles.tile, aspectRatio: 1 }}>
               <OrbitMark size={100} variant="primary" background={C.paper} />
               <span style={styles.lbl}>primary</span>
@@ -324,8 +307,7 @@ export default function BrandSheetPage() {
                 aspectRatio: 1,
                 background: C.ink,
                 borderColor: "#2c2822",
-              }}
-            >
+              }}>
               <OrbitMark size={100} variant="reversed" background={C.ink} />
               <span style={styles.lblOnDark}>reversed</span>
             </div>
@@ -335,14 +317,12 @@ export default function BrandSheetPage() {
                 aspectRatio: 1,
                 background: C.accent,
                 borderColor: "#E25C00",
-              }}
-            >
+              }}>
               <OrbitMark size={100} variant="accent" background={C.accent} />
               <span style={styles.lblOnDark}>accent</span>
             </div>
             <div
-              style={{ ...styles.tile, aspectRatio: 1, background: C.paper2 }}
-            >
+              style={{ ...styles.tile, aspectRatio: 1, background: C.paper2 }}>
               <OrbitMark size={100} variant="mono" background={C.paper2} />
               <span style={styles.lbl}>mono</span>
             </div>
@@ -361,15 +341,17 @@ export default function BrandSheetPage() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 22,
-            }}
-          >
+            }}>
             <div style={{ ...styles.tile, aspectRatio: 1.3 }}>
               <ConstructionGrid />
               <span style={styles.lbl}>grid</span>
             </div>
             <div
-              style={{ ...styles.tile, aspectRatio: 1.3, background: C.paper2 }}
-            >
+              style={{
+                ...styles.tile,
+                aspectRatio: 1.3,
+                background: C.paper2,
+              }}>
               <ClearspaceGuide />
               <span style={styles.lbl}>clearspace</span>
             </div>
@@ -388,8 +370,7 @@ export default function BrandSheetPage() {
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
               gap: 22,
-            }}
-          >
+            }}>
             <div style={{ ...styles.tile, aspectRatio: 1.1 }}>
               <BgsLockup kind="horizontal" background={C.paper} />
               <span style={styles.lbl}>horizontal</span>
@@ -419,8 +400,7 @@ export default function BrandSheetPage() {
               border: "1px solid #E3DDD2",
               borderRadius: 14,
               overflow: "hidden",
-            }}
-          >
+            }}>
             {SWATCHES.map((s, idx) => (
               <div
                 key={s.hex}
@@ -434,13 +414,11 @@ export default function BrandSheetPage() {
                   color: s.fg,
                   borderLeft:
                     idx === SWATCHES.length - 1 ? "1px solid #E3DDD2" : "none",
-                }}
-              >
+                }}>
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{s.name}</span>
                 <span
                   className={jetbrainsMono.className}
-                  style={{ fontSize: 11, opacity: 0.8, marginTop: 3 }}
-                >
+                  style={{ fontSize: 11, opacity: 0.8, marginTop: 3 }}>
                   {s.hex}
                 </span>
               </div>
@@ -466,8 +444,7 @@ export default function BrandSheetPage() {
                     fontWeight: 700,
                     letterSpacing: "-0.03em",
                     lineHeight: 1,
-                  }}
-                >
+                  }}>
                   BGS Систем технологи
                 </span>
               ),
@@ -493,8 +470,7 @@ export default function BrandSheetPage() {
               content: (
                 <span
                   className={jetbrainsMono.className}
-                  style={{ fontSize: 14, color: "#8a8276" }}
-                >
+                  style={{ fontSize: 14, color: "#8a8276" }}>
                   info@bgs.mn · +976 7000 0000
                 </span>
               ),
@@ -509,8 +485,7 @@ export default function BrandSheetPage() {
                 padding: "16px 0",
                 borderBottom:
                   i === arr.length - 1 ? "none" : "1px solid #E3DDD2",
-              }}
-            >
+              }}>
               <span
                 className={jetbrainsMono.className}
                 style={{
@@ -518,8 +493,7 @@ export default function BrandSheetPage() {
                   color: "#8a8276",
                   width: 160,
                   flexShrink: 0,
-                }}
-              >
+                }}>
                 {row.meta}
               </span>
               {row.content}
@@ -542,8 +516,7 @@ export default function BrandSheetPage() {
               gap: 18,
               flexWrap: "wrap",
               marginBottom: 22,
-            }}
-          >
+            }}>
             <AppIcon
               px={84}
               radiusPct={22.5}
@@ -599,8 +572,7 @@ export default function BrandSheetPage() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 22,
-            }}
-          >
+            }}>
             {/* Web header mockup */}
             <div
               style={{
@@ -609,8 +581,7 @@ export default function BrandSheetPage() {
                 padding: 0,
                 overflow: "hidden",
                 alignItems: "stretch",
-              }}
-            >
+              }}>
               <div
                 style={{
                   display: "flex",
@@ -618,8 +589,7 @@ export default function BrandSheetPage() {
                   height: "100%",
                   width: "100%",
                   background: C.paper,
-                }}
-              >
+                }}>
                 <div
                   style={{
                     height: 26,
@@ -628,8 +598,7 @@ export default function BrandSheetPage() {
                     alignItems: "center",
                     gap: 6,
                     padding: "0 12px",
-                  }}
-                >
+                  }}>
                   <span
                     style={{
                       width: 9,
@@ -663,8 +632,7 @@ export default function BrandSheetPage() {
                     justifyContent: "space-between",
                     gap: 24,
                     padding: "0 24px",
-                  }}
-                >
+                  }}>
                   <BgsLockup
                     kind="horizontal"
                     markSize={26}
@@ -679,8 +647,7 @@ export default function BrandSheetPage() {
                       fontWeight: 600,
                       fontSize: 11,
                       color: C.ink,
-                    }}
-                  >
+                    }}>
                     <span>Үйлчилгээ</span>
                     <span>Шийдэл</span>
                     <span
@@ -690,8 +657,7 @@ export default function BrandSheetPage() {
                         padding: "7px 13px",
                         borderRadius: 7,
                         whiteSpace: "nowrap",
-                      }}
-                    >
+                      }}>
                       Холбоо барих
                     </span>
                   </div>
@@ -709,8 +675,7 @@ export default function BrandSheetPage() {
                 alignItems: "stretch",
                 background: C.ink,
                 borderColor: "#2c2822",
-              }}
-            >
+              }}>
               <div
                 style={{
                   display: "flex",
@@ -720,11 +685,17 @@ export default function BrandSheetPage() {
                   width: "100%",
                   padding: "26px 28px",
                   background: C.ink,
-                }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: 13 }}
-                >
+                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
+                  <AppIcon
+                    px={46}
+                    radiusPct={(11 / 46) * 100}
+                    bg={C.accent}
+                    ring="#fff"
+                    node={C.ink}
+                    gap={C.accent}
+                  />
+                  <BgsWordmark size={26} color={C.paper} />
                   <AppIcon
                     px={46}
                     radiusPct={(11 / 46) * 100}
@@ -740,25 +711,21 @@ export default function BrandSheetPage() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-end",
-                  }}
-                >
+                  }}>
                   <div
                     style={{
                       fontSize: 11,
                       lineHeight: 1.7,
                       color: "#cfc8bc",
-                    }}
-                  >
+                    }}>
                     <div
-                      style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}
-                    >
+                      style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>
                       Бат-Эрдэнэ Д.
                     </div>
                     <div>Гүйцэтгэх захирал</div>
                     <div
                       className={jetbrainsMono.className}
-                      style={{ marginTop: 7, color: C.accent }}
-                    >
+                      style={{ marginTop: 7, color: C.accent }}>
                       info@bgs.mn
                     </div>
                   </div>
@@ -770,8 +737,7 @@ export default function BrandSheetPage() {
                       letterSpacing: "0.34em",
                       textTransform: "uppercase",
                       color: "#6f685e",
-                    }}
-                  >
+                    }}>
                     Систем технологи
                   </span>
                 </div>
@@ -798,8 +764,7 @@ export default function BrandSheetPage() {
             display: "flex",
             justifyContent: "space-between",
             borderTop: "1px solid #E3DDD2",
-          }}
-        >
+          }}>
           <span
             className={manrope.className}
             style={{
@@ -807,14 +772,10 @@ export default function BrandSheetPage() {
               fontWeight: 600,
               letterSpacing: "0.34em",
               textTransform: "uppercase",
-            }}
-          >
+            }}>
             BGS · Систем технологи
           </span>
-          <span
-            className={jetbrainsMono.className}
-            style={{ fontSize: 12 }}
-          >
+          <span className={jetbrainsMono.className} style={{ fontSize: 12 }}>
             Orbit mark · v1 · 2026
           </span>
         </div>

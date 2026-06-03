@@ -157,7 +157,7 @@ export default function OrderImplementationPage() {
       setLoadError(null);
       const [data, batches, quotes] = await Promise.all([
         getOrderItemsForOrderProcess(orderId),
-        getOrderPurchaseBatches(orderId),
+        getOrderPurchaseBatches(orderId, true),
         getOrderPurchaseQuotes(orderId),
       ]);
       setItems(data as OrderProcessItem[]);

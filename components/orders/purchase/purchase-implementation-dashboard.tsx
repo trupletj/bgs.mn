@@ -58,6 +58,13 @@ export function PurchaseImplementationDashboard({
   items: OrderProcessItem[];
   batches: PurchaseBatchRow[];
 }) {
+  console.log(
+    "Rendering PurchaseImplementationDashboard with items and batches:",
+    {
+      items,
+      batches,
+    },
+  );
   const rows = buildRows(items, batches);
   const totalSpend = rows.reduce<CurrencyTotals>((totals, row) => {
     for (const [currency, amount] of Object.entries(row.spendByCurrency)) {
@@ -186,7 +193,9 @@ export function PurchaseImplementationDashboard({
                     <PurchasedQuantityCell unit={row.unit} row={row} />
                     <QuantityCell quantity={remaining} unit={row.unit} muted />
                     <td className="px-4 py-3">
-                      <PurchaseStatusBadgeList statusTotals={row.statusTotals} />
+                      <PurchaseStatusBadgeList
+                        statusTotals={row.statusTotals}
+                      />
                     </td>
                     <td className="px-5 py-3 text-right">
                       <p className="font-semibold tabular-nums">
