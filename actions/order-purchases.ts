@@ -111,12 +111,6 @@ export async function getOrderPurchaseBatches(
   canViewPrices?: boolean,
 ) {
   const numericOrderId = Number(orderId);
-  console.log("🔴 getOrderPurchaseBatches called with:", {
-    orderId,
-    numericOrderId,
-    canViewPrices,
-  });
-
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("order_purchase_batches")

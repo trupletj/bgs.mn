@@ -101,7 +101,7 @@ export async function createPolicy(policyData: Omit<Policy, "section">) {
   if (policyData.approved_date) {
     const date = new Date(policyData.approved_date);
     approvedDate = `${date.getFullYear()}-${String(
-      date.getMonth() + 1
+      date.getMonth() + 1,
     ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
@@ -211,7 +211,6 @@ export const deletePolicy = async (id: string) => {
       // Үргэлжлүүлэх, учир нь гол policy устгагдсан
     }
 
-    console.log("Policy deleted with cascade:", { policyId: id });
     return policy;
   } catch (error) {
     console.error("Error in deletePolicy:", error);
@@ -254,11 +253,10 @@ export const restorePolicy = async (id: string) => {
       console.error("Clause restore error:", clauseError);
     }
 
-    console.log("Policy restored with cascade:", { policyId: id });
     return policy;
   } catch (error) {
     throw new Error(
-      `Журам сэргээхэд алдаа гарлаа: ${(error as Error).message}`
+      `Журам сэргээхэд алдаа гарлаа: ${(error as Error).message}`,
     );
   }
 };
@@ -309,7 +307,7 @@ export async function createClause(clauseData: {
 
 const sortByReferenceNumberSection = (
   a: { reference_number: string | null },
-  b: { reference_number: string | null }
+  b: { reference_number: string | null },
 ) => {
   const refA = (a.reference_number ?? "").split(".").map(Number);
   const refB = (b.reference_number ?? "").split(".").map(Number);
@@ -393,7 +391,7 @@ export const getPolicy = async (id: string) => {
 
     // Section-уудыг reference_number-р эрэмбэлэх
     const sortedSections = [...(sections || [])].sort(
-      sortByReferenceNumberSection
+      sortByReferenceNumberSection,
     );
 
     // Section бүрийн clause-уудыг авах
@@ -408,7 +406,7 @@ export const getPolicy = async (id: string) => {
 
         if (clausesError) {
           throw new Error(
-            `Clause авахад алдаа гарлаа: ${clausesError.message}`
+            `Clause авахад алдаа гарлаа: ${clausesError.message}`,
           );
         }
 
@@ -431,7 +429,7 @@ export const getPolicy = async (id: string) => {
         const clausesWithPositions = (allClauses || []).map((clause) => ({
           ...clause,
           clause_position: clausePositions.filter(
-            (pos) => pos.clause_id === clause.id && pos.is_checked === true
+            (pos) => pos.clause_id === clause.id && pos.is_checked === true,
           ),
         }));
 
@@ -446,7 +444,7 @@ export const getPolicy = async (id: string) => {
           isDeleted: section.is_deleted,
           clause: clauseTree,
         };
-      })
+      }),
     );
 
     const { data: scopeTargets, error: scopeError } = await supabase
@@ -457,7 +455,9 @@ export const getPolicy = async (id: string) => {
       .order("target_name");
 
     if (scopeError) {
-      throw new Error(`Хамаарах алба, хэлтэс авахад алдаа гарлаа: ${scopeError.message}`);
+      throw new Error(
+        `Хамаарах алба, хэлтэс авахад алдаа гарлаа: ${scopeError.message}`,
+      );
     }
 
     return {
@@ -476,7 +476,7 @@ export const getPolicy = async (id: string) => {
 
 export async function updatePolicy(
   policyId: string,
-  policyData: Omit<Policy, "section">
+  policyData: Omit<Policy, "section">,
 ) {
   const supabase = createClient();
 
@@ -497,7 +497,7 @@ export async function updatePolicy(
   if (policyData.approved_date) {
     const date = new Date(policyData.approved_date);
     approvedDate = `${date.getFullYear()}-${String(
-      date.getMonth() + 1
+      date.getMonth() + 1,
     ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
