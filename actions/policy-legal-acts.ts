@@ -1,3 +1,4 @@
+"use server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { hasPermission } from "@/actions/rbac";
@@ -253,12 +254,12 @@ function normalizeLegalAct(row: LegalActListRow): LegalActListItem {
   };
 }
 
-export function getLegalActTypeLabel(type: LegalActType) {
+export async function getLegalActTypeLabel(type: LegalActType) {
   if (type === "03") return "03 - Сахилгын шийтгэл";
   return "04 - Журам шинэчлэх";
 }
 
-export function formatLegalActDate(value: string | null | undefined) {
+export async function formatLegalActDate(value: string | null | undefined) {
   return formatDate(value);
 }
 
