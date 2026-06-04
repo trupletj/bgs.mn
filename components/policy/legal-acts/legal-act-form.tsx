@@ -216,7 +216,10 @@ export function LegalActForm({
 
       const formData = new FormData(event.currentTarget);
       const attachment = formData.get("attachment");
-      if (attachment instanceof File && attachment.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+      if (
+        attachment instanceof File &&
+        attachment.size > DOCUMENT_UPLOAD_MAX_BYTES
+      ) {
         throw new Error(
           getFileTooLargeMessage(attachment.name, DOCUMENT_UPLOAD_MAX_BYTES),
         );
@@ -477,7 +480,10 @@ export function LegalActForm({
                         )
                       }
                       onActionChange={(value) =>
-                        updateTargetAction(targetKey("section", section.id), value)
+                        updateTargetAction(
+                          targetKey("section", section.id),
+                          value,
+                        )
                       }
                     />
                     {section.clauses.map((clause) => (
@@ -512,7 +518,10 @@ export function LegalActForm({
                           )
                         }
                         onActionChange={(value) =>
-                          updateTargetAction(targetKey("clause", clause.id), value)
+                          updateTargetAction(
+                            targetKey("clause", clause.id),
+                            value,
+                          )
                         }
                       />
                     ))}
@@ -576,7 +585,7 @@ function TargetRow({
         <Checkbox
           checked={checked}
           onCheckedChange={onToggle}
-          className="mt-1"
+          className="mt-1 border-black"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
