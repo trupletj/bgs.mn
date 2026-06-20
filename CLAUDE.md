@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `../bgs-mobile-app` — энэ вэбийн mobile хувилбар, ижил business logic
 - `../shared-context` — нийтлэг pattern, Supabase schema
 
+## Embed / iframe (mobile shell)
+Энэ вэб (нэвтрэлтийн `?embed=1` хуудас) нь mobile superapp (**m.bgs.mn**)-аас iframe-аар embed хийгддэг. CSP `frame-ancestors`-ийг `next.config.ts` `headers()` нь **`NEXT_PUBLIC_EMBED_PARENT_ORIGINS`** env-ээс үүсгэдэг — Vercel (`bgs-mn` project)-д энэ env-д **`https://m.bgs.mn`** заавал байх ёстой, эс бөгөөс "refused to connect". Env өөрчилсний дараа redeploy. (Топологи + gotcha: `../shared-context` memory `bgs-vercel-deploy`, эсвэл `PROJECTS.md`.)
+
 ## What This Is
 
 BGS.MN — a Next.js 15 + Supabase internal management platform for a Mongolian company. It covers four main subsystems:
