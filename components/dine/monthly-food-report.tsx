@@ -12,10 +12,11 @@ import {
   Search,
 } from "lucide-react";
 
-import type {
-  DiningHallOption,
-  FoodDailyReportRow,
-  FoodMonthlyReportRow,
+import {
+  getFoodDailyReportForExport,
+  type DiningHallOption,
+  type FoodDailyReportRow,
+  type FoodMonthlyReportRow,
 } from "@/actions/food-report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ import {
 interface Props {
   month: string;
   summary: FoodMonthlyReportRow[];
-  daily: FoodDailyReportRow[];
+  dates: string[];
   diningHalls: DiningHallOption[];
 }
 
@@ -200,7 +201,7 @@ function buildCsv(rows: Record<string, string | number>[], columns: string[]) {
 export function MonthlyFoodReport({
   month,
   summary,
-  daily,
+  dates,
   diningHalls,
 }: Props) {
   const router = useRouter();
@@ -215,11 +216,6 @@ export function MonthlyFoodReport({
   const filteredSummary = useMemo(
     () => summary.filter((row) => matchesFilters(row, selectedHall, search)),
     [summary, selectedHall, search],
-  );
-
-  const filteredDaily = useMemo(
-    () => daily.filter((row) => matchesFilters(row, selectedHall, search)),
-    [daily, selectedHall, search],
   );
 
   const companyRows = useMemo(() => {
@@ -334,10 +330,6 @@ export function MonthlyFoodReport({
   );
   const regularVariance = regularTotals.actual - regularTotals.expected;
   const contractVariance = contractTotals.actual - contractTotals.expected;
-  const finalizedDates = useMemo(
-    () => Array.from(new Set(daily.map((row) => row.report_date))).sort(),
-    [daily],
-  );
 
   const updateMonth = (value: string) => {
     setSelectedMonth(value);
@@ -359,21 +351,26 @@ export function MonthlyFoodReport({
     });
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
+    const dailyRows = await getFoodDailyReportForExport(selectedMonth);
     const workbook = XLSX.utils.book_new();
-    const summarySheet = XLSX.utils.json_to_sheet(
-      buildCompanyExportRows(selectedMonth, companyRows),
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(
+        buildCompanyExportRows(selectedMonth, companyRows),
+      ),
+      "Компанийн тайлан",
     );
-    const detailSheet = XLSX.utils.json_to_sheet(
-      buildDetailExportRows(filteredSummary),
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(buildDetailExportRows(filteredSummary)),
+      "Алба, Хэлтсийн тайлан",
     );
-    const dailySheet = XLSX.utils.json_to_sheet(
-      buildDailyExportRows(filteredDaily),
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(buildDailyExportRows(dailyRows)),
+      "Өдөр тутмын тайлан",
     );
-
-    XLSX.utils.book_append_sheet(workbook, summarySheet, "Company summary");
-    XLSX.utils.book_append_sheet(workbook, detailSheet, "Department detail");
-    XLSX.utils.book_append_sheet(workbook, dailySheet, "Daily detail");
 
     const file = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
     saveAs(
@@ -493,17 +490,14 @@ export function MonthlyFoodReport({
             <CardTitle>Сарын нэгтгэл</CardTitle>
             <CardDescription>
               {companyRows.length} байгууллага, {filteredSummary.length}{" "}
-              дэлгэрэнгүй мөр, {filteredDaily.length} өдөр тутмын мөр
+              дэлгэрэнгүй мөр{" "}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">
-              Эцсийн өдөр: {finalizedDates.length}
-            </Badge>
-            {finalizedDates[0] && finalizedDates[finalizedDates.length - 1] ? (
+            <Badge variant="secondary">Нийт өдөр: {dates.length}</Badge>
+            {dates[0] && dates[dates.length - 1] ? (
               <Badge variant="outline">
-                {finalizedDates[0]} -{" "}
-                {finalizedDates[finalizedDates.length - 1]}
+                {dates[0]} - {dates[dates.length - 1]}
               </Badge>
             ) : null}
           </div>
