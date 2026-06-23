@@ -27,8 +27,8 @@ export default async function FoodMonthlyReportPage({
     <MonthlyFoodReport
       month={report.month}
       summary={report.summary}
-      daily={report.daily}
       diningHalls={report.diningHalls}
+      dates={report.dates}
     />
   );
 }

@@ -53,46 +53,34 @@ function getMonthRange(month: string) {
   return { normalizedMonth, start, end };
 }
 
+export async function getFoodDailyReportForExport(month: string) {
+  const supabase = await createClient();
+  const { start } = getMonthRange(month);
+  const { data } = await supabase.rpc("get_food_daily_report", {
+    p_month: start,
+  });
+  return data ?? [];
+}
+
 export async function getFoodMonthlyReport(month: string) {
   const supabase = await createClient();
   const { normalizedMonth, start, end } = getMonthRange(month);
 
-  const [{ data: summaryData, error: summaryError }, { data: detailData, error: detailError }, { data: hallsData }] =
-    await Promise.all([
-      supabase.rpc("get_food_monthly_report", {
-        p_month: start,
-      }),
-      supabase
-        .from("food_report_daily_snapshot")
-        .select(
-          `
-          report_date,
-          dining_hall_id,
-          meal_type,
-          org_name,
-          dep_name,
-          heltes_name,
-          expected_count,
-          actual_count,
-          manual_override_total,
-          extra_serving_total,
-          wrong_location_total,
-          dining_hall ( name )
-        `,
-        )
-        .gte("report_date", start)
-        .lt("report_date", end)
-        .order("report_date", { ascending: true })
-        .order("dining_hall_id", { ascending: true })
-        .order("org_name", { ascending: true }),
-      supabase.from("dining_hall").select("id, name").order("name"),
-    ]);
+  const [
+    { data: summaryData, error: summaryError },
+    { data: hallsData },
+    { data: datesData },
+  ] = await Promise.all([
+    supabase.rpc("get_food_monthly_report", { p_month: start }),
+    supabase.from("dining_hall").select("id, name").order("name"),
+    supabase.rpc("get_food_report_finalized_dates", { p_month: start }),
+  ]);
 
   if (summaryError) {
-    console.error("[food-report] get_food_monthly_report failed:", summaryError.message);
-  }
-  if (detailError) {
-    console.error("[food-report] food_report_daily_snapshot failed:", detailError.message);
+    console.error(
+      "[food-report] get_food_monthly_report failed:",
+      summaryError.message,
+    );
   }
 
   const summary = ((summaryData as unknown[]) || []).map((row) => {
@@ -113,23 +101,9 @@ export async function getFoodMonthlyReport(month: string) {
     } satisfies FoodMonthlyReportRow;
   });
 
-  const daily = ((detailData as unknown[]) || []).map((row) => {
+  const dates = ((datesData as unknown[]) || []).map((row) => {
     const item = row as Record<string, unknown>;
-    const diningHall = item.dining_hall as { name?: string | null } | null;
-    return {
-      report_date: String(item.report_date),
-      dining_hall_id: toNumber(item.dining_hall_id),
-      dining_hall_name: diningHall?.name || null,
-      org_name: String(item.org_name || ""),
-      dep_name: String(item.dep_name || ""),
-      heltes_name: String(item.heltes_name || ""),
-      meal_type: String(item.meal_type || ""),
-      expected_count: toNumber(item.expected_count),
-      actual_count: toNumber(item.actual_count),
-      manual_override_total: toNumber(item.manual_override_total),
-      extra_serving_total: toNumber(item.extra_serving_total),
-      wrong_location_total: toNumber(item.wrong_location_total),
-    } satisfies FoodDailyReportRow;
+    return String(item.report_date);
   });
 
   const diningHalls = ((hallsData as unknown[]) || []).map((row) => {
@@ -143,7 +117,7 @@ export async function getFoodMonthlyReport(month: string) {
   return {
     month: normalizedMonth,
     summary,
-    daily,
+    dates,
     diningHalls,
   };
 }
