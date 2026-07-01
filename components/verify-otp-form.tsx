@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -34,6 +34,7 @@ function VerifyOtpFormInner() {
   const phone = searchParams.get("phone") || "";
   const embed = searchParams.get("embed") === "1";
   const router = useRouter();
+  const [isNavigating, startTransition] = useTransition();
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -41,6 +42,7 @@ function VerifyOtpFormInner() {
   });
 
   const { isSubmitting } = form.formState;
+  const isBusy = isSubmitting || isNavigating;
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     try {
@@ -60,8 +62,10 @@ function VerifyOtpFormInner() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      startTransition(() => {
+        router.push("/dashboard");
+        router.refresh();
+      });
     } catch {
       toast.error("Холболтын алдаа гарлаа.");
     }
@@ -101,7 +105,7 @@ function VerifyOtpFormInner() {
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <InputOTP maxLength={6} {...field} disabled={isSubmitting}>
+                  <InputOTP maxLength={6} {...field} disabled={isBusy}>
                     <InputOTPGroup className="gap-2">
                       {[0, 1, 2, 3, 4, 5].map((i) => (
                         <InputOTPSlot
@@ -121,12 +125,12 @@ function VerifyOtpFormInner() {
           <Button
             type="submit"
             className="h-11 w-full text-sm font-semibold"
-            disabled={isSubmitting}
+            disabled={isBusy}
           >
-            {isSubmitting ? (
+            {isBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Шалгаж байна...
+                {isNavigating ? "Шилжиж байна..." : "Шалгаж байна..."}
               </>
             ) : (
               "Баталгаажуулах"
