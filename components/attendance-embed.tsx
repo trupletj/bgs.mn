@@ -11,6 +11,7 @@ type Tokens = { at: string; rt: string; exp?: number };
 
 export default function AttendanceEmbed() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const iframeReadyRef = useRef(false);
   const [tokens, setTokens] = useState<Tokens | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,18 +47,26 @@ export default function AttendanceEmbed() {
     const supabase = createClient();
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const w = iframeRef.current?.contentWindow;
-      if (!w || !session) return;
-      w.postMessage(
-        {
-          type: "bgs-attendance:refresh-tokens",
-          tokens: {
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            expires_at: session.expires_at,
+      // Iframe нь ATTENDANCE_URL руу navigate хийж дуустал (onLoad) contentWindow
+      // нь "about:blank" хэвээр байх ба энэ нь parent-тай ижил origin-той байдаг тул
+      // targetOrigin=ATTENDANCE_URL-ээр postMessage дуудвал "does not match recipient
+      // window's origin" алдаа шидэж, дараагийн listener-үүдийг тасалдуулна.
+      if (!w || !session || !iframeReadyRef.current) return;
+      try {
+        w.postMessage(
+          {
+            type: "bgs-attendance:refresh-tokens",
+            tokens: {
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+              expires_at: session.expires_at,
+            },
           },
-        },
-        ATTENDANCE_URL,
-      );
+          ATTENDANCE_URL,
+        );
+      } catch (err) {
+        console.error("[attendance-embed] postMessage failed:", err);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -85,6 +94,9 @@ export default function AttendanceEmbed() {
     <iframe
       ref={iframeRef}
       src={src}
+      onLoad={() => {
+        iframeReadyRef.current = true;
+      }}
       className="w-full border-0"
       style={{ height: "calc(100dvh - var(--header-height, 48px) - 1rem)" }}
     />
