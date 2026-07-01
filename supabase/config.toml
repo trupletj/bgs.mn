@@ -10,7 +10,7 @@ enabled = true
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. `public` and `graphql_public` schemas are included by default.
-schemas = ["public", "graphql_public"]
+schemas = ["public", "graphql_public", "target"]
 # Extra schemas to add to the search_path of every request.
 extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
@@ -197,7 +197,7 @@ otp_expiry = 3600
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
 # Template for sending OTP to users
@@ -228,11 +228,11 @@ max_frequency = "5s"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
 [auth.sms.twilio]
-enabled = false
-account_sid = ""
-message_service_sid = ""
+enabled = true
+account_sid = "AC00000000000000000000000000000000"
+message_service_sid = "MG00000000000000000000000000000000"
 # DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
-auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+auth_token = "00000000000000000000000000000000"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]
@@ -333,3 +333,19 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+[auth.hook.send_sms]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/sms-hook?apikey=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
+secrets = "v1,whsec_ZXhhbXBsZXNlY3JldGtleWZvcmxvY2FsZGV2MTIzNDU="
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "http://host.docker.internal:54321/functions/v1/create-auth-user?apikey=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
+secrets = "v1,whsec_ZXhhbXBsZXNlY3JldGtleWZvcmxvY2FsZGV2MTIzNDU="
+
+[functions.sms-hook]
+verify_jwt = false
+
+[functions.create-auth-user]
+verify_jwt = false

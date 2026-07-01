@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getProfileIdFromAuthUserId } from "./profile";
+import { hasPermission } from "./rbac";
 
 export interface OrderProcessFormData {
   name: string;
@@ -83,6 +84,8 @@ interface NestedOrderProcessRow {
       }[]
     | null;
 }
+
+const PURCHASE_ALLOWED_ORDER_STATUSES = ["approved", "changes_requested"];
 
 export async function createOrderProcess(
   formData: OrderProcessFormData,
@@ -286,17 +289,19 @@ export async function getOrderProcess(
 
     if (stepsError) throw stepsError;
 
-    const [{ data: heltesRows, error: heltesError }, { data: purchaseRoleRows, error: purchaseRoleError }] =
-      await Promise.all([
-        supabase
-          .from("order_process_allowed_heltes")
-          .select("heltes_bteg_id")
-          .eq("order_process_id", id),
-        supabase
-          .from("order_process_purchase_roles")
-          .select("role_id")
-          .eq("order_process_id", id),
-      ]);
+    const [
+      { data: heltesRows, error: heltesError },
+      { data: purchaseRoleRows, error: purchaseRoleError },
+    ] = await Promise.all([
+      supabase
+        .from("order_process_allowed_heltes")
+        .select("heltes_bteg_id")
+        .eq("order_process_id", id),
+      supabase
+        .from("order_process_purchase_roles")
+        .select("role_id")
+        .eq("order_process_id", id),
+    ]);
 
     if (heltesError) throw heltesError;
     if (purchaseRoleError) throw purchaseRoleError;
@@ -349,22 +354,26 @@ async function saveOrderProcessAccess({
   if (deleteRolesError) throw deleteRolesError;
 
   if (allowedHeltesIds.length > 0) {
-    const { error } = await supabase.from("order_process_allowed_heltes").insert(
-      allowedHeltesIds.map((heltes_bteg_id) => ({
-        order_process_id: processId,
-        heltes_bteg_id,
-      })),
-    );
+    const { error } = await supabase
+      .from("order_process_allowed_heltes")
+      .insert(
+        allowedHeltesIds.map((heltes_bteg_id) => ({
+          order_process_id: processId,
+          heltes_bteg_id,
+        })),
+      );
     if (error) throw error;
   }
 
   if (purchaseRoleIds.length > 0) {
-    const { error } = await supabase.from("order_process_purchase_roles").insert(
-      purchaseRoleIds.map((role_id) => ({
-        order_process_id: processId,
-        role_id,
-      })),
-    );
+    const { error } = await supabase
+      .from("order_process_purchase_roles")
+      .insert(
+        purchaseRoleIds.map((role_id) => ({
+          order_process_id: processId,
+          role_id,
+        })),
+      );
     if (error) throw error;
   }
 }
@@ -394,7 +403,9 @@ export async function getOrderProcesses() {
   }
 }
 
-export async function getOrderProcessesForCurrentUser(): Promise<OrderProcessOption[]> {
+export async function getOrderProcessesForCurrentUser(): Promise<
+  OrderProcessOption[]
+> {
   const supabase = await createClient();
 
   const {
@@ -423,7 +434,7 @@ export async function getOrderProcessesForCurrentUser(): Promise<OrderProcessOpt
 
   if (roles.includes("super_admin")) {
     const data = await getOrderProcesses();
-    const processes = Array.isArray(data) ? data : data?.data ?? [];
+    const processes = Array.isArray(data) ? data : (data?.data ?? []);
     return processes.map((process: { id: number | string; name: string }) => ({
       id: String(process.id),
       name: process.name,
@@ -455,15 +466,87 @@ export async function getOrderProcessesForCurrentUser(): Promise<OrderProcessOpt
     .map((row) =>
       Array.isArray(row.order_processes)
         ? row.order_processes[0]
-        : row.order_processes
+        : row.order_processes,
     )
     .filter((process): process is { id: number; name: string } =>
-      Boolean(process)
+      Boolean(process),
     )
     .map((process) => ({
       id: String(process.id),
       name: process.name,
     }));
+}
+
+export async function getCanAccessOrderProcess(
+  orderId: number | string,
+): Promise<boolean> {
+  const canOrderAcesssAll = await hasPermission("order", "access");
+  if (canOrderAcesssAll) return true;
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return false;
+
+  const { data: profile } = await supabase
+    .from("profile")
+    .select("id, roles_profiles(role_id)")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  const roleRows = (profile?.roles_profiles ?? []) as RoleAccessRow[];
+  if (roleRows.length === 0) return false;
+
+  const roleIds = roleRows
+    .map((row) => Number(row.role_id))
+    .filter((id) => Number.isFinite(id));
+
+  if (roleIds.length === 0) return false;
+
+  const orderProcessId = await supabase
+    .from("orders")
+    .select("order_process_id")
+    .eq("id", orderId)
+    .single()
+    .then(({ data, error }) => {
+      if (error) {
+        console.error("Error fetching order process ID:", error);
+        return null;
+      }
+      return data?.order_process_id ?? null;
+    });
+
+  if (!orderProcessId) return false;
+
+  const { data, error } = await supabase
+    .from("order_process_purchase_roles")
+    .select("order_process_id")
+    .in("role_id", roleIds)
+    .eq("order_process_id", orderProcessId);
+
+  if (data && data.length > 0) {
+    return true;
+  }
+
+  const isRoleAcess = await supabase
+    .from("order_step_reviewers")
+    .select("id")
+    .in("role_id", roleIds)
+    .eq("order_instance_id", orderProcessId)
+    .single();
+
+  if (!isRoleAcess) {
+    return false;
+  }
+
+  if (error) {
+    console.error("Error checking order process access:", error);
+    return false;
+  }
+  return true;
 }
 
 export async function getPurchaseAllowedProcessIdsForCurrentUser(): Promise<{
@@ -485,6 +568,7 @@ export async function getPurchaseAllowedProcessIdsForCurrentUser(): Promise<{
     .single();
 
   const roleRows = (profile?.roles_profiles ?? []) as RoleAccessRow[];
+  if (roleRows.length === 0) return { isSuperAdmin: false, processIds: [] };
   const roleNames = roleRows.map((row) => row.roles?.name).filter(Boolean);
 
   if (roleNames.includes("super_admin")) {
@@ -625,6 +709,17 @@ export async function getOrderItemsForOrderProcess(orderId: string) {
   const supabase = await createClient();
   await assertCanAccessOrderPurchase(Number(orderId));
 
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("title, requested_delivery_date")
+    .eq("id", orderId)
+    .single();
+
+  if (orderError) {
+    console.error(orderError);
+    throw new Error("Захиалгын мэдээлэл татахад алдаа гарлаа");
+  }
+
   const { data, error } = await supabase
     .from("order_items")
     .select(
@@ -655,27 +750,38 @@ export async function getOrderItemsForOrderProcess(orderId: string) {
     throw new Error("Өгөгдөл татахад алдаа гарлаа");
   }
 
-  return data || [];
+  return (data || []).map((item) => ({
+    ...item,
+    order_title: order?.title ?? null,
+    order_requested_delivery_date: order?.requested_delivery_date ?? null,
+  }));
 }
 
 export async function assertCanAccessOrderPurchase(orderId: number) {
   const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("order_process_id, status")
+    .eq("id", orderId)
+    .single();
+
+  if (error || !data?.order_process_id) {
+    throw new Error("Захиалга олдсонгүй");
+  }
+
+  if (!PURCHASE_ALLOWED_ORDER_STATUSES.includes(String(data.status))) {
+    throw new Error(
+      "Батлагдаагүй захиалгын худалдан авалт, биелэлт рүү хандах боломжгүй",
+    );
+  }
+
   const { isSuperAdmin, processIds } =
     await getPurchaseAllowedProcessIdsForCurrentUser();
 
   if (isSuperAdmin) return;
   if (processIds.length === 0) {
     throw new Error("Энэ захиалгын биелэлтийг харах эрхгүй байна");
-  }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .select("order_process_id")
-    .eq("id", orderId)
-    .single();
-
-  if (error || !data?.order_process_id) {
-    throw new Error("Захиалга олдсонгүй");
   }
 
   if (!processIds.includes(Number(data.order_process_id))) {

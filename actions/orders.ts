@@ -5,7 +5,6 @@ import { getSupabaseAdmin } from "@/utils/supabase/supabaseAdmin";
 import { getProfileIdFromAuthUserId } from "./profile";
 import { getOrderProcessesForCurrentUser } from "./order-process";
 import { createClient } from "@/utils/supabase/server";
-import { createClient as client } from "@/utils/supabase/client";
 import { hasPermission } from "./rbac";
 
 interface DetailReviewer {
@@ -36,8 +35,104 @@ function getReviewerStep(reviewer: DetailReviewer) {
     : reviewer.order_steps;
 }
 
+type OrderDetailAccessOrder = {
+  id?: number | string;
+  created_profile?: number | string | null;
+};
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+async function currentUserHasOrderAccessPermission(profileId: number) {
+  const supabase = getSupabaseAdmin();
+
+  const { data: roleRows, error: roleError } = await supabase
+    .from("roles_profiles")
+    .select("role_id, roles(name)")
+    .eq("profile_id", profileId);
+
+  if (roleError) {
+    console.error("Order detail role access check error:", roleError);
+    return false;
+  }
+
+  if (roleRows.length === 0) return false;
+
+  const { data: permissionRows, error: permissionError } = await supabase
+    .from("role_permissions")
+    .select("id, permissions!inner(module, action)")
+    .in(
+      "role_id",
+      roleRows.map((row) => row.role_id),
+    )
+    .eq("permissions.module", "order")
+    .eq("permissions.action", "access")
+    .limit(1);
+
+  if (permissionError) {
+    console.error(
+      "Order detail permission access check error:",
+      permissionError,
+    );
+    return false;
+  }
+
+  return (permissionRows?.length ?? 0) > 0;
+}
+
+async function hasReviewerAccessToOrder(
+  supabase: SupabaseClient,
+  orderId: number | string,
+  profileId: number,
+) {
+  const { data: instances, error: instanceError } = await supabase
+    .from("order_instances")
+    .select("id")
+    .eq("order_id", orderId);
+
+  if (instanceError || !instances?.length) return false;
+
+  const instanceIds = instances
+    .map((instance) => Number(instance.id))
+    .filter((id) => Number.isFinite(id));
+
+  if (instanceIds.length === 0) return false;
+
+  const { data, error } = await supabase
+    .from("order_step_reviewers")
+    .select("id")
+    .eq("reviewer_profile_id", profileId)
+    .in("order_instance_id", instanceIds)
+    .limit(1);
+
+  if (error) {
+    console.error("Order reviewer access check error:", error);
+    return false;
+  }
+
+  return (data?.length ?? 0) > 0;
+}
+
+async function canCurrentUserAccessOrderDetail(
+  supabase: SupabaseClient,
+  order: OrderDetailAccessOrder,
+) {
+  const profileId = await getProfileIdFromAuthUserId();
+
+  const numericProfileId = Number(profileId);
+  if (!Number.isFinite(numericProfileId)) return false;
+
+  if (await currentUserHasOrderAccessPermission(numericProfileId)) return true;
+
+  if (Number(order.created_profile) === numericProfileId) {
+    return true;
+  }
+
+  if (!order.id) return false;
+  return hasReviewerAccessToOrder(supabase, order.id, numericProfileId);
+}
+
 export async function getOrderWithDetail(orderId: string) {
-  const supabase = client();
+  const supabase = await createClient();
 
   // 1. Захиалга + үүсгэгч профайл
   const { data: order, error: orderError } = await supabase
@@ -60,6 +155,18 @@ export async function getOrderWithDetail(orderId: string) {
   if (orderError || !order) {
     return { data: null, error: orderError || new Error("Order not found") };
   }
+
+  // const canAccessDetail = await canCurrentUserAccessOrderDetail(
+  //   supabase,
+  //   order,
+  // );
+
+  // if (!canAccessDetail) {
+  //   return {
+  //     data: null,
+  //     error: new Error("Энэ захиалгын дэлгэрэнгүйг харах эрхгүй байна"),
+  //   };
+  // }
 
   // 2. Order items
   const { data: items, error: itemsError } = await supabase

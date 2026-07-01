@@ -21,6 +21,7 @@ import QRCode from "qrcode";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MealPlan {
   id?: string;
@@ -215,6 +216,9 @@ export default function OrgDetailPage() {
   const [newLabel, setNewLabel] = useState("");
   const [newPlan, setNewPlan] = useState<MealPlan>(() => createEmptyPlan());
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [planFilter, setPlanFilter] = useState("");
+  const [qrSearch, setQrSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("plans");
 
   // Ажилтан сонгох modal
   const [linkingItem, setLinkingItem] = useState<QRItem | null>(null);
@@ -564,6 +568,30 @@ export default function OrgDetailPage() {
     );
   });
 
+  const planQuery = planFilter.trim().toLowerCase();
+  const filteredPlans = planQuery
+    ? mealPlans.filter((plan) => {
+        const hallName =
+          diningHalls.find((hall) => hall.id === plan.dining_hall_id)?.name ??
+          "";
+        return (
+          plan.date.toLowerCase().includes(planQuery) ||
+          hallName.toLowerCase().includes(planQuery)
+        );
+      })
+    : mealPlans;
+
+  const qrQuery = qrSearch.trim().toLowerCase();
+  const filteredQrItems = qrQuery
+    ? qrItems.filter(
+        (item) =>
+          item.custom_label.toLowerCase().includes(qrQuery) ||
+          (item.user_name ?? "").toLowerCase().includes(qrQuery),
+      )
+    : qrItems;
+
+  const linkedQrCount = qrItems.filter((item) => item.bteg_id).length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -573,29 +601,50 @@ export default function OrgDetailPage() {
   }
 
   return (
-    <div className="p-6 mx-auto space-y-8">
+    <div className="p-4 md:p-6 mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.push("/dine/sub")}
-          className="p-2 hover:bg-slate-100 rounded-lg">
+          className="p-2 hover:bg-slate-100 rounded-lg shrink-0">
           <ArrowLeft className="h-5 w-5 text-slate-600" />
         </button>
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">{orgName}</h1>
-          <p className="text-sm text-slate-500">
-            {qrItems.length} QR код үүссэн
-          </p>
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-slate-800 truncate">
+            {orgName}
+          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+              {qrItems.length} QR код
+            </span>
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+              {linkedQrCount} холбосон
+            </span>
+            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+              {mealPlans.length} төлөвлөгөө
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Хоолны төлөвлөгөө */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <h2 className="font-semibold text-slate-700 mb-4">
-          {editingPlanId
-            ? "Хоолны төлөвлөгөө засах"
-            : "Хоолны төлөвлөгөө нэмэх"}
-        </h2>
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="gap-4">
+        <TabsList className="sticky top-0 z-20 w-full justify-start sm:w-fit">
+          <TabsTrigger value="plans">Хоолны төлөвлөгөө</TabsTrigger>
+          <TabsTrigger value="qr">QR кодууд ({qrItems.length})</TabsTrigger>
+        </TabsList>
+
+        {/* === Хоолны төлөвлөгөөний таб === */}
+        <TabsContent value="plans" className="space-y-5">
+          {/* Хоолны төлөвлөгөө нэмэх/засах */}
+          <div className="bg-white border border-slate-200 rounded-xl p-5">
+            <h2 className="font-semibold text-slate-700 mb-4">
+              {editingPlanId
+                ? "Хоолны төлөвлөгөө засах"
+                : "Хоолны төлөвлөгөө нэмэх"}
+            </h2>
         <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
           <div>
             <label className="text-xs text-slate-500 mb-1 block">Огноо</label>
@@ -668,103 +717,142 @@ export default function OrgDetailPage() {
           )}
         </div>
 
-        {mealPlans.length > 0 && (
-          <div className="mt-4 border-t pt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-slate-500 border-b">
-                  <th className="text-left py-2">Огноо</th>
-                  <th className="text-left py-2">Гал тогоо</th>
-                  {MEAL_PLAN_FIELDS.map((field) => (
-                    <th
-                      key={field.key}
-                      className="min-w-28 px-2 py-2 text-center">
-                      <span className="font-semibold text-slate-700">
-                        {field.shortLabel}
-                      </span>
-                    </th>
-                  ))}
-                  <th className="text-right py-2">Нийт</th>
-                  <th className="text-right py-2">Үйлдэл</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mealPlans.map((plan) => {
-                  const planSummary = getPlanSummary(plan);
-                  const diff = planSummary.actual - planSummary.planned;
+          </div>
 
-                  return (
-                    <tr
-                      key={plan.id || `${plan.date}-${plan.dining_hall_id}`}
-                      className="border-b border-slate-100 align-top">
-                      <td className="py-3 font-medium">{plan.date}</td>
-                      <td className="py-3">
-                        {diningHalls.find(
-                          (hall) => hall.id === plan.dining_hall_id,
-                        )?.name || `#${plan.dining_hall_id}`}
-                      </td>
-                      {MEAL_PLAN_FIELDS.map((field) => {
-                        const planned = Number(plan[field.key] || 0);
-                        const actual = Number(plan[field.actualKey] || 0);
-                        const mealDiff = actual - planned;
+          {/* Хадгалсан төлөвлөгөө */}
+          <div className="bg-white border border-slate-200 rounded-xl">
+            <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-700">
+                  Хадгалсан төлөвлөгөө ({mealPlans.length})
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Нүд бүр: захиалсан / <span className="text-blue-700">идсэн</span>{" "}
+                  / зөрүү
+                </p>
+              </div>
+              {mealPlans.length > 0 && (
+                <div className="relative sm:w-64">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={planFilter}
+                    onChange={(e) => setPlanFilter(e.target.value)}
+                    placeholder="Огноо / гал тогоогоор шүүх..."
+                    className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            </div>
 
-                        return (
-                          <td key={field.key} className="px-2 py-3 text-center">
-                            <div className="leading-5">
-                              <div className="text-slate-700">
-                                <span className="">Захиалсан:</span>{" "}
-                                <span className="font-semibold">
-                                  {formatMealCount(planned)}
-                                </span>
-                              </div>
-                              <div className="text-blue-700">
-                                <span className="">Идсэн:</span>{" "}
-                                <span className="font-semibold">
-                                  {formatMealCount(actual)}
-                                </span>
-                              </div>
-                              {mealDiff !== 0 && (
-                                <div className="text-xs text-slate-500">
-                                  Зөрүү: {mealDiff > 0 ? "+" : ""}
-                                  {formatMealCount(mealDiff)}
+            {mealPlans.length === 0 ? (
+              <p className="py-10 text-center text-sm text-slate-400">
+                Одоогоор төлөвлөгөө алга байна.
+              </p>
+            ) : filteredPlans.length === 0 ? (
+              <p className="py-10 text-center text-sm text-slate-400">
+                Илэрц олдсонгүй.
+              </p>
+            ) : (
+              <div className="max-h-[72vh] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-slate-50">
+                    <tr className="border-b text-xs text-slate-500">
+                      <th className="px-4 py-2.5 text-left">Огноо</th>
+                      <th className="px-2 py-2.5 text-left">Гал тогоо</th>
+                      {MEAL_PLAN_FIELDS.map((field) => (
+                        <th
+                          key={field.key}
+                          className="min-w-16 px-2 py-2.5 text-center font-semibold text-slate-700">
+                          {field.shortLabel}
+                        </th>
+                      ))}
+                      <th className="px-2 py-2.5 text-right">Нийт</th>
+                      <th className="px-4 py-2.5 text-right">Үйлдэл</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPlans.map((plan) => {
+                      const planSummary = getPlanSummary(plan);
+                      const diff = planSummary.actual - planSummary.planned;
+
+                      return (
+                        <tr
+                          key={plan.id || `${plan.date}-${plan.dining_hall_id}`}
+                          className="border-b border-slate-100 hover:bg-slate-50/60">
+                          <td className="px-4 py-2.5 font-medium whitespace-nowrap">
+                            {plan.date}
+                          </td>
+                          <td className="px-2 py-2.5 whitespace-nowrap">
+                            {diningHalls.find(
+                              (hall) => hall.id === plan.dining_hall_id,
+                            )?.name || `#${plan.dining_hall_id}`}
+                          </td>
+                          {MEAL_PLAN_FIELDS.map((field) => {
+                            const planned = Number(plan[field.key] || 0);
+                            const actual = Number(plan[field.actualKey] || 0);
+                            const mealDiff = actual - planned;
+
+                            return (
+                              <td
+                                key={field.key}
+                                className="px-2 py-2.5 text-center">
+                                <div className="leading-tight whitespace-nowrap">
+                                  <span className="text-slate-500">
+                                    {formatMealCount(planned)}
+                                  </span>
+                                  <span className="text-slate-300"> / </span>
+                                  <span className="font-semibold text-blue-700">
+                                    {formatMealCount(actual)}
+                                  </span>
+                                  {mealDiff !== 0 && (
+                                    <div
+                                      className={`text-[11px] ${mealDiff > 0 ? "text-amber-600" : "text-rose-600"}`}>
+                                      {mealDiff > 0 ? "+" : ""}
+                                      {formatMealCount(mealDiff)}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                          <td className="px-2 py-2.5 text-right whitespace-nowrap">
+                            <div className="leading-tight">
+                              <span className="text-slate-500">
+                                {formatMealCount(planSummary.planned)}
+                              </span>
+                              <span className="text-slate-300"> / </span>
+                              <span className="font-semibold text-blue-700">
+                                {formatMealCount(planSummary.actual)}
+                              </span>
+                              {diff !== 0 && (
+                                <div
+                                  className={`text-[11px] ${diff > 0 ? "text-amber-600" : "text-rose-600"}`}>
+                                  {diff > 0 ? "+" : ""}
+                                  {formatMealCount(diff)}
                                 </div>
                               )}
                             </div>
                           </td>
-                        );
-                      })}
-                      <td className="py-3 text-right">
-                        <div className="leading-5">
-                          <div className="text-slate-700">
-                            {formatMealCount(planSummary.planned)} төлөвлөсөн
-                          </div>
-                          <div className="font-semibold text-blue-700">
-                            {formatMealCount(planSummary.actual)} идсэн
-                          </div>
-                          {diff !== 0 && (
-                            <div className="text-xs text-slate-500">
-                              Зөрүү: {diff > 0 ? "+" : ""}
-                              {formatMealCount(diff)}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-right py-3">
-                        <button
-                          onClick={() => handleEditPlan(plan)}
-                          className="inline-flex items-center gap-1 px-2 py-1 border border-slate-200 rounded-md text-xs hover:bg-slate-50">
-                          <Pencil className="h-3 w-3" />
-                          Засах
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          <td className="px-4 py-2.5 text-right">
+                            <button
+                              onClick={() => handleEditPlan(plan)}
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50">
+                              <Pencil className="h-3 w-3" />
+                              Засах
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </TabsContent>
+
+        {/* === QR кодуудын таб === */}
+        <TabsContent value="qr" className="space-y-5">
 
       {/* QR үүсгэх */}
       <div className="bg-white border border-slate-200 rounded-xl p-5">
@@ -798,24 +886,45 @@ export default function OrgDetailPage() {
         </div>
       </div>
 
-      {/* QR жагсаалт */}
-      {qrItems.length > 0 && (
+        {/* QR жагсаалт */}
         <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="font-semibold text-slate-700">
               QR кодууд ({qrItems.length})
             </h2>
-            <button
-              onClick={handleDownloadAllZip}
-              disabled={zipping}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
-              <Archive className="h-4 w-4" />
-              {zipping ? "Бэлтгэж байна..." : "ZIP татах"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {qrItems.length > 0 && (
+                <div className="relative sm:w-56">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={qrSearch}
+                    onChange={(e) => setQrSearch(e.target.value)}
+                    placeholder="Шошго / ажилтнаар хайх..."
+                    className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+              <button
+                onClick={handleDownloadAllZip}
+                disabled={zipping || qrItems.length === 0}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
+                <Archive className="h-4 w-4" />
+                {zipping ? "Бэлтгэж байна..." : "ZIP татах"}
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {qrItems.map((item) => (
+          {qrItems.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-400">
+              Одоогоор QR код алга. Дээрх талбараас үүсгэнэ үү.
+            </p>
+          ) : filteredQrItems.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-400">
+              Илэрц олдсонгүй.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+              {filteredQrItems.map((item) => (
               <div
                 key={item.id}
                 className="border rounded-lg p-3 flex flex-col items-center gap-2">
@@ -866,9 +975,11 @@ export default function OrgDetailPage() {
                 </button>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+        </TabsContent>
+      </Tabs>
 
       {/* Ажилтан сонгох Modal */}
       {linkingItem && (

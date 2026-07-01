@@ -39,5 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase data dumps
+supabase/seed.sql
 #vscode
 .vscode/*

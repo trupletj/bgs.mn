@@ -1,17 +1,26 @@
 import { createClient } from "@/utils/supabase/server";
 import { RequestOtpForm } from "@/components/login-form";
+import { EmbedAutoPost } from "@/components/embed-auto-post";
+import { OrbitMark } from "@/components/brand/orbit-mark";
 import { redirect } from "next/navigation";
-import { Building2, Shield, Users, BarChart3, CheckCircle } from "lucide-react";
+import { Shield, Users, BarChart3, CheckCircle } from "lucide-react";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ embed?: string }>;
+}) {
+  const params = await searchParams;
+  const embed = params.embed === "1";
+
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
-  if (claims) redirect("/dashboard");
+  if (claims && !embed) redirect("/dashboard");
 
   return (
     <div className="flex min-h-svh">
       {/* ===== Left branding panel ===== */}
-      <div className="relative hidden md:flex md:w-[56%] flex-col justify-between overflow-hidden bg-[oklch(0.175_0.038_264)] p-12">
+      <div className="relative hidden md:flex md:w-[56%] flex-col justify-between overflow-hidden bg-sidebar p-12">
         {/* Subtle grid pattern */}
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.035]"
@@ -27,9 +36,7 @@ export default async function Home() {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/20 backdrop-blur-sm ring-1 ring-white/10">
-            <Building2 className="h-6 w-6 text-white" />
-          </div>
+          <OrbitMark size={44} variant="reversed" background="#16130F" />
           <div>
             <p className="text-lg font-bold leading-none text-white">
               BGS систем
@@ -88,13 +95,12 @@ export default async function Home() {
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-12">
         {/* Mobile logo */}
         <div className="mb-10 flex items-center gap-3 md:hidden">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-            <Building2 className="h-5 w-5 text-white" />
-          </div>
+          <OrbitMark size={40} variant="primary" />
           <span className="text-xl font-bold">BGS систем</span>
         </div>
 
         <RequestOtpForm className="w-full max-w-[400px]" />
+        {embed && claims ? <EmbedAutoPost /> : null}
 
         <p className="mt-10 max-w-xs text-center text-xs leading-relaxed text-muted-foreground">
           Нэвтрэхэд асуудал гарвал системийн админтай холбогдоно уу.

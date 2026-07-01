@@ -4,7 +4,8 @@ import {
   getMonthlyOrderTrend,
   getOrderStatusBreakdown,
 } from "@/actions/dashboard";
-import { hasPermission, hasRole } from "@/actions/rbac";
+import { hasPermission, hasRole, getUserRoles } from "@/actions/rbac";
+import AttendanceEmbed from "@/components/attendance-embed";
 import {
   FileText,
   Star,
@@ -18,9 +19,15 @@ import {
 } from "lucide-react";
 import { OrderTrendChart } from "@/components/dashboard/order-trend-chart";
 import { OrderStatusChart } from "@/components/dashboard/order-status-chart";
-import { AttendanceWidget } from "@/components/dashboard/attendance-widget";
+import { DashboardTabs } from "@/components/dashboard/tabs";
 
 export default async function DashboardPage() {
+  const roles = await getUserRoles();
+
+  if (roles.length === 0) {
+    return <AttendanceEmbed />;
+  }
+
   const hasPolicyAccess = await hasPermission("policy", "access");
   const hasOrderAccess = await hasPermission("order", "access");
 
@@ -64,8 +71,8 @@ export default async function DashboardPage() {
       ]
     : [];
 
-  return (
-    <div className="flex flex-col gap-8 p-4 lg:p-6">
+  const dashboardContent = (
+    <div className="flex flex-col gap-8">
       {/* Page header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -81,9 +88,6 @@ export default async function DashboardPage() {
           Систем ажиллаж байна
         </div>
       </div>
-
-      {/* Attendance — permission-гүй, бүх нэвтэрсэн хэрэглэгчид */}
-      <AttendanceWidget />
 
       {/* Order stats — захиалгын эрх бүхий хүмүүст */}
       {hasOrderAccess && orderStats && (
@@ -156,6 +160,12 @@ export default async function DashboardPage() {
           </div>
         </section>
       ) : null}
+    </div>
+  );
+
+  return (
+    <div className="p-4 lg:p-6">
+      <DashboardTabs dashboardContent={dashboardContent} />
     </div>
   );
 }

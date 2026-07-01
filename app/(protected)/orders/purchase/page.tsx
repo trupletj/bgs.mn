@@ -34,10 +34,13 @@ interface PurchaseOrder {
 }
 
 type PurchaseOrderRow = Omit<PurchaseOrder, "profile"> & {
-  profile?: { name?: string; department_name?: string } | null | Array<{
-    name?: string;
-    department_name?: string;
-  }>;
+  profile?:
+    | { name?: string; department_name?: string }
+    | null
+    | Array<{
+        name?: string;
+        department_name?: string;
+      }>;
 };
 
 interface PurchaseOrderItem {
@@ -48,6 +51,15 @@ interface PurchaseOrderItem {
     id: number;
     quantity?: number | null;
     status?: string | null;
+  }>;
+  order_purchase_lines?: Array<{
+    id: number;
+    quantity?: number | null;
+    order_fulfillment?: Array<{
+      id: number;
+      quantity?: number | null;
+      status?: string | null;
+    }>;
   }>;
 }
 
@@ -81,11 +93,26 @@ const STATUS_CFG = {
 } as const;
 
 const ORDER_TYPE: Record<string, { label: string; className: string }> = {
-  emergency:         { label: "Яаралтай",        className: "bg-red-50 text-red-700 border-red-200" },
-  service:           { label: "Үйлчилгээний",    className: "bg-amber-50 text-amber-700 border-amber-200" },
-  "major repairs":   { label: "Их засвар",        className: "bg-orange-50 text-orange-700 border-orange-200" },
-  "safety reserves": { label: "Аюулгүйн нөөц",   className: "bg-green-50 text-green-700 border-green-200" },
-  other:             { label: "Бусад",            className: "bg-slate-100 text-slate-600 border-slate-200" },
+  emergency: {
+    label: "Яаралтай",
+    className: "bg-red-50 text-red-700 border-red-200",
+  },
+  service: {
+    label: "Үйлчилгээний",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  "major repairs": {
+    label: "Их засвар",
+    className: "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  "safety reserves": {
+    label: "Аюулгүйн нөөц",
+    className: "bg-green-50 text-green-700 border-green-200",
+  },
+  other: {
+    label: "Бусад",
+    className: "bg-slate-100 text-slate-600 border-slate-200",
+  },
 };
 
 const PURCHASE_STATUS: Record<
@@ -109,14 +136,20 @@ const PURCHASE_STATUS: Record<
   },
 };
 
-const COMPLETED_FULFILLMENT_STATUSES = new Set(["received", "completed", "done"]);
+const COMPLETED_FULFILLMENT_STATUSES = new Set([
+  "received",
+  "completed",
+  "done",
+]);
 
 function getPurchaseStatus(items: PurchaseOrderItem[] = []): PurchaseStatus {
-  const hasAnyFulfillment = items.some(
-    (item) => (item.order_fulfillment?.length ?? 0) > 0,
+  const hasAnyPurchase = items.some(
+    (item) =>
+      (item.order_fulfillment?.length ?? 0) > 0 ||
+      (item.order_purchase_lines?.length ?? 0) > 0,
   );
 
-  if (!hasAnyFulfillment) return "not_ordered";
+  if (!hasAnyPurchase) return "not_ordered";
 
   const allItemsCompleted =
     items.length > 0 &&
@@ -144,10 +177,7 @@ function getPurchaseStatus(items: PurchaseOrderItem[] = []): PurchaseStatus {
 function PurchaseStatusBadge({ status }: { status: PurchaseStatus }) {
   const cfg = PURCHASE_STATUS[status];
   return (
-    <Badge
-      variant="outline"
-      className={cn("text-xs px-2 py-0", cfg.className)}
-    >
+    <Badge variant="outline" className={cn("text-xs px-2 py-0", cfg.className)}>
       {cfg.label}
     </Badge>
   );
@@ -190,7 +220,8 @@ export default async function OrderPurchasePage({
 
   let query = supabase
     .from("orders")
-    .select(`
+    .select(
+      `
       id, order_number, title, status, order_type, order_process_id,
       created_at, requested_delivery_date,
       profile:created_profile ( name, department_name ),
@@ -202,9 +233,19 @@ export default async function OrderPurchasePage({
           id,
           quantity,
           status
+        ),
+        order_purchase_lines (
+          id,
+          quantity,
+          order_fulfillment (
+            id,
+            quantity,
+            status
+          )
         )
       )
-    `)
+    `,
+    )
     .in("status", ["approved", "changes_requested"]);
 
   if (!isSuperAdmin) {
@@ -215,42 +256,49 @@ export default async function OrderPurchasePage({
     ascending: false,
   });
 
-  const orders = ((data ?? []) as PurchaseOrderRow[])
-    .map((row) => ({
-      ...row,
-      profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
-      purchaseStatus: getPurchaseStatus(row.order_items),
-    })) as PurchaseOrderWithStatus[];
+  const orders = ((data ?? []) as PurchaseOrderRow[]).map((row) => ({
+    ...row,
+    profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
+    purchaseStatus: getPurchaseStatus(row.order_items),
+  })) as PurchaseOrderWithStatus[];
 
   const sortedOrders = [...orders].sort((a, b) => {
     if (sort === "purchase_status_asc") {
-      return PURCHASE_STATUS[a.purchaseStatus].rank - PURCHASE_STATUS[b.purchaseStatus].rank;
+      return (
+        PURCHASE_STATUS[a.purchaseStatus].rank -
+        PURCHASE_STATUS[b.purchaseStatus].rank
+      );
     }
     if (sort === "purchase_status_desc") {
-      return PURCHASE_STATUS[b.purchaseStatus].rank - PURCHASE_STATUS[a.purchaseStatus].rank;
+      return (
+        PURCHASE_STATUS[b.purchaseStatus].rank -
+        PURCHASE_STATUS[a.purchaseStatus].rank
+      );
     }
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  const approved = orders.filter((o) => o.status === "approved");
-  const changesRequested = orders.filter((o) => o.status === "changes_requested");
   const purchaseCounts = sortedOrders.reduce(
     (acc, order) => {
       acc[order.purchaseStatus] += 1;
       return acc;
     },
-    { not_ordered: 0, ordering: 0, completed: 0 } as Record<PurchaseStatus, number>,
+    { not_ordered: 0, ordering: 0, completed: 0 } as Record<
+      PurchaseStatus,
+      number
+    >,
   );
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
-
       {/* Header */}
       <div>
         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/60">
           Захиалгын модуль
         </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Худалдан авалт</h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">
+          Худалдан авалт
+        </h1>
       </div>
 
       {error ? (
@@ -262,32 +310,12 @@ export default async function OrderPurchasePage({
       ) : (
         <>
           {/* Summary stats */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:w-96">
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="absolute left-0 top-0 h-0.5 w-full bg-emerald-500 opacity-60" />
-              <p className="text-xs font-medium text-muted-foreground">Батлагдсан</p>
-              <div className="mt-2 flex items-end gap-2">
-                <p className="text-3xl font-bold tabular-nums">{approved.length}</p>
-                <div className="mb-0.5 rounded-lg bg-emerald-50 p-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                </div>
-              </div>
-            </div>
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <div className="absolute left-0 top-0 h-0.5 w-full bg-amber-400 opacity-60" />
-              <p className="text-xs font-medium text-muted-foreground">Өөрчлөлттэй батлагдсан</p>
-              <div className="mt-2 flex items-end gap-2">
-                <p className="text-3xl font-bold tabular-nums">{changesRequested.length}</p>
-                <div className="mb-0.5 rounded-lg bg-amber-50 p-1.5">
-                  <AlertCircle className="h-4 w-4 text-amber-500" />
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-[38rem]">
             {(Object.keys(PURCHASE_STATUS) as PurchaseStatus[]).map((key) => (
-              <div key={key} className="rounded-xl border border-border bg-card p-3">
+              <div
+                key={key}
+                className="rounded-xl border border-border bg-card p-3">
                 <p className="text-xs text-muted-foreground">
                   {PURCHASE_STATUS[key].label}
                 </p>
@@ -303,14 +331,27 @@ export default async function OrderPurchasePage({
               <ArrowDownUp className="h-4 w-4 text-muted-foreground" />
               Эрэмбэлэх
             </div>
-            <Button asChild variant={sort === "created_desc" ? "default" : "outline"} size="sm">
+            <Button
+              asChild
+              variant={sort === "created_desc" ? "default" : "outline"}
+              size="sm">
               <Link href="/orders/purchase">Огноогоор</Link>
             </Button>
-            <Button asChild variant={sort === "purchase_status_asc" ? "default" : "outline"} size="sm">
-              <Link href="/orders/purchase?sort=purchase_status_asc">Статус өсөх</Link>
+            <Button
+              asChild
+              variant={sort === "purchase_status_asc" ? "default" : "outline"}
+              size="sm">
+              <Link href="/orders/purchase?sort=purchase_status_asc">
+                Статус өсөх
+              </Link>
             </Button>
-            <Button asChild variant={sort === "purchase_status_desc" ? "default" : "outline"} size="sm">
-              <Link href="/orders/purchase?sort=purchase_status_desc">Статус буурах</Link>
+            <Button
+              asChild
+              variant={sort === "purchase_status_desc" ? "default" : "outline"}
+              size="sm">
+              <Link href="/orders/purchase?sort=purchase_status_desc">
+                Статус буурах
+              </Link>
             </Button>
           </div>
 
@@ -329,7 +370,8 @@ export default async function OrderPurchasePage({
             <div className="flex flex-col gap-2">
               {sortedOrders.map((order) => {
                 const statusCfg = STATUS_CFG[order.status];
-                const typeCfg = ORDER_TYPE[order.order_type] ?? ORDER_TYPE.other;
+                const typeCfg =
+                  ORDER_TYPE[order.order_type] ?? ORDER_TYPE.other;
                 const createdDate = formatDate(order.created_at);
                 const deliveryDate = formatDate(order.requested_delivery_date);
                 return (
@@ -338,9 +380,8 @@ export default async function OrderPurchasePage({
                     className={cn(
                       "group rounded-xl border border-border bg-card pl-4 transition-shadow hover:shadow-sm",
                       "border-l-[3px]",
-                      statusCfg.borderAccent
-                    )}
-                  >
+                      statusCfg.borderAccent,
+                    )}>
                     <div className="flex flex-col gap-3 py-4 pr-4 sm:flex-row sm:items-center">
                       <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary sm:flex">
                         <Package className="h-4 w-4" />
@@ -354,15 +395,27 @@ export default async function OrderPurchasePage({
                               {order.order_number}
                             </span>
                           )}
-                          <Badge variant="outline" className={cn("text-xs px-2 py-0", typeCfg.className)}>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs px-2 py-0",
+                              typeCfg.className,
+                            )}>
                             {typeCfg.label}
                           </Badge>
-                          <Badge variant="outline" className={cn("text-xs px-2 py-0", statusCfg.badge)}>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs px-2 py-0",
+                              statusCfg.badge,
+                            )}>
                             {statusCfg.label}
                           </Badge>
                           <PurchaseStatusBadge status={order.purchaseStatus} />
                         </div>
-                        <p className="font-semibold leading-snug text-foreground">{order.title}</p>
+                        <p className="font-semibold leading-snug text-foreground">
+                          {order.title}
+                        </p>
                         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           {order.profile?.name && (
                             <span className="flex items-center gap-1">
@@ -395,8 +448,7 @@ export default async function OrderPurchasePage({
                         asChild
                         variant="outline"
                         size="sm"
-                        className="h-8 shrink-0 gap-1.5 self-start text-xs sm:self-auto"
-                      >
+                        className="h-8 shrink-0 gap-1.5 self-start text-xs sm:self-auto">
                         <Link href={`/orders/${order.id}/imp`}>
                           Биелэлт
                           <ArrowUpRight className="h-3.5 w-3.5" />
@@ -420,7 +472,9 @@ function EmptyState() {
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
         <ShoppingCart className="h-6 w-6 text-muted-foreground/40" />
       </div>
-      <p className="font-semibold text-foreground">Худалдан авалтад бэлэн захиалга байхгүй</p>
+      <p className="font-semibold text-foreground">
+        Худалдан авалтад бэлэн захиалга байхгүй
+      </p>
       <p className="mt-1 text-sm text-muted-foreground">
         Батлагдсан болон өөрчлөлттэй батлагдсан захиалгууд энд харагдана
       </p>

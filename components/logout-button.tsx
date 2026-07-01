@@ -1,21 +1,15 @@
 "use client";
 
-import { createClient } from "@/utils/supabase/client";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+import { IconLogout } from "@tabler/icons-react";
 
-export function LogoutButton() {
-  const router = useRouter();
-
-  const logout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-  };
-
+export function LogoutButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button className="w-full" onClick={logout}>
+    <button
+      type="button"
+      className="flex w-full items-center gap-2"
+      onClick={onClick}>
+      <IconLogout className="h-4 w-4" />
       Системээс гарах
-    </Button>
+    </button>
   );
 }

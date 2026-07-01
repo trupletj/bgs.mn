@@ -22,6 +22,8 @@ export interface UserSearchPickerProps {
   limit?: number;
   /** Auto-focus the input on mount. */
   autoFocus?: boolean;
+  /** Custom search function (defaults to the global `searchUsers`). */
+  searchFn?: (query: string, limit: number) => Promise<UserSearchResult[]>;
 }
 
 /**
@@ -39,6 +41,7 @@ export function UserSearchPicker({
   className,
   limit = 12,
   autoFocus,
+  searchFn = searchUsers,
 }: UserSearchPickerProps) {
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<UserSearchResult[]>([]);
@@ -59,7 +62,7 @@ export function UserSearchPicker({
     setLoading(true);
     const myReq = ++reqIdRef.current;
     const timer = setTimeout(async () => {
-      const data = await searchUsers(trimmed, limit + (excludeIds?.length ?? 0));
+      const data = await searchFn(trimmed, limit + (excludeIds?.length ?? 0));
       if (myReq !== reqIdRef.current) return;
       const exclude = new Set(excludeIds ?? []);
       const filtered = data.filter((u) => !exclude.has(u.id)).slice(0, limit);

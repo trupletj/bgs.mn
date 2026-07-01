@@ -5,6 +5,7 @@ export interface NavSubItem {
   title: string;
   url: string;
   badgeCount?: number;
+  items?: NavSubItem[];
 }
 
 export interface NavService {
@@ -29,8 +30,14 @@ export async function getNavServices(): Promise<NavService[]> {
     "job_description",
     "create",
   );
+  const hasNewsManage = await hasPermission("news", "create");
+  const hasNotificationCreate = await hasPermission("notification", "create");
+  const hasBannerManage = await hasPermission("banner", "create");
   const hasCreateOrder = await hasPermission("order", "create");
   const hasOrderAccess = await hasPermission("order", "access");
+  const seManage = await hasPermission("shift_exchange", "view");
+  const seSubmit = seManage || (await hasPermission("shift_exchange", "submit"));
+  const hasShiftExchange = seManage || seSubmit;
   const hasOrderPurchase = await hasPermission("order", "purchase");
   const hasOrderReview = await hasPermission("order", "edit");
   const pendingOrderReviewCount = hasOrderReview
@@ -47,21 +54,32 @@ export async function getNavServices(): Promise<NavService[]> {
     items: [],
   });
 
-  services.push({
-    key: "attendance",
-    title: "Ирц",
-    url: "/attendance",
-    basePaths: ["/attendance"],
-    items: [],
-  });
-
-  services.push({
-    key: "eelj",
-    title: "Ээлж",
-    url: "/eelj",
-    basePaths: ["/eelj"],
-    items: [],
-  });
+  if (hasShiftExchange) {
+    const seItems: NavSubItem[] = [];
+    if (seManage) {
+      seItems.push({ title: "Ээлжүүд", url: "/shift-exchange" });
+    }
+    if (seSubmit) {
+      seItems.push({ title: "Зорчигч бүртгэх", url: "/shift-exchange/register" });
+    }
+    if (seManage) {
+      seItems.push({ title: "Чиглэл", url: "/shift-exchange/directions" });
+      seItems.push({ title: "Тайлан", url: "/shift-exchange/reports" });
+    }
+    if (seManage) {
+      seItems.push({
+        title: "Хамтрагч бүлгүүд",
+        url: "/shift-exchange/companion-groups",
+      });
+    }
+    services.push({
+      key: "shift-exchange",
+      title: "Ээлж солилцоо",
+      url: seManage ? "/shift-exchange" : "/shift-exchange/register",
+      basePaths: ["/shift-exchange"],
+      items: seItems,
+    });
+  }
 
   const orderItems: NavSubItem[] = [];
   if (hasOrderPurchase) {
@@ -125,12 +143,29 @@ export async function getNavServices(): Promise<NavService[]> {
     roles.some((r) => ["super_admin", "hr_emp", "monitoring_emp"].includes(r))
   ) {
     const policyItems: NavSubItem[] = [
-      { title: "Журмын жагсаалт", url: "/policy/list" },
+      {
+        title: "Журмын жагсаалт",
+        url: "/policy",
+        items: [
+          { title: "Алба", url: "/policy/scopes/alba" },
+          { title: "Хэлтэс", url: "/policy/scopes/heltes" },
+        ],
+      },
+      {
+        title: "Эрх зүйн акт",
+        url: "/policy/legal-acts",
+        items: hasPolicyCreate
+          ? [{ title: "+ Эрх зүйн акт нэмэх", url: "/policy/legal-acts/new" }]
+          : [],
+      },
+      {
+        title: "Журмын хэрэгжилт",
+        url: "/policy/imp",
+        items: hasPolicyCreate
+          ? [{ title: "+ Журам нэмэх", url: "/policy/new" }]
+          : [],
+      },
     ];
-
-    if (hasPolicyCreate) {
-      policyItems.push({ title: "+ Журам нэмэх", url: "/policy/new" });
-    }
 
     services.push({
       key: "policy",
@@ -177,6 +212,26 @@ export async function getNavServices(): Promise<NavService[]> {
         { title: "Хүсэлтүүд", url: "/devices/requests" },
         { title: "Тайлан", url: "/devices/report" },
       ],
+    });
+  }
+
+  if (hasNewsManage || hasNotificationCreate || hasBannerManage) {
+    const contentItems: NavSubItem[] = [];
+    if (hasNewsManage) {
+      contentItems.push({ title: "Мэдээ", url: "/news" });
+    }
+    if (hasBannerManage) {
+      contentItems.push({ title: "Баннер", url: "/banners" });
+    }
+    if (hasNotificationCreate) {
+      contentItems.push({ title: "Мэдэгдэл", url: "/notifications" });
+    }
+    services.push({
+      key: "content",
+      title: "Контент",
+      url: contentItems[0]?.url ?? "/news",
+      basePaths: ["/news", "/banners", "/notifications"],
+      items: contentItems,
     });
   }
 

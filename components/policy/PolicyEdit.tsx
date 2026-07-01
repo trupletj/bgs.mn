@@ -51,7 +51,6 @@ export default function PolicyEditClient({ policyId }: PolicyEditClientProps) {
   const fetchPolicy = async () => {
     setIsLoading(true);
     try {
-      console.log("Fetching policy for edit:", { policyId });
       const response = await fetch(`/api/policy?id=${policyId}`, {
         cache: "no-store",
       });
@@ -60,12 +59,6 @@ export default function PolicyEditClient({ policyId }: PolicyEditClientProps) {
         throw new Error(error.error || "Журам олдсонгүй");
       }
       const data: Policy = await response.json();
-      console.log("Policy fetched for edit:", {
-        id: data.id,
-        referenceCode: data.referenceCode,
-        name: data.name,
-        section: data.section?.length,
-      });
       setPolicy(data);
     } catch (error) {
       console.error("Failed to fetch policy:", error);
@@ -111,11 +104,9 @@ export default function PolicyEditClient({ policyId }: PolicyEditClientProps) {
         })),
       }}
       onSuccess={() => {
-        console.log("Policy updated:", { policyId: policy.id });
         router.push(`/policy/${policy.id}`);
       }}
       onCancel={() => {
-        console.log("Edit mode cancelled:", { policyId: policy.id });
         router.push(`/policy/${policy.id}`);
       }}
     />
