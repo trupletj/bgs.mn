@@ -18,28 +18,41 @@ export interface NavService {
 }
 
 export async function getNavServices(): Promise<NavService[]> {
-  const roles = await getUserRoles();
-  const hasDiningAccess = await hasPermission("dining", "access");
-  const hasEmployeeAccess = await hasPermission("employee", "read");
-  const hasPolicyCreate = await hasPermission("policy", "create");
-  const hasJobDescriptionAccess = await hasPermission(
-    "job_description",
-    "access",
-  );
-  const hasJobDescriptionCreate = await hasPermission(
-    "job_description",
-    "create",
-  );
-  const hasNewsManage = await hasPermission("news", "create");
-  const hasNotificationCreate = await hasPermission("notification", "create");
-  const hasBannerManage = await hasPermission("banner", "create");
-  const hasCreateOrder = await hasPermission("order", "create");
-  const hasOrderAccess = await hasPermission("order", "access");
-  const seManage = await hasPermission("shift_exchange", "view");
-  const seSubmit = seManage || (await hasPermission("shift_exchange", "submit"));
+  const [
+    roles,
+    hasDiningAccess,
+    hasEmployeeAccess,
+    hasPolicyCreate,
+    hasJobDescriptionAccess,
+    hasJobDescriptionCreate,
+    hasNewsManage,
+    hasNotificationCreate,
+    hasBannerManage,
+    hasCreateOrder,
+    hasOrderAccess,
+    seManage,
+    seSubmitPermission,
+    hasOrderPurchase,
+    hasOrderReview,
+  ] = await Promise.all([
+    getUserRoles(),
+    hasPermission("dining", "access"),
+    hasPermission("employee", "read"),
+    hasPermission("policy", "create"),
+    hasPermission("job_description", "access"),
+    hasPermission("job_description", "create"),
+    hasPermission("news", "create"),
+    hasPermission("notification", "create"),
+    hasPermission("banner", "create"),
+    hasPermission("order", "create"),
+    hasPermission("order", "access"),
+    hasPermission("shift_exchange", "view"),
+    hasPermission("shift_exchange", "submit"),
+    hasPermission("order", "purchase"),
+    hasPermission("order", "edit"),
+  ]);
+  const seSubmit = seManage || seSubmitPermission;
   const hasShiftExchange = seManage || seSubmit;
-  const hasOrderPurchase = await hasPermission("order", "purchase");
-  const hasOrderReview = await hasPermission("order", "edit");
   const pendingOrderReviewCount = hasOrderReview
     ? await getPendingOrderReviewCountForCurrentUser()
     : 0;

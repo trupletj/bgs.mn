@@ -80,6 +80,9 @@ export function NavUser({
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
+                <span className="truncate text-sm font-medium">
+                  Хэрэглэгч
+                </span>
                 <IconDotsVertical className="ml-auto h-4 w-4 text-sidebar-foreground/40" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
