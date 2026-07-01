@@ -8,9 +8,8 @@ import {
   IconUsers,
   IconFileText,
   IconShield,
-  IconClockHour4,
-  IconBus,
   IconBriefcase,
+  IconArrowsExchange,
   type Icon,
 } from "@tabler/icons-react";
 import { usePathname } from "next/navigation";
@@ -37,8 +36,7 @@ import { ORBIT_COLORS } from "@/components/brand/orbit-mark"; // C-г ашигл
 
 const serviceIcons: Record<string, Icon> = {
   dashboard: IconLayoutDashboard,
-  attendance: IconClockHour4,
-  eelj: IconBus,
+  "shift-exchange": IconArrowsExchange,
   orders: IconClipboardList,
   dine: IconToolsKitchen2,
   employees: IconUsers,
@@ -50,10 +48,12 @@ const serviceIcons: Record<string, Icon> = {
 export function AppSidebar({
   services,
   user,
+  qrPayload,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   services: NavServiceType[];
   user: { name: string; email: string; avatar: string };
+  qrPayload?: string | null;
 }) {
   const pathname = usePathname();
 
@@ -122,13 +122,15 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* Sub-navigation for active section */}
-        <NavService services={services} />
       </SidebarContent>
 
+      {/* Sub-navigation outside scrollable area — prevents layout shift on appearance */}
+      <div className="shrink-0 px-2">
+        <NavService services={services} />
+      </div>
+
       <SidebarFooter className="border-t border-sidebar-border p-2">
-        <NavUser user={user} />
+        <NavUser user={user} qrPayload={qrPayload} />
       </SidebarFooter>
     </Sidebar>
   );

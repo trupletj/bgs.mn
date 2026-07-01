@@ -92,11 +92,11 @@
   --ring: oklch(0.689 0.196 44);
 
   /* Charts — orange lead, warm + complementary set */
-  --chart-1: oklch(0.689 0.196 44);   /* orange */
-  --chart-2: oklch(0.62 0.11 200);    /* teal */
-  --chart-3: oklch(0.7 0.14 85);      /* amber */
-  --chart-4: oklch(0.55 0.14 280);    /* violet */
-  --chart-5: oklch(0.62 0.16 150);    /* green */
+  --chart-1: oklch(0.689 0.196 44); /* orange */
+  --chart-2: oklch(0.62 0.11 200); /* teal */
+  --chart-3: oklch(0.7 0.14 85); /* amber */
+  --chart-4: oklch(0.55 0.14 280); /* violet */
+  --chart-5: oklch(0.62 0.16 150); /* green */
 
   /* Sidebar — Ink #16130F */
   --sidebar: oklch(0.205 0.014 60);
@@ -147,7 +147,7 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
+body {
     @apply bg-background text-foreground;
   }
 }

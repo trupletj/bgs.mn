@@ -44,7 +44,7 @@ export function NavService({ services }: { services: NavServiceType[] }) {
   if (!activeService || activeService.items.length === 0) return null;
 
   return (
-    <SidebarGroup className="mt-1">
+    <SidebarGroup className="py-1 animate-in fade-in-0 duration-200">
       <SidebarGroupLabel className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/30">
         {activeService.title}
       </SidebarGroupLabel>

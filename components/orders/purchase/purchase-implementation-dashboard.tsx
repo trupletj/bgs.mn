@@ -58,13 +58,6 @@ export function PurchaseImplementationDashboard({
   items: OrderProcessItem[];
   batches: PurchaseBatchRow[];
 }) {
-  console.log(
-    "Rendering PurchaseImplementationDashboard with items and batches:",
-    {
-      items,
-      batches,
-    },
-  );
   const rows = buildRows(items, batches);
   const totalSpend = rows.reduce<CurrencyTotals>((totals, row) => {
     for (const [currency, amount] of Object.entries(row.spendByCurrency)) {

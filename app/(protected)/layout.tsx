@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getNavServices } from "@/actions/nav";
+import { getQrPayload } from "@/actions/profile";
 
 export default async function AuditLayout({
   children,
@@ -20,22 +21,27 @@ export default async function AuditLayout({
   let userEmail = authUser.user?.email ?? "";
 
   if (authUser.user) {
-    const { data: profile } = await supabase
-      .from("profile")
+    const { data: userRecord } = await supabase
+      .from("users")
       .select("first_name, last_name, email")
       .eq("auth_user_id", authUser.user.id)
       .single();
 
-    if (profile) {
-      const fullName = [profile.first_name, profile.last_name]
-        .filter(Boolean)
-        .join(" ");
-      if (fullName) userName = fullName;
-      if (profile.email) userEmail = profile.email;
+    if (userRecord) {
+      const firstName = userRecord.first_name ?? "";
+      const lastInitial = userRecord.last_name?.[0] ?? "";
+      const displayName = lastInitial
+        ? `${lastInitial}. ${firstName}`.trim()
+        : firstName;
+      if (displayName) userName = displayName;
+      if (userRecord.email) userEmail = userRecord.email;
     }
   }
 
-  const services = await getNavServices();
+  const [services, qrPayload] = await Promise.all([
+    getNavServices(),
+    getQrPayload(),
+  ]);
 
   return (
     <SidebarProvider
@@ -49,6 +55,7 @@ export default async function AuditLayout({
         variant="inset"
         services={services}
         user={{ name: userName, email: userEmail, avatar: "" }}
+        qrPayload={qrPayload}
       />
       <SidebarInset>
         <SiteHeader />

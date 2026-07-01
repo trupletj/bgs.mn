@@ -35,6 +35,9 @@ export async function getNavServices(): Promise<NavService[]> {
   const hasBannerManage = await hasPermission("banner", "create");
   const hasCreateOrder = await hasPermission("order", "create");
   const hasOrderAccess = await hasPermission("order", "access");
+  const seManage = await hasPermission("shift_exchange", "view");
+  const seSubmit = seManage || (await hasPermission("shift_exchange", "submit"));
+  const hasShiftExchange = seManage || seSubmit;
   const hasOrderPurchase = await hasPermission("order", "purchase");
   const hasOrderReview = await hasPermission("order", "edit");
   const pendingOrderReviewCount = hasOrderReview
@@ -51,21 +54,32 @@ export async function getNavServices(): Promise<NavService[]> {
     items: [],
   });
 
-  services.push({
-    key: "attendance",
-    title: "Ирц",
-    url: "/attendance",
-    basePaths: ["/attendance"],
-    items: [],
-  });
-
-  services.push({
-    key: "eelj",
-    title: "Ээлж",
-    url: "/eelj",
-    basePaths: ["/eelj"],
-    items: [],
-  });
+  if (hasShiftExchange) {
+    const seItems: NavSubItem[] = [];
+    if (seManage) {
+      seItems.push({ title: "Ээлжүүд", url: "/shift-exchange" });
+    }
+    if (seSubmit) {
+      seItems.push({ title: "Зорчигч бүртгэх", url: "/shift-exchange/register" });
+    }
+    if (seManage) {
+      seItems.push({ title: "Чиглэл", url: "/shift-exchange/directions" });
+      seItems.push({ title: "Тайлан", url: "/shift-exchange/reports" });
+    }
+    if (seManage) {
+      seItems.push({
+        title: "Хамтрагч бүлгүүд",
+        url: "/shift-exchange/companion-groups",
+      });
+    }
+    services.push({
+      key: "shift-exchange",
+      title: "Ээлж солилцоо",
+      url: seManage ? "/shift-exchange" : "/shift-exchange/register",
+      basePaths: ["/shift-exchange"],
+      items: seItems,
+    });
+  }
 
   const orderItems: NavSubItem[] = [];
   if (hasOrderPurchase) {

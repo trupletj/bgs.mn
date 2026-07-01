@@ -22,7 +22,7 @@ export const PURCHASE_STATUS_ORDER = [
   "cancelled",
 ];
 
-const STATUS_BADGE_CONFIG: Record<
+export const STATUS_BADGE_CONFIG: Record<
   string,
   { icon: LucideIcon; className: string }
 > = {

@@ -57,6 +57,31 @@ export const NEXT_FULFILLMENT_STATUS_OPTIONS: Record<
   ],
 };
 
+// Бодит хүргэлтийн шугаман дараалал (cancelled-ийг оруулаагүй — тэр нь салангид үйлдэл).
+export const PURCHASE_FLOW_ORDER = [
+  "purchased",
+  "at_warehouse",
+  "in_delivery",
+  "at_mine",
+  "completed",
+] as const;
+
+export function getNextFlowStatus(status?: string | null): string | null {
+  const index = PURCHASE_FLOW_ORDER.indexOf(
+    (status ?? "") as (typeof PURCHASE_FLOW_ORDER)[number],
+  );
+  if (index < 0 || index >= PURCHASE_FLOW_ORDER.length - 1) return null;
+  return PURCHASE_FLOW_ORDER[index + 1];
+}
+
+export function getPrevFlowStatus(status?: string | null): string | null {
+  const index = PURCHASE_FLOW_ORDER.indexOf(
+    (status ?? "") as (typeof PURCHASE_FLOW_ORDER)[number],
+  );
+  if (index <= 0) return null;
+  return PURCHASE_FLOW_ORDER[index - 1];
+}
+
 export const CURRENCY_OPTIONS = [
   { value: "MNT", label: "Төгрөг (MNT)" },
   { value: "USD", label: "Доллар (USD)" },

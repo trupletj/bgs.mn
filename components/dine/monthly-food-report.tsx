@@ -54,7 +54,9 @@ interface Props {
 
 interface CompanySummaryRow {
   org_name: string;
-  is_contract: boolean;
+  // Байгууллага дотор Үндсэн ба/эсвэл Гэрээт ажилтан байгаа эсэх (мөр бүрээр тогтооно).
+  has_regular: boolean;
+  has_contract: boolean;
   expected_count: number;
   actual_count: number;
   manual_override_total: number;
@@ -75,10 +77,21 @@ const MEAL_TYPE_LABELS: Record<string, string> = {
   extend_lunch: "Сунгасан өдөр",
 };
 
+const MEAL_TYPE_ORDER = [
+  "breakfast",
+  "morning_meal",
+  "lunch",
+  "dinner",
+  "night_meal",
+  "extend_morning_meal",
+  "extend_lunch",
+];
+
 const SUMMARY_COLUMNS = [
   "Сар",
   "Байгууллага",
   "Ангилал",
+  "Хоолны төрөл",
   "Төлөвлөсөн",
   "Идсэн",
   "Зөрүү",
@@ -93,6 +106,11 @@ function formatNumber(value: number) {
 
 function getMealLabel(mealType: string) {
   return MEAL_TYPE_LABELS[mealType] || mealType;
+}
+
+function getMealOrderIndex(mealType: string) {
+  const index = MEAL_TYPE_ORDER.indexOf(mealType);
+  return index === -1 ? MEAL_TYPE_ORDER.length : index;
 }
 
 function getMonthLabel(month: string) {
@@ -133,18 +151,80 @@ function isContractRow(row: FoodMonthlyReportRow) {
   return row.dep_name === "Гэрээт" || row.heltes_name === "Гэрээт";
 }
 
-function buildCompanyExportRows(month: string, rows: CompanySummaryRow[]) {
-  return rows.map((row) => ({
-    Сар: getMonthLabel(month),
-    Байгууллага: row.org_name,
-    Ангилал: row.is_contract ? "Гэрээт" : "Үндсэн",
-    Төлөвлөсөн: row.expected_count,
-    Идсэн: row.actual_count,
-    Зөрүү: row.actual_count - row.expected_count,
-    "Гараар бүртгэсэн": row.manual_override_total,
-    "Нэмэлт порц": row.extra_serving_total,
-    "Буруу байршил": row.wrong_location_total,
-  }));
+interface CompanyMealSummaryRow {
+  org_name: string;
+  is_contract: boolean;
+  meal_type: string;
+  expected_count: number;
+  actual_count: number;
+  manual_override_total: number;
+  extra_serving_total: number;
+  wrong_location_total: number;
+}
+
+// Компанийн тайланг байгууллага бүрээр нь Үндсэн/Гэрээт ангилал, дотор нь өглөөний
+// цай, өдрийн хоол, оройн хоол, шөнийн хоол гэх мэт хоолны төрлөөр задлан гаргана.
+// Ангиллыг мөр бүрийн жинхэнэ төлвөөр (sub_employee = Гэрээт) тогтоох тул нэг
+// байгууллага доороо Үндсэн ба Гэрээт мөрөө тусд нь үнэн зөв харуулна.
+function buildCompanyExportRows(month: string, rows: FoodMonthlyReportRow[]) {
+  // Эрэмбэлэхэд хэрэглэх — байгууллагыг нийт идсэн тоогоор нь нэг дор барина.
+  const actualByOrg = new Map<string, number>();
+  rows.forEach((row) => {
+    actualByOrg.set(
+      row.org_name,
+      (actualByOrg.get(row.org_name) || 0) + row.actual_count,
+    );
+  });
+
+  const grouped = new Map<string, CompanyMealSummaryRow>();
+  rows.forEach((row) => {
+    const isContract = isContractRow(row);
+    const key = `${row.org_name}__${isContract ? "c" : "r"}__${row.meal_type}`;
+    const current =
+      grouped.get(key) ||
+      ({
+        org_name: row.org_name,
+        is_contract: isContract,
+        meal_type: row.meal_type,
+        expected_count: 0,
+        actual_count: 0,
+        manual_override_total: 0,
+        extra_serving_total: 0,
+        wrong_location_total: 0,
+      } satisfies CompanyMealSummaryRow);
+
+    current.expected_count += row.expected_count;
+    current.actual_count += row.actual_count;
+    current.manual_override_total += row.manual_override_total;
+    current.extra_serving_total += row.extra_serving_total;
+    current.wrong_location_total += row.wrong_location_total;
+    grouped.set(key, current);
+  });
+
+  return Array.from(grouped.values())
+    .sort((a, b) => {
+      if (a.org_name !== b.org_name) {
+        const actualDiff =
+          (actualByOrg.get(b.org_name) || 0) - (actualByOrg.get(a.org_name) || 0);
+        if (actualDiff !== 0) return actualDiff;
+        return a.org_name.localeCompare(b.org_name, "mn-MN");
+      }
+      // Нэг байгууллага дотор: эхэлж Үндсэн, дараа нь Гэрээт; цаашид хоолны төрлөөр.
+      if (a.is_contract !== b.is_contract) return a.is_contract ? 1 : -1;
+      return getMealOrderIndex(a.meal_type) - getMealOrderIndex(b.meal_type);
+    })
+    .map((row) => ({
+      Сар: getMonthLabel(month),
+      Байгууллага: row.org_name,
+      Ангилал: row.is_contract ? "Гэрээт" : "Үндсэн",
+      "Хоолны төрөл": getMealLabel(row.meal_type),
+      Төлөвлөсөн: row.expected_count,
+      Идсэн: row.actual_count,
+      Зөрүү: row.actual_count - row.expected_count,
+      "Гараар бүртгэсэн": row.manual_override_total,
+      "Нэмэлт порц": row.extra_serving_total,
+      "Буруу байршил": row.wrong_location_total,
+    }));
 }
 
 function buildDetailExportRows(rows: FoodMonthlyReportRow[]) {
@@ -226,7 +306,8 @@ export function MonthlyFoodReport({
         rows.get(row.org_name) ||
         ({
           org_name: row.org_name,
-          is_contract: isContractRow(row),
+          has_regular: false,
+          has_contract: false,
           expected_count: 0,
           actual_count: 0,
           manual_override_total: 0,
@@ -241,7 +322,11 @@ export function MonthlyFoodReport({
       current.extra_serving_total += row.extra_serving_total;
       current.wrong_location_total += row.wrong_location_total;
       current.detail_count += 1;
-      current.is_contract = current.is_contract || isContractRow(row);
+      if (isContractRow(row)) {
+        current.has_contract = true;
+      } else {
+        current.has_regular = true;
+      }
       rows.set(row.org_name, current);
     });
 
@@ -300,34 +385,18 @@ export function MonthlyFoodReport({
   );
 
   const variance = totals.actual - totals.expected;
-  const regularTotals = useMemo(
-    () =>
-      companyRows
-        .filter((row) => !row.is_contract)
-        .reduce(
-          (acc, row) => {
-            acc.expected += row.expected_count;
-            acc.actual += row.actual_count;
-            return acc;
-          },
-          { expected: 0, actual: 0 },
-        ),
-    [companyRows],
-  );
-  const contractTotals = useMemo(
-    () =>
-      companyRows
-        .filter((row) => row.is_contract)
-        .reduce(
-          (acc, row) => {
-            acc.expected += row.expected_count;
-            acc.actual += row.actual_count;
-            return acc;
-          },
-          { expected: 0, actual: 0 },
-        ),
-    [companyRows],
-  );
+  // Үндсэн/Гэрээт зөрүүг мөр бүрийн жинхэнэ ангиллаар тооцно (байгууллагын түвшинд
+  // нэгтгэвэл холимог байгууллага бүхэлдээ нэг тал руу буруу тоологдоно).
+  const { regularTotals, contractTotals } = useMemo(() => {
+    const regular = { expected: 0, actual: 0 };
+    const contract = { expected: 0, actual: 0 };
+    filteredSummary.forEach((row) => {
+      const bucket = isContractRow(row) ? contract : regular;
+      bucket.expected += row.expected_count;
+      bucket.actual += row.actual_count;
+    });
+    return { regularTotals: regular, contractTotals: contract };
+  }, [filteredSummary]);
   const regularVariance = regularTotals.actual - regularTotals.expected;
   const contractVariance = contractTotals.actual - contractTotals.expected;
 
@@ -357,7 +426,7 @@ export function MonthlyFoodReport({
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        buildCompanyExportRows(selectedMonth, companyRows),
+        buildCompanyExportRows(selectedMonth, filteredSummary),
       ),
       "Компанийн тайлан",
     );
@@ -383,7 +452,7 @@ export function MonthlyFoodReport({
 
   const exportCsv = () => {
     const csv = `\uFEFF${buildCsv(
-      buildCompanyExportRows(selectedMonth, companyRows),
+      buildCompanyExportRows(selectedMonth, filteredSummary),
       SUMMARY_COLUMNS,
     )}`;
     saveAs(
@@ -551,9 +620,17 @@ export function MonthlyFoodReport({
                           <TableCell>
                             <Badge
                               variant={
-                                row.is_contract ? "secondary" : "outline"
+                                row.has_regular && row.has_contract
+                                  ? "default"
+                                  : row.has_contract
+                                    ? "secondary"
+                                    : "outline"
                               }>
-                              {row.is_contract ? "Гэрээт" : "Үндсэн"}
+                              {row.has_regular && row.has_contract
+                                ? "Холимог"
+                                : row.has_contract
+                                  ? "Гэрээт"
+                                  : "Үндсэн"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
