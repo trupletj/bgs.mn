@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Calendar, Info } from "lucide-react";
-import { hasPermission } from "@/actions/rbac";
+import { hasPermission, hasRole } from "@/actions/rbac";
 import {
   getMyExchangeSubmissions,
+  getOrganizations,
   getShiftExchange,
 } from "@/actions/shift-exchange";
 import {
@@ -22,16 +23,20 @@ export default async function RegisterDetailPage({
   const { id: idStr } = await params;
   const id = Number(idStr);
 
-  const [canSubmit, canView] = await Promise.all([
+  const [canSubmit, canView, isSuperAdmin] = await Promise.all([
     hasPermission("shift_exchange", "submit"),
     hasPermission("shift_exchange", "view"),
+    hasRole("super_admin"),
   ]);
   if (!canSubmit && !canView) redirect("/unauthorized");
 
   const exchange = await getShiftExchange(id);
   if (!exchange) notFound();
 
-  const mySubmissions = await getMyExchangeSubmissions(id);
+  const [mySubmissions, organizations] = await Promise.all([
+    getMyExchangeSubmissions(id),
+    isSuperAdmin ? getOrganizations() : Promise.resolve([]),
+  ]);
 
   const deadline = registrationDeadline(exchange.exchangeDate);
   const overrideUntil = exchange.registrationOverrideUntil;
@@ -85,8 +90,9 @@ export default async function RegisterDetailPage({
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <p>
-            Энэ ээлжид ирэх / буух өөрийн байгууллагын зорчигчдыг бүртгэнэ.
-            Бүртгэсэн зорчигчдыг хүний нөөцийн ажилтан автобусанд хуваарилна.
+            {isSuperAdmin
+              ? "Энэ ээлжид ирэх / буух зорчигчдыг дурын байгууллагаас бүртгэнэ. Бүртгэсэн зорчигчдыг хүний нөөцийн ажилтан автобусанд хуваарилна."
+              : "Энэ ээлжид ирэх / буух өөрийн байгууллагын зорчигчдыг бүртгэнэ. Бүртгэсэн зорчигчдыг хүний нөөцийн ажилтан автобусанд хуваарилна."}
           </p>
         </div>
       </div>
@@ -95,6 +101,8 @@ export default async function RegisterDetailPage({
         exchangeId={id}
         myPool={mySubmissions}
         canRegister={canRegister}
+        isSuperAdmin={isSuperAdmin}
+        organizations={organizations}
       />
     </div>
   );

@@ -3,7 +3,7 @@
 import { cache } from "react";
 import { revalidatePath } from "next/cache";
 import { createClient, createClientForSchema } from "@/utils/supabase/server";
-import { hasPermission } from "@/actions/rbac";
+import { hasPermission, hasRole } from "@/actions/rbac";
 import type { UserSearchResult } from "@/actions/users";
 import type {
   ActionResult,
@@ -347,11 +347,21 @@ const ORG_SEARCH_FIELDS = [
   "heltes_name",
 ] as const;
 
-/** All active users in the CURRENT user's organization, for browsing by
- *  alba/heltes (no search query). Ordered so callers can group on the client. */
-export async function getMyOrgUsers(): Promise<UserSearchResult[]> {
+/** Active users of an organization, for browsing by alba/heltes (no search
+ *  query). Defaults to the CURRENT user's organization; `orgBtegId` lets a
+ *  super_admin browse another company (shared HR across companies).
+ *  Ordered so callers can group on the client. */
+export async function getMyOrgUsers(
+  orgBtegId?: string,
+): Promise<UserSearchResult[]> {
   const supabase = await createClient();
-  const { data: org } = await supabase.rpc("current_user_org_id");
+  let org: string | null = null;
+  if (orgBtegId && (await hasRole("super_admin"))) {
+    org = orgBtegId;
+  } else {
+    const { data } = await supabase.rpc("current_user_org_id");
+    org = (data as string) ?? null;
+  }
   if (!org) return [];
 
   const { data, error } = await supabase
@@ -937,11 +947,15 @@ async function mapAssignmentRows(
     const { data: users } = await supabase
       .from("users")
       .select(
-        "id, first_name, last_name, position_name, department_name, heltes_name, organization_id, autobus_direction_id, phone",
+        "id, first_name, last_name, position_name, department_name, heltes_name, organization_id, autobus_direction_id, phone, sf_guard_group_id",
       )
       .in("id", internalIds);
     for (const u of users ?? []) userMap.set(String(u.id), u);
   }
+
+  // eelj (ажлын ээлж) бүлэг — sf_guard_group_id-аар eelj_groups нэрийг холбоно.
+  const eeljGroups = await getEeljGroups();
+  const eeljNameByBteg = new Map(eeljGroups.map((g) => [g.btegId, g.name]));
 
   // companion group (хамтрагч бүлэг) — хэрэглэгч тус бүрийн бүлэг
   const companionMap = new Map<string, { id: number; name: string }>();
@@ -984,6 +998,10 @@ async function mapAssignmentRows(
       ? (orgNames.get(organizationId) ?? null)
       : null;
     const phone = (u?.phone as string) ?? null;
+    const eeljGroupId = (u?.sf_guard_group_id as string) ?? null;
+    const eeljGroupName = eeljGroupId
+      ? (eeljNameByBteg.get(eeljGroupId) ?? null)
+      : null;
 
     // Prefer the snapshot stored on the assignment; fall back to the user's
     // current direction (legacy rows before the snapshot column).
@@ -1016,6 +1034,8 @@ async function mapAssignmentRows(
       phone,
       companionGroupId: companionMap.get(internalUserId)?.id ?? null,
       companionGroupName: companionMap.get(internalUserId)?.name ?? null,
+      eeljGroupId,
+      eeljGroupName,
     } satisfies PassengerAssignment;
   });
 }
@@ -1077,13 +1097,15 @@ export async function getPoolAssignments(
 
 /** The caller's OWN organization's assignments in an exchange (pool + bus).
  *  Used by the submit panel. Filtered by org explicitly so it is correct even
- *  for admin/super_admin (whose RLS returns every row). */
+ *  for HR admin (whose RLS returns every row). super_admin sees every
+ *  organization's submissions (shared HR across companies). */
 export async function getMyExchangeSubmissions(
   exchangeId: number,
 ): Promise<PassengerAssignment[]> {
+  const isSuperAdmin = await hasRole("super_admin");
   const supabase = await createClient();
   const { data: org } = await supabase.rpc("current_user_org_id");
-  if (!org) return [];
+  if (!isSuperAdmin && !org) return [];
   const { data, error } = await (await sb())
     .from("passenger_assignments")
     .select("*")
@@ -1094,7 +1116,9 @@ export async function getMyExchangeSubmissions(
     return [];
   }
   const mapped = await mapAssignmentRows(data ?? []);
-  return mapped.filter((a) => a.organizationId === String(org));
+  return isSuperAdmin
+    ? mapped
+    : mapped.filter((a) => a.organizationId === String(org));
 }
 
 export async function bulkAssignPassengers(

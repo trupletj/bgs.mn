@@ -79,6 +79,8 @@ export interface PassengerAssignment {
   phone: string | null;
   companionGroupId: number | null;
   companionGroupName: string | null;
+  eeljGroupId: string | null;
+  eeljGroupName: string | null;
 }
 
 export interface Organization {

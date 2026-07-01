@@ -36,24 +36,32 @@ export function OrgBrowsePanel({
   excludeIds,
   disabled,
   onAdd,
+  orgOverride,
 }: {
   excludeIds: string[];
   disabled: boolean;
   onAdd: (ids: string[]) => void;
+  /** super_admin only: browse a different company's employees. `undefined` =
+   *  caller's own organization (default). `null` = no company chosen yet. */
+  orgOverride?: string | null;
 }) {
   const [users, setUsers] = useState<UserSearchResult[] | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    if (orgOverride === null) {
+      setUsers(null);
+      return;
+    }
     let active = true;
-    getMyOrgUsers().then((data) => {
+    getMyOrgUsers(orgOverride).then((data) => {
       if (active) setUsers(data);
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [orgOverride]);
 
   const excluded = useMemo(() => new Set(excludeIds), [excludeIds]);
 
@@ -99,9 +107,12 @@ export function OrgBrowsePanel({
         )
       : users;
 
+    // Алба (department_name) байхгүй ч хэлтэстэй (heltes_name) хүмүүсийг
+    // "Бусад"-д цуглуулахгүй, харин өөрийн хэлтсээр нь тусдаа бүлэг болгоно.
     const byAlba = new Map<string, UserSearchResult[]>();
     for (const u of filtered) {
-      const key = u.department_name?.trim() || OTHER;
+      const key =
+        u.department_name?.trim() || u.heltes_name?.trim() || OTHER;
       const arr = byAlba.get(key);
       if (arr) arr.push(u);
       else byAlba.set(key, [u]);
@@ -126,6 +137,14 @@ export function OrgBrowsePanel({
     });
   }, [users, query]);
 
+  if (orgOverride === null) {
+    return (
+      <p className="rounded-md bg-muted/50 px-3 py-6 text-center text-sm text-muted-foreground">
+        Эхлээд дээрээс байгууллага сонгоно уу.
+      </p>
+    );
+  }
+
   if (users === null) {
     return (
       <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
@@ -138,7 +157,9 @@ export function OrgBrowsePanel({
   if (users.length === 0) {
     return (
       <p className="rounded-md bg-muted/50 px-3 py-6 text-center text-sm text-muted-foreground">
-        Таны байгууллагад идэвхтэй хэрэглэгч олдсонгүй.
+        {orgOverride === undefined
+          ? "Таны байгууллагад идэвхтэй хэрэглэгч олдсонгүй."
+          : "Энэ байгууллагад идэвхтэй хэрэглэгч олдсонгүй."}
       </p>
     );
   }
@@ -201,7 +222,8 @@ export function OrgBrowsePanel({
 
                     {g.heltesBlocks.map((hb) => (
                       <div key={hb.heltes} className="space-y-1">
-                        {g.heltesBlocks.length > 1 || hb.heltes !== OTHER ? (
+                        {(g.heltesBlocks.length > 1 || hb.heltes !== OTHER) &&
+                        hb.heltes !== g.alba ? (
                           <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
                             {hb.heltes}
                           </p>

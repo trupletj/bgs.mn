@@ -10,6 +10,7 @@ import {
   Bus,
   Users,
   Trash2,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -51,11 +52,19 @@ import type {
 } from "@/types/shift-exchange";
 
 const NO_ORG = "__none__";
+const NO_EELJ = "Ээлжийн бүлэггүй";
+
+interface EeljBlock {
+  eeljKey: string;
+  eeljName: string;
+  members: PassengerAssignment[];
+}
 
 interface CompanyGroup {
   orgId: string;
   orgName: string;
   members: PassengerAssignment[];
+  eeljBlocks: EeljBlock[];
 }
 
 /**
@@ -91,11 +100,29 @@ export function PooledByCompany({
           orgId,
           orgName: p.organizationName ?? "Байгууллага тодорхойгүй",
           members: [p],
+          eeljBlocks: [],
         });
     }
-    return [...byOrg.values()].sort((a, b) =>
-      a.orgName.localeCompare(b.orgName),
-    );
+    return [...byOrg.values()]
+      .map((g) => {
+        const byEelj = new Map<string, EeljBlock>();
+        for (const p of g.members) {
+          const eeljKey = p.eeljGroupId ?? NO_EELJ;
+          const existing = byEelj.get(eeljKey);
+          if (existing) existing.members.push(p);
+          else
+            byEelj.set(eeljKey, {
+              eeljKey,
+              eeljName: p.eeljGroupName ?? NO_EELJ,
+              members: [p],
+            });
+        }
+        g.eeljBlocks = [...byEelj.values()].sort((a, b) =>
+          a.eeljName.localeCompare(b.eeljName, "mn", { numeric: true }),
+        );
+        return g;
+      })
+      .sort((a, b) => a.orgName.localeCompare(b.orgName));
   }, [pool]);
 
   const toggleOne = (id: number) =>
@@ -252,60 +279,75 @@ export function PooledByCompany({
                     Бүгдийг сонгох
                   </label>
                 )}
-                <ul className="flex flex-col gap-1.5">
-                  {g.members.map((m) => {
-                    const noDirection = !m.directionName;
-                    const Row = (
-                      <>
-                        <span className="font-medium text-foreground">
-                          {m.displayName || "Нэргүй"}
-                        </span>
-                        {noDirection ? (
-                          <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-                            <AlertTriangle className="h-3 w-3" />
-                            чиглэлгүй
+                <div className="flex flex-col gap-3">
+                  {g.eeljBlocks.map((eb) => (
+                    <div key={eb.eeljKey} className="space-y-1.5">
+                      {g.eeljBlocks.length > 1 && (
+                        <p className="flex items-center gap-1.5 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                          <CalendarClock className="h-3 w-3 shrink-0" />
+                          {eb.eeljName}
+                          <span className="tabular-nums normal-case text-muted-foreground/50">
+                            ({eb.members.length})
                           </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            {m.directionName}
-                          </span>
-                        )}
-                        {m.positionName && (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Briefcase className="h-3 w-3 shrink-0" />
-                            {m.positionName}
-                          </span>
-                        )}
-                        {m.companionGroupName && (
-                          <Badge
-                            variant="secondary"
-                            className="gap-1 text-[11px]">
-                            <Users className="h-3 w-3" />
-                            {m.companionGroupName}
-                          </Badge>
-                        )}
-                      </>
-                    );
-                    return selectable ? (
-                      <li key={m.id}>
-                        <label className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md border px-2.5 py-1.5 text-sm">
-                          <Checkbox
-                            checked={selected.has(m.id)}
-                            onCheckedChange={() => toggleOne(m.id)}
-                          />
-                          {Row}
-                        </label>
-                      </li>
-                    ) : (
-                      <li
-                        key={m.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md border px-2.5 py-1.5 text-sm">
-                        {Row}
-                      </li>
-                    );
-                  })}
-                </ul>
+                        </p>
+                      )}
+                      <ul className="flex flex-col gap-1.5">
+                        {eb.members.map((m) => {
+                          const noDirection = !m.directionName;
+                          const Row = (
+                            <>
+                              <span className="font-medium text-foreground">
+                                {m.displayName || "Нэргүй"}
+                              </span>
+                              {noDirection ? (
+                                <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  чиглэлгүй
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  {m.directionName}
+                                </span>
+                              )}
+                              {m.positionName && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Briefcase className="h-3 w-3 shrink-0" />
+                                  {m.positionName}
+                                </span>
+                              )}
+                              {m.companionGroupName && (
+                                <Badge
+                                  variant="secondary"
+                                  className="gap-1 text-[11px]">
+                                  <Users className="h-3 w-3" />
+                                  {m.companionGroupName}
+                                </Badge>
+                              )}
+                            </>
+                          );
+                          return selectable ? (
+                            <li key={m.id}>
+                              <label className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md border px-2.5 py-1.5 text-sm">
+                                <Checkbox
+                                  checked={selected.has(m.id)}
+                                  onCheckedChange={() => toggleOne(m.id)}
+                                />
+                                {Row}
+                              </label>
+                            </li>
+                          ) : (
+                            <li
+                              key={m.id}
+                              className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md border px-2.5 py-1.5 text-sm">
+                              {Row}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </AccordionContent>
             </AccordionItem>
           );

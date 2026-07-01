@@ -35,6 +35,13 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UserSearchPicker } from "@/components/users/user-search-picker";
 import { OrgBrowsePanel } from "@/components/shift-exchange/org-browse-panel";
 import {
@@ -42,8 +49,9 @@ import {
   searchMyOrgUsers,
   submitPassengersToPool,
 } from "@/actions/shift-exchange";
+import { searchUsers } from "@/actions/users";
 import { BusyIndicator } from "@/components/ui/page-loader";
-import type { PassengerAssignment } from "@/types/shift-exchange";
+import type { Organization, PassengerAssignment } from "@/types/shift-exchange";
 
 /** Нэр дээрх эхний үсгүүдээс товч initials гаргана. */
 function initials(name: string): string {
@@ -82,18 +90,27 @@ function PassengerStatus({ p }: { p: PassengerAssignment }) {
  * Rep-facing panel: submit own-organization people into an exchange pool.
  * The RPC validates org membership server-side, so picking a non-org user is
  * simply skipped (reported in the toast).
+ *
+ * super_admin (companies share one HR department) can instead pick any
+ * company and register its people too — the RPC lifts the org restriction
+ * for that role.
  */
 export function SubmitPoolPanel({
   exchangeId,
   myPool,
   canRegister,
+  isSuperAdmin = false,
+  organizations = [],
 }: {
   exchangeId: number;
   myPool: PassengerAssignment[];
   canRegister: boolean;
+  isSuperAdmin?: boolean;
+  organizations?: Organization[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [orgId, setOrgId] = useState("");
 
   const addMany = (userIds: string[]) => {
     if (userIds.length === 0) return;
@@ -142,7 +159,11 @@ export function SubmitPoolPanel({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Миний байгууллагын зорчигчид</h2>
+          <h2 className="text-sm font-semibold">
+            {isSuperAdmin
+              ? "Бүх байгууллагын зорчигчид"
+              : "Миний байгууллагын зорчигчид"}
+          </h2>
         </div>
         <Badge variant="secondary" className="tabular-nums">
           {myPool.length} зорчигч
@@ -159,17 +180,33 @@ export function SubmitPoolPanel({
               Хайлтаар
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="browse" className="mt-3">
+          <TabsContent value="browse" className="mt-3 space-y-3">
+            {isSuperAdmin && (
+              <Select value={orgId} onValueChange={setOrgId}>
+                <SelectTrigger className="h-9 w-full">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Байгууллага сонгох..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((o) => (
+                    <SelectItem key={o.btegId} value={o.btegId}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <OrgBrowsePanel
               excludeIds={myPool.map((p) => p.internalUserId)}
               disabled={pending}
               onAdd={addMany}
+              orgOverride={isSuperAdmin ? orgId || null : undefined}
             />
           </TabsContent>
           <TabsContent value="search" className="mt-3">
             <UserSearchPicker
               placeholder="Нэр, утас, ажлын байраар хайх..."
-              searchFn={searchMyOrgUsers}
+              searchFn={isSuperAdmin ? searchUsers : searchMyOrgUsers}
               excludeIds={myPool.map((p) => p.internalUserId)}
               disabled={pending}
               onSelect={(u) => add(u.id)}
@@ -190,7 +227,9 @@ export function SubmitPoolPanel({
             Зорчигч бүртгээгүй байна
           </p>
           <p className="text-xs text-muted-foreground">
-            Дээрх хайлтаас өөрийн байгууллагын хүмүүсийг нэмнэ үү
+            {isSuperAdmin
+              ? "Дээрх хайлтаас байгууллагын хүмүүсийг нэмнэ үү"
+              : "Дээрх хайлтаас өөрийн байгууллагын хүмүүсийг нэмнэ үү"}
           </p>
         </div>
       ) : (
@@ -270,6 +309,12 @@ export function SubmitPoolPanel({
                     <span className="font-medium text-foreground">
                       {p.displayName || "Нэргүй"}
                     </span>
+                    {isSuperAdmin && p.organizationName && (
+                      <Badge variant="outline" className="gap-1 text-[11px]">
+                        <Building2 className="h-3 w-3" />
+                        {p.organizationName}
+                      </Badge>
+                    )}
                     <PassengerStatus p={p} />
                   </div>
 
