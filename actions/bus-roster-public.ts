@@ -24,6 +24,8 @@ export interface PublicRosterRow {
   albaOrHeltes: string | null;
   organizationName: string | null;
   isConfirmed: boolean;
+  /** true бол энэ мөр passenger биш, тухайн автобусны аялалын ахлах. */
+  isLeader: boolean;
 }
 
 export async function getPublicBusRoster(): Promise<PublicRosterRow[]> {
@@ -53,5 +55,6 @@ export async function getPublicBusRoster(): Promise<PublicRosterRow[]> {
     albaOrHeltes: ((r.alba_name as string) || (r.heltes_name as string)) ?? null,
     organizationName: (r.organization_name as string)?.trim() || null,
     isConfirmed: Boolean(r.is_confirmed),
+    isLeader: Boolean(r.is_leader),
   }));
 }

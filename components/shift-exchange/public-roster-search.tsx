@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Bus, Clock, CheckCircle2, Users } from "lucide-react";
+import { Search, Bus, Clock, CheckCircle2, Users, UserCog } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -20,6 +21,12 @@ import {
 } from "@/components/shift-exchange/shared";
 import type { PublicRosterRow } from "@/actions/bus-roster-public";
 import type { ShiftDirection } from "@/types/shift-exchange";
+
+/** Аялалын ахлахыг эхэнд нь, дараа нь нэрээр эрэмбэлнэ. */
+function sortRows(a: PublicRosterRow, b: PublicRosterRow): number {
+  if (a.isLeader !== b.isLeader) return a.isLeader ? -1 : 1;
+  return mnCompare(a.passengerName, b.passengerName);
+}
 
 interface ExchangeGroup {
   exchangeId: number;
@@ -148,12 +155,12 @@ export function PublicRosterSearch({ rows }: { rows: PublicRosterRow[] }) {
                         нэг нь нягт stack хийсэн карт-мөр. */}
                     <div className="divide-y sm:hidden">
                       {b.rows
-                        .sort((x, y) => mnCompare(x.passengerName, y.passengerName))
+                        .sort(sortRows)
                         .map((r) => (
                           <div
                             key={r.passengerName + r.busId}
                             className="px-3 py-2.5">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               {r.isConfirmed && (
                                 <CheckCircle2
                                   className="h-3.5 w-3.5 shrink-0 text-emerald-600"
@@ -163,6 +170,12 @@ export function PublicRosterSearch({ rows }: { rows: PublicRosterRow[] }) {
                               <span className="truncate text-sm font-medium text-foreground">
                                 {r.lastName} {r.firstName || "Нэргүй"}
                               </span>
+                              {r.isLeader && (
+                                <Badge className="gap-1 border-transparent bg-amber-100 text-[11px] text-amber-800">
+                                  <UserCog className="h-3 w-3" />
+                                  Ахлах
+                                </Badge>
+                              )}
                             </div>
                             {(r.positionName || r.albaOrHeltes) && (
                               <p className="truncate text-xs text-muted-foreground">
@@ -193,35 +206,43 @@ export function PublicRosterSearch({ rows }: { rows: PublicRosterRow[] }) {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {b.rows
-                            .sort((x, y) => mnCompare(x.passengerName, y.passengerName))
-                            .map((r) => (
-                              <TableRow key={r.passengerName + r.busId}>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {r.organizationName ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {r.albaOrHeltes ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  {r.lastName || "—"}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <div className="flex items-center gap-1.5">
-                                    {r.isConfirmed && (
-                                      <CheckCircle2
-                                        className="h-3.5 w-3.5 shrink-0 text-emerald-600"
-                                        aria-label="QR баталгаажсан"
-                                      />
-                                    )}
-                                    {r.firstName || "Нэргүй"}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {r.positionName ?? "—"}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                          {b.rows.sort(sortRows).map((r) => (
+                            <TableRow
+                              key={r.passengerName + r.busId}
+                              className={
+                                r.isLeader ? "bg-amber-50/60 hover:bg-amber-50/60" : undefined
+                              }>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {r.organizationName ?? "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {r.albaOrHeltes ?? "—"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {r.lastName || "—"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {r.isConfirmed && (
+                                    <CheckCircle2
+                                      className="h-3.5 w-3.5 shrink-0 text-emerald-600"
+                                      aria-label="QR баталгаажсан"
+                                    />
+                                  )}
+                                  {r.firstName || "Нэргүй"}
+                                  {r.isLeader && (
+                                    <Badge className="gap-1 border-transparent bg-amber-100 text-[11px] text-amber-800">
+                                      <UserCog className="h-3 w-3" />
+                                      Ахлах
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {r.positionName ?? "—"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
