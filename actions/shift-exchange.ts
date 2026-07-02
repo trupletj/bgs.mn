@@ -125,6 +125,57 @@ export const getEeljGroups = cache(async (): Promise<EeljGroupOption[]> => {
     }));
 });
 
+/** Гэрээт компаний төлөөлөгчид зориулсан — зөвхөн ӨӨРСДИЙН байгууллагад
+ *  харьяалагдах (eelj_groups.organization_id) ээлжийн бүлгүүд. */
+export async function getMyOrgEeljGroups(): Promise<EeljGroupOption[]> {
+  const supabase = await createClient();
+  const { data: org } = await supabase.rpc("current_user_org_id");
+  if (!org) return [];
+  const { data, error } = await supabase
+    .from("eelj_groups")
+    .select("bteg_id, name")
+    .eq("organization_id", org as string)
+    .order("name", { nullsFirst: false });
+  if (error) {
+    console.error("[shift-exchange] getMyOrgEeljGroups:", error.message);
+    return [];
+  }
+  return (data ?? [])
+    .filter((g) => g.bteg_id)
+    .map((g) => ({
+      btegId: String(g.bteg_id),
+      name: (g.name as string) ?? "",
+    }));
+}
+
+/** Гэрээт компаний төлөөлөгч ЗӨВХӨН ӨӨРСДИЙН байгууллагад харьяалагдах
+ *  ээлжийн бүлгүүдийг холбож, тэдгээрийн гишүүдийг pool-руу нэмнэ. DB талд
+ *  (add_my_org_eelj_group_to_pool RPC) байгууллага давхар шалгагдана. */
+export async function linkMyOrgEeljGroups(
+  exchangeId: number,
+  groupBtegIds: string[],
+): Promise<ActionResult<{ added: number }>> {
+  const canSubmit =
+    (await hasPermission("shift_exchange", "submit")) ||
+    (await hasPermission("shift_exchange", "admin"));
+  if (!canSubmit) return { ok: false, error: "Танд эрх алга" };
+  if (groupBtegIds.length === 0) return { ok: true, added: 0 };
+
+  const client = await sb();
+  let added = 0;
+  for (const groupBtegId of groupBtegIds) {
+    const { data, error } = await client.rpc(
+      "add_my_org_eelj_group_to_pool",
+      { p_exchange_id: exchangeId, p_group_bteg_id: groupBtegId },
+    );
+    if (error) return { ok: false, error: error.message };
+    added += Number(data ?? 0);
+  }
+  revalidatePath(`/shift-exchange/register/${exchangeId}`);
+  revalidatePath(`/shift-exchange/${exchangeId}`);
+  return { ok: true, added };
+}
+
 // ── Companion groups (хамтрагч бүлэг) ────────────────────────────────────────
 export const getCompanionGroups = cache(async (): Promise<CompanionGroup[]> => {
   const client = await sb();
@@ -919,6 +970,93 @@ export async function transferTripLeaderToBus(
   revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
 
   return addInternalPassenger(targetBusId, tripLeaderId);
+}
+
+/** Тухайн автобусны аялалын ахлахыг ахлах статусаас чөлөөлөөд, ЯГ ТЭР Л
+ *  автобусанд энгийн зорчигчоор үлдээнэ (өөр автобус руу шилжүүлэхгүй,
+ *  pool рүү ч буцаахгүй). Суудлын хязгаарыг шалгана (ахлахын нөөцлөгдсөн
+ *  суудал одоо энгийн зорчигчийн суудал болж хувирна). */
+export async function demoteTripLeaderToBusPassenger(
+  busId: number,
+  exchangeId: number,
+): Promise<ActionResult> {
+  const denied = await requireAdmin();
+  if (denied) return { ok: false, error: denied };
+
+  const { data: bus } = await (await sb())
+    .from("buses")
+    .select("trip_leader_id")
+    .eq("id", busId)
+    .maybeSingle();
+  const tripLeaderId = bus?.trip_leader_id as string | null | undefined;
+  if (!tripLeaderId)
+    return { ok: false, error: "Энэ автобус аялалын ахлахгүй байна" };
+
+  const { data: cap } = await (
+    await sb()
+  ).rpc("check_bus_capacity", { p_bus_id: busId });
+  const c = (Array.isArray(cap) ? cap[0] : cap) as Record<string, unknown>;
+  if (c?.is_full)
+    return { ok: false, error: "Автобус дүүрсэн байна" };
+
+  const client = await sb();
+  const { error: clearErr } = await client
+    .from("buses")
+    .update({ trip_leader_id: null })
+    .eq("id", busId);
+  if (clearErr) return { ok: false, error: clearErr.message };
+
+  const { error: insertErr } = await client
+    .from("passenger_assignments")
+    .insert({
+      shift_exchange_id: exchangeId,
+      bus_id: busId,
+      internal_user_id: tripLeaderId,
+    });
+  if (insertErr) return { ok: false, error: insertErr.message };
+
+  revalidatePath(`/shift-exchange/${exchangeId}`);
+  revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
+  return { ok: true };
+}
+
+/** Тухайн автобусны аялалын ахлахыг ахлах статусаас чөлөөлөөд, хуваарилаагүй
+ *  (pool) жагсаалт руу буцаана. Устгахгүй — дараа нь дахин хуваарилж болно. */
+export async function removeTripLeaderToPool(
+  busId: number,
+  exchangeId: number,
+): Promise<ActionResult> {
+  const denied = await requireAdmin();
+  if (denied) return { ok: false, error: denied };
+
+  const { data: bus } = await (await sb())
+    .from("buses")
+    .select("trip_leader_id")
+    .eq("id", busId)
+    .maybeSingle();
+  const tripLeaderId = bus?.trip_leader_id as string | null | undefined;
+  if (!tripLeaderId)
+    return { ok: false, error: "Энэ автобус аялалын ахлахгүй байна" };
+
+  const client = await sb();
+  const { error: clearErr } = await client
+    .from("buses")
+    .update({ trip_leader_id: null })
+    .eq("id", busId);
+  if (clearErr) return { ok: false, error: clearErr.message };
+
+  const { error: insertErr } = await client
+    .from("passenger_assignments")
+    .insert({
+      shift_exchange_id: exchangeId,
+      bus_id: null,
+      internal_user_id: tripLeaderId,
+    });
+  if (insertErr) return { ok: false, error: insertErr.message };
+
+  revalidatePath(`/shift-exchange/${exchangeId}`);
+  revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
+  return { ok: true };
 }
 
 export async function updateBus(
