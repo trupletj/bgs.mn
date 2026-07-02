@@ -34,6 +34,32 @@ async function requireAdmin(): Promise<string | null> {
   return ok ? null : "Танд энэ үйлдлийг хийх эрх алга";
 }
 
+/** Нэг хүн нэг ээлжид зэрэг хоёр автобусны ахлах байж болохгүй тул шинээр
+ *  ахлах болгохоос өмнө өөр автобус дээрх хуучин ахлах статусыг нь цэвэрлэнэ
+ *  (эс тэгвээс buses.trip_leader_id-ийн unique constraint 23505 шидэнэ).
+ *  trg_sync_bus_trip_leader trigger цэвэрлэгдсэн автобусны trip_leaders
+ *  sync-ийг мөн автоматаар засна. Цэвэрлэсэн бол тухайн автобусны нэрийг буцаана. */
+async function clearOtherTripLeaderships(
+  exchangeId: number,
+  tripLeaderId: string,
+  exceptBusId: number | null,
+): Promise<string | null> {
+  const client = await sb();
+  let query = client
+    .from("buses")
+    .select("id, name")
+    .eq("shift_exchange_id", exchangeId)
+    .eq("trip_leader_id", tripLeaderId);
+  if (exceptBusId != null) query = query.neq("id", exceptBusId);
+  const { data: other } = await query.maybeSingle();
+  if (!other) return null;
+  await client
+    .from("buses")
+    .update({ trip_leader_id: null })
+    .eq("id", other.id);
+  return other.name as string;
+}
+
 async function currentUserId(): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase.rpc("current_user_id");
@@ -608,18 +634,6 @@ export async function setRegistrationOverride(
   return { ok: true };
 }
 
-export async function deleteShiftExchange(id: number): Promise<ActionResult> {
-  const denied = await requireAdmin();
-  if (denied) return { ok: false, error: denied };
-  const { error } = await (await sb())
-    .from("shift_exchanges")
-    .delete()
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath("/shift-exchange");
-  return { ok: true };
-}
-
 // ── Buses ───────────────────────────────────────────────────────────────────
 async function busDirectionsMap(
   busIds: number[],
@@ -799,6 +813,9 @@ export async function createBus(
   const denied = await requireAdmin();
   if (denied) return { ok: false, error: denied };
 
+  if (input.tripLeaderId)
+    await clearOtherTripLeaderships(exchangeId, input.tripLeaderId, null);
+
   const client = await sb();
   const { data, error } = await client
     .from("buses")
@@ -838,14 +855,25 @@ export async function createBus(
 }
 
 /** Change (or clear) a bus's trip leader inline. The trg_sync_bus_trip_leader
- *  trigger keeps bgs_attendance.trip_leaders in sync automatically. */
+ *  trigger keeps bgs_attendance.trip_leaders in sync automatically. Хэрэв
+ *  сонгосон хүн өөр автобусны ахлах байсан бол тэндээс нь автоматаар
+ *  чөлөөлж (23505 conflict-ыг тойрч) шинэ автобусанд ахлах болгоно. */
 export async function setBusTripLeader(
   busId: number,
   exchangeId: number,
   tripLeaderId: string | null,
-): Promise<ActionResult> {
+): Promise<ActionResult<{ clearedFromBusName?: string }>> {
   const denied = await requireAdmin();
   if (denied) return { ok: false, error: denied };
+
+  let clearedFromBusName: string | null = null;
+  if (tripLeaderId)
+    clearedFromBusName = await clearOtherTripLeaderships(
+      exchangeId,
+      tripLeaderId,
+      busId,
+    );
+
   const { error } = await (await sb())
     .from("buses")
     .update({ trip_leader_id: tripLeaderId })
@@ -860,7 +888,37 @@ export async function setBusTripLeader(
   }
   revalidatePath(`/shift-exchange/${exchangeId}`);
   revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
-  return { ok: true };
+  return { ok: true, ...(clearedFromBusName ? { clearedFromBusName } : {}) };
+}
+
+/** Тухайн автобусны аялалын ахлахыг ахлах статусаас нь чөлөөлөөд, өөр
+ *  автобусанд энгийн зорчигчоор шилжүүлнэ (аялалын ахлах хосолсон "хасах +
+ *  шилжүүлэх" үйлдэл). */
+export async function transferTripLeaderToBus(
+  busId: number,
+  exchangeId: number,
+  targetBusId: number,
+): Promise<AddPassengerResult> {
+  const denied = await requireAdmin();
+  if (denied) return { ok: false, error: denied };
+
+  const { data: bus } = await (await sb())
+    .from("buses")
+    .select("trip_leader_id")
+    .eq("id", busId)
+    .maybeSingle();
+  const tripLeaderId = bus?.trip_leader_id as string | null | undefined;
+  if (!tripLeaderId)
+    return { ok: false, error: "Энэ автобус аялалын ахлахгүй байна" };
+
+  const { error } = await (await sb())
+    .from("buses")
+    .update({ trip_leader_id: null })
+    .eq("id", busId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
+
+  return addInternalPassenger(targetBusId, tripLeaderId);
 }
 
 export async function updateBus(
@@ -870,6 +928,10 @@ export async function updateBus(
 ): Promise<ActionResult> {
   const denied = await requireAdmin();
   if (denied) return { ok: false, error: denied };
+
+  if (input.tripLeaderId)
+    await clearOtherTripLeaderships(exchangeId, input.tripLeaderId, busId);
+
   const client = await sb();
   const { error } = await client
     .from("buses")
@@ -935,41 +997,51 @@ async function mapAssignmentRows(
     ...new Set(rows.map((a) => a.internal_user_id).filter(Boolean)),
   ] as string[];
 
-  const [directions, orgNames] = await Promise.all([
-    getDirections(),
-    getOrgNameMap(),
-  ]);
+  // Бие даасан query-үүдийг зэрэг явуулна (өмнө нь дараалан хүлээдэг байсан).
+  const [directions, orgNames, eeljGroups, users, members] = await Promise.all(
+    [
+      getDirections(),
+      getOrgNameMap(),
+      getEeljGroups(),
+      internalIds.length
+        ? createClient()
+            .then((supabase) =>
+              supabase
+                .from("users")
+                .select(
+                  "id, first_name, last_name, position_name, department_id, department_name, heltes_name, organization_id, autobus_direction_id, phone, sf_guard_group_id",
+                )
+                .in("id", internalIds),
+            )
+            .then((res) => res.data ?? [])
+        : Promise.resolve([] as Record<string, unknown>[]),
+      internalIds.length
+        ? sb()
+            .then((client) =>
+              client
+                .from("companion_group_members")
+                .select("internal_user_id, group_id")
+                .in("internal_user_id", internalIds),
+            )
+            .then((res) => res.data ?? [])
+        : Promise.resolve([] as Record<string, unknown>[]),
+    ],
+  );
   const dirByBteg = new Map(directions.map((d) => [d.btegId, d.name]));
 
   const userMap = new Map<string, Record<string, unknown>>();
-  if (internalIds.length) {
-    const supabase = await createClient();
-    const { data: users } = await supabase
-      .from("users")
-      .select(
-        "id, first_name, last_name, position_name, department_name, heltes_name, organization_id, autobus_direction_id, phone, sf_guard_group_id",
-      )
-      .in("id", internalIds);
-    for (const u of users ?? []) userMap.set(String(u.id), u);
-  }
+  for (const u of users) userMap.set(String(u.id), u);
 
   // eelj (ажлын ээлж) бүлэг — sf_guard_group_id-аар eelj_groups нэрийг холбоно.
-  const eeljGroups = await getEeljGroups();
   const eeljNameByBteg = new Map(eeljGroups.map((g) => [g.btegId, g.name]));
 
   // companion group (хамтрагч бүлэг) — хэрэглэгч тус бүрийн бүлэг
   const companionMap = new Map<string, { id: number; name: string }>();
-  if (internalIds.length) {
-    const client = await sb();
-    const { data: members } = await client
-      .from("companion_group_members")
-      .select("internal_user_id, group_id")
-      .in("internal_user_id", internalIds);
-    const groupIds = [
-      ...new Set((members ?? []).map((m) => Number(m.group_id))),
-    ];
+  if (members.length) {
+    const groupIds = [...new Set(members.map((m) => Number(m.group_id)))];
     const groupNames = new Map<number, string>();
     if (groupIds.length) {
+      const client = await sb();
       const { data: groups } = await client
         .from("companion_groups")
         .select("id, name")
@@ -977,7 +1049,7 @@ async function mapAssignmentRows(
       for (const g of groups ?? [])
         groupNames.set(Number(g.id), String(g.name ?? ""));
     }
-    for (const m of members ?? [])
+    for (const m of members)
       companionMap.set(String(m.internal_user_id), {
         id: Number(m.group_id),
         name: groupNames.get(Number(m.group_id)) ?? "",
@@ -991,8 +1063,12 @@ async function mapAssignmentRows(
 
     const displayName = `${u?.last_name ?? ""} ${u?.first_name ?? ""}`.trim();
     const positionName = (u?.position_name as string) ?? null;
-    const albaName = (u?.department_name as string) ?? null;
-    const heltesName = (u?.heltes_name as string) ?? null;
+    // department_name/heltes_name can be "" (not null) on rows where that
+    // side doesn't apply — decide by the *_id, not by the string value.
+    const albaName = u?.department_id
+      ? (u?.department_name as string) || null
+      : null;
+    const heltesName = (u?.heltes_name as string) || null;
     const organizationId = (u?.organization_id as string) ?? null;
     const organizationName = organizationId
       ? (orgNames.get(organizationId) ?? null)
@@ -1078,21 +1154,31 @@ export async function getAssignments(
   return mapAssignmentRows(data ?? []);
 }
 
+/** All passenger assignments for an exchange (pool + on-bus), decorated.
+ *  React-`cache()`-тэй тул нэг request дотор {@link getPoolAssignments} болон
+ *  {@link getReportRows} зэрэг дуудагдвал query + mapAssignmentRows нэг л удаа
+ *  явна (өмнө нь тус тусдаа давхар татдаг байсан). */
+const getExchangeAssignments = cache(
+  async (exchangeId: number): Promise<PassengerAssignment[]> => {
+    const { data, error } = await (await sb())
+      .from("passenger_assignments")
+      .select("*")
+      .eq("shift_exchange_id", exchangeId)
+      .order("id");
+    if (error) {
+      console.error("[shift-exchange] getExchangeAssignments:", error.message);
+      return [];
+    }
+    return mapAssignmentRows(data ?? []);
+  },
+);
+
 /** Pool: passengers submitted to an exchange but not yet on a bus. */
 export async function getPoolAssignments(
   exchangeId: number,
 ): Promise<PassengerAssignment[]> {
-  const { data, error } = await (await sb())
-    .from("passenger_assignments")
-    .select("*")
-    .eq("shift_exchange_id", exchangeId)
-    .is("bus_id", null)
-    .order("id");
-  if (error) {
-    console.error("[shift-exchange] getPoolAssignments:", error.message);
-    return [];
-  }
-  return mapAssignmentRows(data ?? []);
+  const all = await getExchangeAssignments(exchangeId);
+  return all.filter((a) => a.busId == null);
 }
 
 /** The caller's OWN organization's assignments in an exchange (pool + bus).
@@ -1156,10 +1242,20 @@ async function busExchangeId(busId: number): Promise<number | null> {
   return data ? Number(data.shift_exchange_id) : null;
 }
 
+export interface AddPassengerResult {
+  ok: boolean;
+  error?: string;
+  /** true бол уг хүн өөр автобусны аялалын ахлах байгаа тул хэрэглэгчээс
+   *  баталгаажуулалт авч, дараа нь `force: true`-ээр дахин дуудах ёстой. */
+  needsLeaderConfirm?: boolean;
+  leaderBusName?: string;
+}
+
 export async function addInternalPassenger(
   busId: number,
   userId: string,
-): Promise<ActionResult> {
+  force = false,
+): Promise<AddPassengerResult> {
   const denied = await requireAdmin();
   if (denied) return { ok: false, error: denied };
   const exchangeId = await busExchangeId(busId);
@@ -1171,6 +1267,54 @@ export async function addInternalPassenger(
   ).rpc("check_bus_capacity", { p_bus_id: busId });
   const c = (Array.isArray(cap) ? cap[0] : cap) as Record<string, unknown>;
   if (c?.is_full) return { ok: false, error: "Автобус дүүрсэн байна" };
+
+  // энэ хүн аль хэдийн энэ ээлжийн аль нэг автобусны аялалын ахлах бол
+  // зэрэгцээд зорчигчоор нэмэхгүй (нэг хүн = нэг бичлэг). force=true бол
+  // (хэрэглэгч сануулгыг баталгаажуулсан) тэндээс нь чөлөөлөөд үргэлжлүүлнэ.
+  const { data: leaderBus } = await (await sb())
+    .from("buses")
+    .select("id, name")
+    .eq("shift_exchange_id", exchangeId)
+    .eq("trip_leader_id", userId)
+    .maybeSingle();
+  if (leaderBus) {
+    if (!force)
+      return {
+        ok: false,
+        error: `Энэ хүн "${leaderBus.name}" автобусны аялалын ахлах байна`,
+        needsLeaderConfirm: true,
+        leaderBusName: leaderBus.name as string,
+      };
+    await (await sb())
+      .from("buses")
+      .update({ trip_leader_id: null })
+      .eq("id", leaderBus.id);
+    revalidatePath(`/shift-exchange/${exchangeId}/buses/${leaderBus.id}`);
+  }
+
+  // энэ хүн энэ ээлжид өөр автобус дээр (эсвэл pool-д) аль хэдийн байгаа бол
+  // шинээр бичлэг нэмэхгүй — байгаа бичлэгийг нь энэ автобус руу шилжүүлнэ.
+  const { data: existing } = await (await sb())
+    .from("passenger_assignments")
+    .select("id, bus_id")
+    .eq("shift_exchange_id", exchangeId)
+    .eq("internal_user_id", userId)
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.bus_id === busId) {
+      return { ok: false, error: "Энэ хүн аль хэдийн энэ автобусанд байна" };
+    }
+    const { error } = await (await sb()).rpc("transfer_passenger", {
+      p_assignment_id: existing.id,
+      p_target_bus_id: busId,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
+    if (existing.bus_id != null)
+      revalidatePath(`/shift-exchange/${exchangeId}/buses/${existing.bus_id}`);
+    return { ok: true };
+  }
 
   const { error } = await (await sb()).from("passenger_assignments").insert({
     shift_exchange_id: exchangeId,
@@ -1413,19 +1557,11 @@ export interface ReportRow {
 export async function getReportRows(exchangeId: number): Promise<ReportRow[]> {
   if (!(await hasPermission("shift_exchange", "view"))) return [];
 
-  // Бүх зорчигчийг (автобустай + хуваарилаагүй) НЭГ query-ээр аваад нэг удаа баяжуулна.
-  // (Өмнө автобус тус бүрээр дараалан татдаг байсан → N+1.)
-  const client = await sb();
-  const [res, buses] = await Promise.all([
-    client
-      .from("passenger_assignments")
-      .select("*")
-      .eq("shift_exchange_id", exchangeId)
-      .order("id"),
+  const [all, buses] = await Promise.all([
+    getExchangeAssignments(exchangeId),
     getBusesForExchange(exchangeId),
   ]);
   const busName = new Map(buses.map((b) => [b.id, b.name]));
-  const all = await mapAssignmentRows(res.data ?? []);
 
   return all.map((a) => ({
     assignmentId: a.id,
@@ -1436,7 +1572,7 @@ export async function getReportRows(exchangeId: number): Promise<ReportRow[]> {
     firstName: a.firstName,
     lastName: a.lastName,
     position: a.positionName,
-    alba: a.albaName,
+    alba: a.albaName ?? a.heltesName,
     organizationName: a.organizationName,
     directionName: a.directionName,
     phone: a.phone,
@@ -1673,28 +1809,38 @@ export async function autoDistributePool(
   };
 }
 
-/** Link an eelj group and add its workers to the POOL (хуваарилаагүй жагсаалт).
- *  Автобусанд хуваарилахгүй — хуваарилалт зөвхөн "Ухаалаг хуваарилах"-аар. */
-export async function linkAndAssignGroup(
+/** Link one or more eelj groups and add their workers to the POOL
+ *  (хуваарилаагүй жагсаалт). Автобусанд хуваарилахгүй — хуваарилалт зөвхөн
+ *  "Ухаалаг хуваарилах"-аар. */
+export async function linkAndAssignGroups(
   exchangeId: number,
-  groupBtegId: string,
+  groupBtegIds: string[],
 ): Promise<ActionResult<{ added: number }>> {
   const denied = await requireAdmin();
   if (denied) return { ok: false, error: denied };
-  const { error: linkErr } = await (await sb())
-    .from("shift_exchange_groups")
-    .upsert(
-      { shift_exchange_id: exchangeId, group_bteg_id: groupBtegId },
-      { onConflict: "shift_exchange_id,group_bteg_id" },
-    );
+  if (groupBtegIds.length === 0) return { ok: true, added: 0 };
+
+  const client = await sb();
+  const { error: linkErr } = await client.from("shift_exchange_groups").upsert(
+    groupBtegIds.map((groupBtegId) => ({
+      shift_exchange_id: exchangeId,
+      group_bteg_id: groupBtegId,
+    })),
+    { onConflict: "shift_exchange_id,group_bteg_id" },
+  );
   if (linkErr) return { ok: false, error: linkErr.message };
-  const { data, error } = await (await sb()).rpc("add_eelj_group_to_pool", {
-    p_exchange_id: exchangeId,
-    p_group_bteg_id: groupBtegId,
-  });
-  if (error) return { ok: false, error: error.message };
+
+  let added = 0;
+  for (const groupBtegId of groupBtegIds) {
+    const { data, error } = await client.rpc("add_eelj_group_to_pool", {
+      p_exchange_id: exchangeId,
+      p_group_bteg_id: groupBtegId,
+    });
+    if (error) return { ok: false, error: error.message };
+    added += Number(data ?? 0);
+  }
   revalidatePath(`/shift-exchange/${exchangeId}`);
-  return { ok: true, added: Number(data ?? 0) };
+  return { ok: true, added };
 }
 
 /** Unlink a group and remove its unconfirmed workers from the exchange

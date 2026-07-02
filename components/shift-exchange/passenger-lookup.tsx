@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import {
   Bus,
   CheckCircle2,
@@ -62,6 +62,7 @@ interface Filters {
   position: string;
   direction: string;
   org: string;
+  alba: string;
 }
 
 const EMPTY: Filters = {
@@ -71,6 +72,7 @@ const EMPTY: Filters = {
   position: "",
   direction: "",
   org: "",
+  alba: "",
 };
 
 const TEXT_FIELDS: {
@@ -81,8 +83,13 @@ const TEXT_FIELDS: {
   { key: "lastName", label: "Овог", placeholder: "овгоор..." },
   { key: "firstName", label: "Нэр", placeholder: "нэрээр..." },
   { key: "phone", label: "Утас", placeholder: "утсаар..." },
+];
+
+const AFTER_ALBA_TEXT_FIELDS: typeof TEXT_FIELDS = [
   { key: "position", label: "Албан тушаал", placeholder: "тушаалаар..." },
 ];
+
+const ALBA_OPTIONS_ID = "alba-heltes-options";
 
 function match(value: string | null, q: string): boolean {
   if (!q.trim()) return true;
@@ -91,7 +98,8 @@ function match(value: string | null, q: string): boolean {
 
 /**
  * "Хэн ямар автобусанд" — ээлжийн зорчигчдыг олон талбараар (овог, нэр, утас,
- * албан тушаал, чиглэл, байгууллага) шүүж, аль автобусанд хуваарилагдсаныг харна.
+ * албан тушаал, чиглэл, байгууллага, алба/хэлтэс) шүүж, аль автобусанд
+ * хуваарилагдсаныг харна.
  */
 export function PassengerLookup({
   rows,
@@ -196,25 +204,37 @@ export function PassengerLookup({
     return [...s].sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
-  const active = Object.values(f).some((v) => v.trim() !== "");
+  const albaOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rows) if (r.alba) s.add(r.alba);
+    return [...s].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  // Оролтын талбарууд шууд (lag-гүй) шинэчлэгдэнэ; 100+ мөрийг дахин
+  // шүүж, sort хийж, DropdownMenu-тэй мөр бүрийг дахин render хийх (хүнд
+  // ажиллагаа) нь deferred утга дээр суурилж бага зэрэг хойшлогдоно ингэснээр
+  // бичих үед input hang хийхгүй.
+  const deferredF = useDeferredValue(f);
+  const active = Object.values(deferredF).some((v) => v.trim() !== "");
 
   const filtered = useMemo(() => {
     if (!active) return [];
     const base = rows.filter(
       (r) =>
-        match(r.lastName, f.lastName) &&
-        match(r.firstName, f.firstName) &&
-        match(r.phone, f.phone) &&
-        match(r.position, f.position) &&
-        (f.direction === "" || r.directionName === f.direction) &&
-        (f.org === "" || r.organizationName === f.org),
+        match(r.lastName, deferredF.lastName) &&
+        match(r.firstName, deferredF.firstName) &&
+        match(r.phone, deferredF.phone) &&
+        match(r.alba, deferredF.alba) &&
+        match(r.position, deferredF.position) &&
+        (deferredF.direction === "" || r.directionName === deferredF.direction) &&
+        (deferredF.org === "" || r.organizationName === deferredF.org),
     );
     return [...base].sort(
       (a, b) =>
         a.busName.localeCompare(b.busName) ||
         a.passengerName.localeCompare(b.passengerName),
     );
-  }, [rows, f, active]);
+  }, [rows, deferredF, active]);
 
   const allSelected =
     filtered.length > 0 && filtered.every((r) => selected.has(r.assignmentId));
@@ -245,8 +265,36 @@ export function PassengerLookup({
         )}
       </div>
 
-      <Card className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-6">
+      <Card className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-7">
         {TEXT_FIELDS.map((field) => (
+          <div key={field.key} className="space-y-1">
+            <Label className="text-xs text-muted-foreground">
+              {field.label}
+            </Label>
+            <Input
+              value={f[field.key]}
+              onChange={(e) => set(field.key, e.target.value)}
+              placeholder={field.placeholder}
+              className="h-9"
+            />
+          </div>
+        ))}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Алба/Хэлтэс</Label>
+          <Input
+            value={f.alba}
+            onChange={(e) => set("alba", e.target.value)}
+            placeholder="сонгох эсвэл бичих..."
+            list={ALBA_OPTIONS_ID}
+            className="h-9"
+          />
+          <datalist id={ALBA_OPTIONS_ID}>
+            {albaOptions.map((a) => (
+              <option key={a} value={a} />
+            ))}
+          </datalist>
+        </div>
+        {AFTER_ALBA_TEXT_FIELDS.map((field) => (
           <div key={field.key} className="space-y-1">
             <Label className="text-xs text-muted-foreground">
               {field.label}
@@ -365,6 +413,7 @@ export function PassengerLookup({
                   <TableHead>Нэр</TableHead>
                   <TableHead className="w-44">Автобус</TableHead>
                   <TableHead className="w-40">Байгууллага</TableHead>
+                  <TableHead className="w-40">Алба/Хэлтэс</TableHead>
                   <TableHead className="w-28">Чиглэл</TableHead>
                   {showActions && <TableHead className="w-12" />}
                 </TableRow>
@@ -373,7 +422,7 @@ export function PassengerLookup({
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={showActions ? 6 : 4}
+                      colSpan={showActions ? 7 : 5}
                       className="py-10 text-center text-sm text-muted-foreground">
                       Олдсонгүй
                     </TableCell>
@@ -424,6 +473,9 @@ export function PassengerLookup({
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {r.organizationName ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.alba ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {r.directionName ?? "—"}

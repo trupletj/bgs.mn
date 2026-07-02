@@ -8,15 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { UserSearchPicker } from "@/components/users/user-search-picker";
 import { DateTime24 } from "@/components/shift-exchange/datetime-24";
+import { DirectionBadge } from "@/components/shift-exchange/shared";
 import { createBus, updateBus, type BusInput } from "@/actions/shift-exchange";
 import type {
   AutobusDirection,
@@ -26,11 +20,19 @@ import type {
 
 export function BusForm({
   exchangeId,
+  exchangeDirection,
+  exchangeDate,
   directions,
   initial,
   onDone,
 }: {
   exchangeId: number;
+  /** Ээлжийн чиглэл (bgs_attendance.shift_exchanges.direction) — автобус
+   *  үргэлж энэтэй адил чиглэлтэй тул хэрэглэгчээр дахин сонгуулахгүй. */
+  exchangeDirection: ShiftDirection;
+  /** Ээлжийн огноо (bgs_attendance.shift_exchanges.exchange_date) — шинэ
+   *  автобусны хөдлөх огноог үүгээр урьдчилж тохируулна, цагийг нь л сонгоно. */
+  exchangeDate: string;
   directions: AutobusDirection[];
   initial?: BusWithStats;
   /** Өгвөл хадгалсны дараа навигац хийхгүй, энэ callback-ийг дуудна (dialog-д). */
@@ -39,16 +41,13 @@ export function BusForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [direction, setDirection] = useState<ShiftDirection>(
-    initial?.direction ?? "departing",
-  );
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [capacity, setCapacity] = useState(String(initial?.capacity ?? 45));
   const [departureTime, setDepartureTime] = useState(
     initial?.departureTime
       ? new Date(initial.departureTime).toISOString().slice(0, 16)
-      : "",
+      : `${exchangeDate}T00:30`,
   );
   const [leader, setLeader] = useState<{ id: string; name: string } | null>(
     initial?.tripLeaderId
@@ -70,7 +69,7 @@ export function BusForm({
       return;
     }
     const input: BusInput = {
-      direction,
+      direction: exchangeDirection,
       name: name.trim(),
       description: description || null,
       capacity: Number(capacity) || 45,
@@ -104,17 +103,10 @@ export function BusForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Чиглэл</Label>
-          <Select
-            value={direction}
-            onValueChange={(v) => setDirection(v as ShiftDirection)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="departing">Буух</SelectItem>
-              <SelectItem value="arriving">Ирэх</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex h-9 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+            <DirectionBadge direction={exchangeDirection} />
+            <span className="text-xs">Ээлжийн чиглэлээр</span>
+          </div>
         </div>
         <div className="space-y-1.5">
           <Label>Багтаамж</Label>

@@ -5,6 +5,40 @@ import type {
   ShiftExchangeStatus,
 } from "@/types/shift-exchange";
 
+/**
+ * `localeCompare` (ялангуяа "mn" locale-той) нь Intl/ICU-с хамаардаг тул server
+ * (Node) болон client (browser)-д өөр эрэмбэ гаргаж болзошгүй — "use client"
+ * component дотор SSR/hydration хооронд эрэмбэ зөрвөл React hydration mismatch
+ * шидэнэ (жагсаалт эрэмбэ солигдож "дахин зурагдана"). Тиймээс жагсаалтын
+ * эрэмбэ DOM бүтцэд нөлөөлдөг газарт Intl огт ашиглахгүй, ердийн Unicode
+ * codepoint-оор харьцуулна — аль ч орчинд яг ижил үр дүн гарна.
+ */
+export function mnCompare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** mnCompare шиг боловч тоон хэсгүүдийг ("Автобус 2" vs "Автобус 10") бодит
+ *  тоогоор нь харьцуулна ("numeric: true"-ийн Intl-гүй хувилбар). */
+export function mnCompareNatural(a: string, b: string): number {
+  const chunks = /(\d+)|(\D+)/g;
+  const A = a.match(chunks) ?? [];
+  const B = b.match(chunks) ?? [];
+  const len = Math.max(A.length, B.length);
+  for (let i = 0; i < len; i++) {
+    const x = A[i] ?? "";
+    const y = B[i] ?? "";
+    if (x === y) continue;
+    const isNumeric = (s: string) => /^\d+$/.test(s);
+    if (isNumeric(x) && isNumeric(y)) {
+      const diff = Number(x) - Number(y);
+      if (diff !== 0) return diff;
+    } else {
+      return mnCompare(x, y);
+    }
+  }
+  return 0;
+}
+
 export const DIRECTION_LABEL: Record<ShiftDirection, string> = {
   arriving: "Ирэх",
   departing: "Буух",
@@ -53,6 +87,25 @@ export function repRegistrationOpen(e: {
 export function isFridayDate(dateStr: string): boolean {
   // dateStr нь 'YYYY-MM-DD' — tz-аас хамаарахгүйгээр UTC-ээр гариг тооцно.
   return new Date(`${dateStr}T00:00:00Z`).getUTCDay() === 5;
+}
+
+/**
+ * "(ООО/)ММ/ӨӨ, ЦЦ:мм" хэлбэрээр Улаанбаатарын цагаар (UTC+8, DST-гүй)
+ * форматална. `toLocaleString("mn-MN", ...)` server (Node ICU)-той
+ * client (browser)-ийн хооронд өөр гарч ирж (жишээ нь сарыг "VII" гэх мэт
+ * роман тоогоор) hydration mismatch үүсгэдэг тул Intl огт ашиглахгүйгээр
+ * гараар форматална.
+ */
+export function formatBusDateTime(
+  iso: string,
+  { includeYear = false }: { includeYear?: boolean } = {},
+): string {
+  const d = new Date(new Date(iso).getTime() + 8 * 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = includeYear
+    ? `${d.getUTCFullYear()}/${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}`
+    : `${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}`;
+  return `${ymd}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 /**

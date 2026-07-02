@@ -18,8 +18,10 @@ import {
 const HOURS = Array.from({ length: 24 }, (_, i) =>
   String(i).padStart(2, "0"),
 );
-const MINUTES = Array.from({ length: 60 }, (_, i) =>
-  String(i).padStart(2, "0"),
+// 5 минутын алхамтай (00, 05, 10, ... 55) — автобусны хөдлөх цагт секундын
+// нарийвчлал хэрэггүй, сонголтыг богиносгоно.
+const MINUTES = Array.from({ length: 12 }, (_, i) =>
+  String(i * 5).padStart(2, "0"),
 );
 
 export function DateTime24({
@@ -40,7 +42,7 @@ export function DateTime24({
       onChange("");
       return;
     }
-    onChange(`${d}T${h || "00"}:${m || "00"}`);
+    onChange(`${d}T${h || "00"}:${m || "30"}`);
   };
 
   return (
@@ -54,7 +56,7 @@ export function DateTime24({
       <div className="flex items-center gap-1">
         <Select
           value={hour || undefined}
-          onValueChange={(h) => emit(date, h, minute || "00")}>
+          onValueChange={(h) => emit(date, h, minute || "30")}>
           <SelectTrigger className="w-[4.5rem]">
             <SelectValue placeholder="ЦЦ" />
           </SelectTrigger>
@@ -68,7 +70,7 @@ export function DateTime24({
         </Select>
         <span className="text-muted-foreground">:</span>
         <Select
-          value={minute || undefined}
+          value={minute || "30"}
           onValueChange={(m) => emit(date, hour || "00", m)}>
           <SelectTrigger className="w-[4.5rem]">
             <SelectValue placeholder="ММ" />

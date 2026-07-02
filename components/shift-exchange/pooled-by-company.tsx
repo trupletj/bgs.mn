@@ -45,7 +45,11 @@ import {
   removePoolSubmissions,
 } from "@/actions/shift-exchange";
 import { BusyIndicator } from "@/components/ui/page-loader";
-import { passengerCapacity } from "@/components/shift-exchange/shared";
+import {
+  passengerCapacity,
+  mnCompare,
+  mnCompareNatural,
+} from "@/components/shift-exchange/shared";
 import type {
   BusWithStats,
   PassengerAssignment,
@@ -118,11 +122,11 @@ export function PooledByCompany({
             });
         }
         g.eeljBlocks = [...byEelj.values()].sort((a, b) =>
-          a.eeljName.localeCompare(b.eeljName, "mn", { numeric: true }),
+          mnCompareNatural(a.eeljName, b.eeljName),
         );
         return g;
       })
-      .sort((a, b) => a.orgName.localeCompare(b.orgName));
+      .sort((a, b) => mnCompare(a.orgName, b.orgName));
   }, [pool]);
 
   const toggleOne = (id: number) =>
@@ -182,69 +186,71 @@ export function PooledByCompany({
   return (
     <div className="space-y-2">
       <BusyIndicator busy={pending} />
+      {/* хөвөгч bar — layout-ыг түлхэхгүй, доошоо гүйлгээд ч дэлгэцэн дээр үлдэнэ */}
       {selectable && selected.size > 0 && (
-        <div className="sticky top-2 z-20 flex flex-row flex-wrap items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <Badge variant="secondary" className="tabular-nums">
-            {selected.size} сонгосон
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-muted-foreground"
-            onClick={() => setSelected(new Set())}>
-            Цуцлах
-          </Button>
-          <div className="flex-1" />
-          <Select value={target} onValueChange={setTarget}>
-            <SelectTrigger size="sm" className="h-8 w-48">
-              <SelectValue placeholder="Автобус сонгох..." />
-            </SelectTrigger>
-            <SelectContent>
-              {buses.map((b) => (
-                <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name} ({b.passengerCount}/{passengerCapacity(b.capacity)})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            className="h-8"
-            disabled={pending || !target}
-            onClick={assign}>
-            <Bus className="h-4 w-4" />
-            Хуваарилах
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1 text-destructive hover:bg-destructive/5 hover:text-destructive"
-                disabled={pending}>
-                <Trash2 className="h-4 w-4" />
-                Устгах
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  Сонгосон {selected.size} зорчигчийг устгах уу?
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  Эдгээр хүн ээлжээс бүрэн хасагдана. Дахин бүртгэх боломжтой.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Болих</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={remove}
-                  className="bg-destructive text-white hover:bg-destructive/90">
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4">
+          <div className="pointer-events-auto flex flex-row flex-wrap items-center gap-2 rounded-full border-2 border-primary/40 bg-background py-1.5 pl-3 pr-1.5 shadow-xl">
+            <Badge variant="secondary" className="tabular-nums">
+              {selected.size} сонгосон
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-muted-foreground"
+              onClick={() => setSelected(new Set())}>
+              Цуцлах
+            </Button>
+            <Select value={target} onValueChange={setTarget}>
+              <SelectTrigger size="sm" className="h-8 w-48">
+                <SelectValue placeholder="Автобус сонгох..." />
+              </SelectTrigger>
+              <SelectContent>
+                {buses.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name} ({b.passengerCount}/{passengerCapacity(b.capacity)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              className="h-8 rounded-full"
+              disabled={pending || !target}
+              onClick={assign}>
+              <Bus className="h-4 w-4" />
+              Хуваарилах
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1 rounded-full text-destructive hover:bg-destructive/5 hover:text-destructive"
+                  disabled={pending}>
+                  <Trash2 className="h-4 w-4" />
                   Устгах
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Сонгосон {selected.size} зорчигчийг устгах уу?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Эдгээр хүн ээлжээс бүрэн хасагдана. Дахин бүртгэх боломжтой.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Болих</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={remove}
+                    className="bg-destructive text-white hover:bg-destructive/90">
+                    Устгах
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       )}
 

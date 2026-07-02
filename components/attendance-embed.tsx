@@ -9,7 +9,7 @@ const ATTENDANCE_URL =
 
 type Tokens = { at: string; rt: string; exp?: number };
 
-export default function AttendanceEmbed() {
+export default function AttendanceEmbed({ fill = false }: { fill?: boolean }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const iframeReadyRef = useRef(false);
   const [tokens, setTokens] = useState<Tokens | null>(null);
@@ -89,6 +89,22 @@ export default function AttendanceEmbed() {
 
   const hash = `at=${encodeURIComponent(tokens.at)}&rt=${encodeURIComponent(tokens.rt)}${tokens.exp ? `&exp=${tokens.exp}` : ""}`;
   const src = `${ATTENDANCE_URL}/?embed=1&platform=web#${hash}`;
+
+  // fill=true: эцэг элемент (жишээ: dashboard tab-ийн flex-1 хэсэг) аль хэдийн
+  // харагдах хэмжээгээрээ хязгаарлагдсан үед л ашиглана — тэгвэл гаднах
+  // хуудас scroll хийхгүй, зөвхөн iframe өөрөө дотроо scroll хийнэ.
+  if (fill) {
+    return (
+      <iframe
+        ref={iframeRef}
+        src={src}
+        onLoad={() => {
+          iframeReadyRef.current = true;
+        }}
+        className="h-full w-full border-0"
+      />
+    );
+  }
 
   return (
     <iframe
