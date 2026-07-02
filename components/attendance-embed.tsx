@@ -98,6 +98,7 @@ export default function AttendanceEmbed({ fill = false }: { fill?: boolean }) {
       <iframe
         ref={iframeRef}
         src={src}
+        allow="camera"
         onLoad={() => {
           iframeReadyRef.current = true;
         }}
@@ -110,6 +111,7 @@ export default function AttendanceEmbed({ fill = false }: { fill?: boolean }) {
     <iframe
       ref={iframeRef}
       src={src}
+      allow="camera"
       onLoad={() => {
         iframeReadyRef.current = true;
       }}
