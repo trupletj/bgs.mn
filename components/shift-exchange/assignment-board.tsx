@@ -14,6 +14,8 @@ import {
   Inbox,
   CornerUpLeft,
   UserCog,
+  UserMinus,
+  Trash2,
   MapPin,
   Briefcase,
   Users,
@@ -64,15 +66,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { UserSearchPicker } from "@/components/users/user-search-picker";
 import {
   addInternalPassenger,
   bulkTransferPassengers,
   bulkUnassignToPool,
+  demoteTripLeaderToBusPassenger,
   getAssignments,
   linkAssignmentsAsCompanions,
   removePassenger,
+  removeTripLeaderToPool,
   setBusTripLeader,
   setPassengersConfirmed,
   transferPassenger,
@@ -251,6 +256,33 @@ export function AssignmentBoard({
         refresh();
       } else toast.error(res.error);
     });
+  };
+
+  // ахлахыг чөлөөлөөд яг энэ автобусанд энгийн зорчигчоор үлдээх
+  const onDemoteLeaderHere = () =>
+    startTransition(async () => {
+      const res = await demoteTripLeaderToBusPassenger(bus.id, exchangeId);
+      if (res.ok) {
+        toast.success("Ахлах чөлөөлөгдөж энэ автобусанд зорчигчоор үлдлээ");
+        refresh();
+      } else toast.error(res.error);
+    });
+
+  // ахлахыг чөлөөлөөд хуваарилаагүй (pool) руу буцаах — устгахгүй
+  const onReturnLeaderToPool = () =>
+    startTransition(async () => {
+      const res = await removeTripLeaderToPool(bus.id, exchangeId);
+      if (res.ok) {
+        toast.success("Ахлах чөлөөлөгдөж хуваарилаагүй жагсаалт руу буцлаа");
+        refresh();
+      } else toast.error(res.error);
+    });
+
+  // ахлахыг бүрэн устгах — ямар ч бичлэг үлдэхгүй (буцаах боломжгүй тул баталгаажуулна)
+  const [leaderDeleteOpen, setLeaderDeleteOpen] = useState(false);
+  const onDeleteLeader = () => {
+    onSetLeader(null);
+    setLeaderDeleteOpen(false);
   };
 
   // remove
@@ -651,6 +683,22 @@ export function AssignmentBoard({
                 {canAdmin && (
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Ахлахаас чөлөөлөөд энэ автобусанд зорчигчоор үлдээх"
+                        disabled={pending}
+                        onClick={onDemoteLeaderHere}>
+                        <UserMinus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Ахлахаас чөлөөлөөд хуваарилаагүй руу буцаах"
+                        disabled={pending}
+                        onClick={onReturnLeaderToPool}>
+                        <CornerUpLeft className="h-4 w-4" />
+                      </Button>
                       {otherBuses.length > 0 && (
                         <Button
                           variant="ghost"
@@ -660,13 +708,39 @@ export function AssignmentBoard({
                           <ArrowLeftRight className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        title="Ахлахаас чөлөөлөх"
-                        onClick={() => onSetLeader(null)}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog
+                        open={leaderDeleteOpen}
+                        onOpenChange={setLeaderDeleteOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Устгах — энэ ээлжээс бүрэн хасна"
+                            className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Аялалын ахлахыг устгах уу?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {leader.displayName} энэ ээлжээс бүрэн хасагдана
+                              — ямар ч автобус, хуваарилаагүй жагсаалтад
+                              үлдэхгүй. Дахин бүртгэх боломжтой.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Болих</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={onDeleteLeader}
+                              className="bg-destructive text-white hover:bg-destructive/90">
+                              Устгах
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 )}
@@ -785,7 +859,7 @@ export function AssignmentBoard({
           Dialog-ийн `translate`-тэй transform нөлөөлдөг `fixed`-ийн зэрэг
           containing-block эмзэглэл байхгүй тул хоёр контекстэд адилхан ажиллана. */}
       {canAdmin && selected.size > 0 && (
-        <div className="sticky bottom-0 z-30 rounded-lg border bg-background/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="sticky bottom-0 z-30 rounded-lg border-2 border-primary/40 bg-background px-4 py-3 shadow-xl">
           <div className="flex flex-row flex-wrap items-center gap-2">
             <Badge variant="secondary" className="tabular-nums">
               {selected.size} сонгосон

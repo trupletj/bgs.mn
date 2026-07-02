@@ -352,51 +352,6 @@ export function PassengerLookup({
         </p>
       ) : (
         <>
-          {showActions && selected.size > 0 && (
-            <div className="sticky top-2 z-20 flex flex-row flex-wrap items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
-              <Badge variant="secondary" className="tabular-nums">
-                {selected.size} сонгосон
-              </Badge>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-muted-foreground"
-                onClick={clearSel}>
-                Цуцлах
-              </Button>
-              <div className="flex-1" />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                disabled={pending}
-                onClick={onBulkUnassign}>
-                <CornerUpLeft className="h-4 w-4" />
-                Хуваарилаагүй руу буцаах
-              </Button>
-              <Select value={bulkTarget} onValueChange={setBulkTarget}>
-                <SelectTrigger size="sm" className="h-8 w-44">
-                  <SelectValue placeholder="Автобус сонгох..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {buses.map((b) => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {b.name} ({b.passengerCount}/{passengerCapacity(b.capacity)}
-                      )
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                className="h-8"
-                disabled={pending || !bulkTarget}
-                onClick={onBulkTransfer}>
-                <ArrowLeftRight className="h-4 w-4" />
-                Шилжүүлэх
-              </Button>
-            </div>
-          )}
           <Card className="max-h-96 overflow-auto p-0">
             <Table>
               <TableHeader>
@@ -445,7 +400,13 @@ export function PassengerLookup({
                             />
                           </TableCell>
                         )}
-                        <TableCell>
+                        <TableCell
+                        className={showActions ? "cursor-pointer" : undefined}
+                        onClick={
+                          showActions
+                            ? () => toggleRow(r.assignmentId)
+                            : undefined
+                        }>
                         <div className="flex items-center gap-2">
                           <span className="text-foreground">
                             {r.passengerName || "Нэргүй"}
@@ -528,6 +489,52 @@ export function PassengerLookup({
             </TableBody>
           </Table>
         </Card>
+
+        {showActions && selected.size > 0 && (
+          <div className="sticky bottom-0 z-20 flex flex-row flex-wrap items-center gap-2 rounded-lg border-2 border-primary/40 bg-background px-4 py-3 shadow-xl">
+            <Badge variant="secondary" className="tabular-nums">
+              {selected.size} сонгосон
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-muted-foreground"
+              onClick={clearSel}>
+              Цуцлах
+            </Button>
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={pending}
+              onClick={onBulkUnassign}>
+              <CornerUpLeft className="h-4 w-4" />
+              Хуваарилаагүй руу буцаах
+            </Button>
+            <Select value={bulkTarget} onValueChange={setBulkTarget}>
+              <SelectTrigger size="sm" className="h-8 w-44">
+                <SelectValue placeholder="Автобус сонгох..." />
+              </SelectTrigger>
+              <SelectContent>
+                {buses.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name} ({b.passengerCount}/{passengerCapacity(b.capacity)}
+                    )
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={pending || !bulkTarget}
+              onClick={onBulkTransfer}>
+              <ArrowLeftRight className="h-4 w-4" />
+              Шилжүүлэх
+            </Button>
+          </div>
+        )}
         </>
       )}
     </section>

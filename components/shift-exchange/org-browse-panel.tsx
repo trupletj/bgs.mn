@@ -265,10 +265,11 @@ export function OrgBrowsePanel({
         </ScrollArea>
       )}
 
-      {/* хөвөгч bar — layout-ыг түлхэхгүй (absolute overlay) */}
+      {/* хөвөгч bar — layout-ыг түлхэхгүй (absolute overlay), баруун талын
+          "Хуваарилсан/Хуваарилаагүй" footbar-тай ижил загвар. */}
       {selected.size > 0 && (
         <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex justify-center px-2">
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border bg-background/95 py-1.5 pl-3 pr-1.5 shadow-md backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border-2 border-primary/40 bg-background px-4 py-3 shadow-xl">
             <Badge variant="secondary" className="tabular-nums">
               {selected.size} сонгосон
             </Badge>
@@ -281,7 +282,7 @@ export function OrgBrowsePanel({
             </Button>
             <Button
               size="sm"
-              className="h-8 rounded-full"
+              className="h-8"
               disabled={disabled}
               onClick={submit}>
               <Plus className="h-4 w-4" />

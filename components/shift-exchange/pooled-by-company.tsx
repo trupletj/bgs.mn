@@ -45,6 +45,7 @@ import {
   removePoolSubmissions,
 } from "@/actions/shift-exchange";
 import { BusyIndicator } from "@/components/ui/page-loader";
+import { SmartAssignButton } from "@/components/shift-exchange/smart-assign-button";
 import {
   passengerCapacity,
   mnCompare,
@@ -212,14 +213,20 @@ export function PooledByCompany({
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              size="sm"
-              className="h-8 rounded-full"
-              disabled={pending || !target}
-              onClick={assign}>
-              <Bus className="h-4 w-4" />
-              Хуваарилах
-            </Button>
+            {target ? (
+              <Button
+                size="sm"
+                className="h-8 rounded-full"
+                disabled={pending}
+                onClick={assign}>
+                <Bus className="h-4 w-4" />
+                Хуваарилах
+              </Button>
+            ) : (
+              // Автобус хараахан сонгоогүй байгаа бол гараар сонгуулахын
+              // оронд "Ухаалаг хуваарилах"-ыг шууд энд санал болгоно.
+              <SmartAssignButton exchangeId={exchangeId} pooledCount={pool.length} />
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button

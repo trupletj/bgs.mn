@@ -3,12 +3,15 @@ import { notFound, redirect } from "next/navigation";
 import { Calendar, Info } from "lucide-react";
 import { hasPermission, hasRole } from "@/actions/rbac";
 import {
+  getLinkedGroups,
   getMyExchangeSubmissions,
+  getMyOrgEeljGroups,
   getOrganizations,
   getShiftExchange,
 } from "@/actions/shift-exchange";
 import {
   DirectionBadge,
+  DIRECTION_LABEL,
   StatusBadge,
   registrationDeadline,
   repRegistrationOpen,
@@ -34,10 +37,14 @@ export default async function RegisterDetailPage({
   const exchange = await getShiftExchange(id);
   if (!exchange) notFound();
 
-  const [mySubmissions, organizations] = await Promise.all([
-    getMyExchangeSubmissions(id),
-    isSuperAdmin ? getOrganizations() : Promise.resolve([]),
-  ]);
+  const [mySubmissions, organizations, myOrgEeljGroups, linkedGroups] =
+    await Promise.all([
+      getMyExchangeSubmissions(id),
+      isSuperAdmin ? getOrganizations() : Promise.resolve([]),
+      isSuperAdmin ? Promise.resolve([]) : getMyOrgEeljGroups(),
+      getLinkedGroups(id),
+    ]);
+  const linkedGroupIds = new Set(linkedGroups.map((g) => g.btegId));
 
   const deadline = registrationDeadline(exchange.exchangeDate);
   const overrideUntil = exchange.registrationOverrideUntil;
@@ -85,9 +92,19 @@ export default async function RegisterDetailPage({
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <p>
+            <span className="font-medium text-foreground">
+              «{exchange.name}»
+            </span>{" "}
+            ээлжийн{" "}
+            <span className="font-medium text-foreground">
+              {DIRECTION_LABEL[exchange.direction].toLowerCase()}
+            </span>{" "}
+            зорчигчдыг{" "}
             {isSuperAdmin
-              ? "Энэ ээлжид ирэх / буух зорчигчдыг дурын байгууллагаас бүртгэнэ. Бүртгэсэн зорчигчдыг хүний нөөцийн ажилтан автобусанд хуваарилна."
-              : "Энэ ээлжид ирэх / буух өөрийн байгууллагын зорчигчдыг бүртгэнэ. Бүртгэсэн зорчигчдыг хүний нөөцийн ажилтан автобусанд хуваарилна."}
+              ? "дурын байгууллагаас"
+              : "зөвхөн өөрийн байгууллагынхныг"}{" "}
+            бүртгэнэ. Бүртгэсэн хүмүүсийг хүний нөөцийн ажилтан автобусанд
+            хуваарилна.
           </p>
         </div>
       </div>
@@ -98,6 +115,8 @@ export default async function RegisterDetailPage({
         canRegister={canRegister}
         isSuperAdmin={isSuperAdmin}
         organizations={organizations}
+        myOrgEeljGroups={myOrgEeljGroups}
+        linkedGroupIds={linkedGroupIds}
       />
     </div>
   );
