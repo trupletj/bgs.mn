@@ -48,24 +48,23 @@ export async function hasRole(role: string | string[]): Promise<boolean> {
     : roles.includes(role);
 }
 
-export async function hasPermission(
-  module: string,
-  action: string,
-): Promise<boolean> {
-  const user = await getUser();
-  if (!user) return false;
+export const hasPermission = cache(
+  async (module: string, action: string): Promise<boolean> => {
+    const user = await getUser();
+    if (!user) return false;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("has_permission", {
-    p_user_id: user.id,
-    p_module: module,
-    p_action: action,
-  });
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("has_permission", {
+      p_user_id: user.id,
+      p_module: module,
+      p_action: action,
+    });
 
-  if (error) {
-    console.error("Permission check error:", error);
-    return false;
-  }
+    if (error) {
+      console.error("Permission check error:", error);
+      return false;
+    }
 
-  return data === true;
-}
+    return data === true;
+  },
+);

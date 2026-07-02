@@ -6,6 +6,7 @@ import { Plus, Users, X, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +31,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { linkAndAssignGroup, unlinkGroup } from "@/actions/shift-exchange";
+import { linkAndAssignGroups, unlinkGroup } from "@/actions/shift-exchange";
 import { BusyIndicator } from "@/components/ui/page-loader";
 import type { EeljGroupOption, LinkedGroup } from "@/types/shift-exchange";
 
@@ -46,6 +47,7 @@ export function LinkedGroups({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const linkedIds = useMemo(
     () => new Set(linkedGroups.map((g) => g.btegId)),
@@ -56,15 +58,26 @@ export function LinkedGroups({
     [allGroups, linkedIds],
   );
 
-  const onLink = (groupBtegId: string) =>
+  const toggleSelected = (groupBtegId: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupBtegId)) next.delete(groupBtegId);
+      else next.add(groupBtegId);
+      return next;
+    });
+
+  const onLinkSelected = () => {
+    if (selected.size === 0) return;
     startTransition(async () => {
-      setOpen(false);
-      const res = await linkAndAssignGroup(exchangeId, groupBtegId);
+      const res = await linkAndAssignGroups(exchangeId, [...selected]);
       if (res.ok) {
         toast.success(`${res.added} хүн хуваарилаагүй жагсаалтад нэмэгдлээ`);
+        setSelected(new Set());
+        setOpen(false);
         router.refresh();
       } else toast.error(res.error ?? "Алдаа гарлаа");
     });
+  };
 
   const onUnlink = (groupBtegId: string) =>
     startTransition(async () => {
@@ -91,7 +104,12 @@ export function LinkedGroups({
           нэмэгдэнэ
         </span>
         <div className="h-px flex-1 bg-border" />
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover
+          open={open}
+          onOpenChange={(o) => {
+            setOpen(o);
+            if (!o) setSelected(new Set());
+          }}>
           <PopoverTrigger asChild>
             <Button size="sm" disabled={pending || available.length === 0}>
               <Plus className="h-4 w-4" />
@@ -109,13 +127,28 @@ export function LinkedGroups({
                     <CommandItem
                       key={g.btegId}
                       value={g.name}
-                      onSelect={() => onLink(g.btegId)}>
+                      onSelect={() => toggleSelected(g.btegId)}
+                      className="gap-2">
+                      <Checkbox
+                        checked={selected.has(g.btegId)}
+                        className="pointer-events-none"
+                      />
                       {g.name}
                     </CommandItem>
                   ))}
                 </CommandGroup>
               </CommandList>
             </Command>
+            {selected.size > 0 && (
+              <div className="flex items-center justify-between gap-2 border-t p-2">
+                <span className="text-xs text-muted-foreground">
+                  {selected.size} сонгосон
+                </span>
+                <Button size="sm" disabled={pending} onClick={onLinkSelected}>
+                  Нэмэх
+                </Button>
+              </div>
+            )}
           </PopoverContent>
         </Popover>
       </div>

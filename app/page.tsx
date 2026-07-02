@@ -2,8 +2,16 @@ import { createClient } from "@/utils/supabase/server";
 import { RequestOtpForm } from "@/components/login-form";
 import { EmbedAutoPost } from "@/components/embed-auto-post";
 import { OrbitMark } from "@/components/brand/orbit-mark";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LegacySystemNoticeToast } from "@/components/legacy-system-notice";
 import { redirect } from "next/navigation";
-import { Shield, Users, BarChart3, CheckCircle } from "lucide-react";
+import {
+  Shield,
+  Users,
+  BarChart3,
+  CheckCircle,
+  TriangleAlert,
+} from "lucide-react";
 
 export default async function Home({
   searchParams,
@@ -93,6 +101,8 @@ export default async function Home({
 
       {/* ===== Right form panel ===== */}
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-12">
+        {!embed ? <LegacySystemNoticeToast /> : null}
+
         {/* Mobile logo */}
         <div className="mb-10 flex items-center gap-3 md:hidden">
           <OrbitMark size={40} variant="primary" />
@@ -102,7 +112,21 @@ export default async function Home({
         <RequestOtpForm className="w-full max-w-[400px]" />
         {embed && claims ? <EmbedAutoPost /> : null}
 
-        <p className="mt-10 max-w-xs text-center text-xs leading-relaxed text-muted-foreground">
+        {/* Toast (дээрх) түр зуур анхаарал татна; энэ Alert байнга харагдана. */}
+        <Alert className="mt-6 w-full max-w-[400px] border-amber-300 bg-amber-50 text-amber-900">
+          <TriangleAlert className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-900">
+            Хэрэв та үзлэгийн хуудас бөглөх бол{" "}
+            <a
+              href="https://my.bgs.mn"
+              className="font-medium underline underline-offset-2">
+              my.bgs.mn
+            </a>{" "}
+            дарж хуучин системээр орно уу.
+          </AlertDescription>
+        </Alert>
+
+        <p className="mt-6 max-w-xs text-center text-xs leading-relaxed text-muted-foreground">
           Нэвтрэхэд асуудал гарвал системийн админтай холбогдоно уу.
         </p>
       </div>

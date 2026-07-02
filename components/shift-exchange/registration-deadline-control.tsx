@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DateTime24 } from "@/components/shift-exchange/datetime-24";
 import { setRegistrationOverride } from "@/actions/shift-exchange";
-import { registrationDeadline } from "@/components/shift-exchange/shared";
+import {
+  registrationDeadline,
+  formatBusDateTime,
+} from "@/components/shift-exchange/shared";
 
 /**
  * HR control: бүртгэлийн анхдагч эцсийн хугацааг (exchange_date - 2 өдөр) тодорхой
@@ -99,13 +102,8 @@ export function RegistrationDeadlineControl({
                     : "text-muted-foreground")
                 }>
                 {overrideActive ? "Одоо" : "Өмнө нь"}{" "}
-                {new Date(registrationOverrideUntil).toLocaleString("mn-MN", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
+                {formatBusDateTime(registrationOverrideUntil, {
+                  includeYear: true,
                 })}{" "}
                 хүртэл сунгасан.
               </span>

@@ -12,6 +12,7 @@ import {
   StatusBadge,
   registrationDeadline,
   repRegistrationOpen,
+  formatBusDateTime,
 } from "@/components/shift-exchange/shared";
 import { SubmitPoolPanel } from "@/components/shift-exchange/submit-pool-panel";
 
@@ -74,13 +75,7 @@ export default async function RegisterDetailPage({
             {overrideUntil && (
               <span className="ml-1 text-amber-600">
                 (Хүний нөөцийн ажилтан сунгасан:{" "}
-                {new Date(overrideUntil).toLocaleString("mn-MN", {
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })}
+                {formatBusDateTime(overrideUntil)}
                 )
               </span>
             )}

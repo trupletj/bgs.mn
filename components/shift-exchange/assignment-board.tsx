@@ -76,6 +76,7 @@ import {
   setBusTripLeader,
   setPassengersConfirmed,
   transferPassenger,
+  transferTripLeaderToBus,
   unassignToPool,
   unlinkAssignmentsFromCompanions,
   type BusLeaderRow,
@@ -90,8 +91,11 @@ import { BusyIndicator } from "@/components/ui/page-loader";
 import {
   DirectionBadge,
   passengerCapacity,
+  mnCompare,
 } from "@/components/shift-exchange/shared";
 import { AlertTriangle } from "lucide-react";
+
+const ALL = "__all__";
 
 interface Props {
   exchangeId: number;
@@ -104,6 +108,10 @@ interface Props {
   otherBuses: BusWithStats[];
   directions: AutobusDirection[];
   canAdmin: boolean;
+  /** Dialog дотор ашиглах үед (жишээ: BusGrid) parent-ийн локал fetch хийсэн
+   *  assignments/leader-ийг мөн шинэчлэхэд ашиглана — router.refresh() ганцаараа
+   *  Server Component prop-уудыг л шинэчилдэг тул. */
+  onDataChange?: () => void;
 }
 
 export function AssignmentBoard({
@@ -117,21 +125,35 @@ export function AssignmentBoard({
   otherBuses,
   directions,
   canAdmin,
+  onDataChange,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [albaFilter, setAlbaFilter] = useState("");
 
   const assignedUserIds = useMemo(
     () => assignments.map((a) => a.internalUserId),
     [assignments],
   );
 
+  // энэ автобусанд байгаа зорчигчдын алба/хэлтэсийнset — filter-т ашиглана.
+  const albaOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of assignments) {
+      const v = a.albaName ?? a.heltesName;
+      if (v) s.add(v);
+    }
+    return [...s].sort(mnCompare);
+  }, [assignments]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return assignments;
-    return assignments.filter((a) =>
-      [
+    return assignments.filter((a) => {
+      if (albaFilter && (a.albaName ?? a.heltesName) !== albaFilter)
+        return false;
+      if (!q) return true;
+      return [
         a.displayName,
         a.albaName,
         a.heltesName,
@@ -142,26 +164,36 @@ export function AssignmentBoard({
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(q),
-    );
-  }, [assignments, search]);
+        .includes(q);
+    });
+  }, [assignments, search, albaFilter]);
 
   const seatLimit = passengerCapacity(bus.capacity); // ахлахын 1 суудал нөөцилсөн
-  const pct = seatLimit
-    ? Math.round((bus.passengerCount / seatLimit) * 100)
-    : 0;
+  const occupied = bus.passengerCount + (bus.tripLeaderId ? 1 : 0); // ахлахтай нийт
+  const pct = bus.capacity ? Math.round((occupied / bus.capacity) * 100) : 0;
   const isFull = bus.passengerCount >= seatLimit;
   const noLeader = !bus.tripLeaderId;
-  const refresh = () => router.refresh();
+  const refresh = () => {
+    router.refresh();
+    onDataChange?.();
+  };
 
   // single add (internal)
   const [addOpen, setAddOpen] = useState(false);
-  const onAddInternal = (userId: string) =>
+  // хэрэв сонгосон хүн өөр автобусны ахлах бол эхлээд сануулга/баталгаажуулалт авна
+  const [leaderConfirm, setLeaderConfirm] = useState<{
+    userId: string;
+    leaderBusName: string;
+  } | null>(null);
+  const onAddInternal = (userId: string, force = false) =>
     startTransition(async () => {
-      const res = await addInternalPassenger(bus.id, userId);
+      const res = await addInternalPassenger(bus.id, userId, force);
       if (res.ok) {
         toast.success("Нэмэгдлээ");
+        setLeaderConfirm(null);
         refresh();
+      } else if (res.needsLeaderConfirm) {
+        setLeaderConfirm({ userId, leaderBusName: res.leaderBusName ?? "" });
       } else toast.error(res.error);
     });
 
@@ -174,11 +206,38 @@ export function AssignmentBoard({
     startTransition(async () => {
       const res = await setBusTripLeader(bus.id, exchangeId, userId);
       if (res.ok) {
-        toast.success(userId ? "Ахлах солигдлоо" : "Ахлах хасагдлаа");
+        toast.success(
+          res.clearedFromBusName
+            ? `Ахлах солигдлоо — "${res.clearedFromBusName}" автобусны ахлахаас чөлөөлөгдсөн`
+            : userId
+              ? "Ахлах солигдлоо"
+              : "Ахлах хасагдлаа",
+        );
         setLeaderOpen(false);
+        clearSelection();
         refresh();
       } else toast.error(res.error);
     });
+
+  // trip leader-ийг өөр автобус руу зорчигчоор шилжүүлэх (ахлах статусыг цуцална)
+  const [leaderTransferOpen, setLeaderTransferOpen] = useState(false);
+  const [leaderTransferTarget, setLeaderTransferTarget] = useState("");
+  const onTransferLeader = () => {
+    if (!leaderTransferTarget) return;
+    startTransition(async () => {
+      const res = await transferTripLeaderToBus(
+        bus.id,
+        exchangeId,
+        Number(leaderTransferTarget),
+      );
+      if (res.ok) {
+        toast.success("Ахлах чөлөөлөгдөж зорчигчоор шилжлээ");
+        setLeaderTransferOpen(false);
+        setLeaderTransferTarget("");
+        refresh();
+      } else toast.error(res.error);
+    });
+  };
 
   // remove
   const [toRemove, setToRemove] = useState<PassengerAssignment | null>(null);
@@ -248,6 +307,11 @@ export function AssignmentBoard({
       else next.add(id);
       return next;
     });
+  // яг нэг хүн сонгосон үед л "Ахлах болгох" сонголт үзүүлнэ
+  const singleSelected =
+    selected.size === 1
+      ? assignments.find((a) => selected.has(a.id))
+      : undefined;
 
   const [bulkUnassignOpen, setBulkUnassignOpen] = useState(false);
   const onBulkUnassign = () =>
@@ -383,9 +447,9 @@ export function AssignmentBoard({
           <div className="min-w-48 space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium tabular-nums">
-                {bus.passengerCount} / {seatLimit}
+                {occupied} / {bus.capacity}
                 <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  зорчигч +1 ахлах
+                  зорчигч
                 </span>
               </span>
               <span className="text-xs text-emerald-600">
@@ -482,8 +546,8 @@ export function AssignmentBoard({
       </Card>
 
       {/* search */}
-      <Card className="px-4 py-3">
-        <div className="relative">
+      <Card className="flex-row flex-wrap gap-2 px-4 py-3">
+        <div className="relative min-w-48 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Зорчигч хайх..."
@@ -492,82 +556,24 @@ export function AssignmentBoard({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {albaOptions.length > 0 && (
+          <Select
+            value={albaFilter === "" ? ALL : albaFilter}
+            onValueChange={(v) => setAlbaFilter(v === ALL ? "" : v)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Алба/Хэлтэс" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Алба/Хэлтэс: Бүгд</SelectItem>
+              {albaOptions.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </Card>
-
-      {/* bulk action bar */}
-      {canAdmin && selected.size > 0 && (
-        <div className="sticky top-2 z-20 flex flex-row flex-wrap items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <Badge variant="secondary" className="tabular-nums">
-            {selected.size} сонгосон
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-muted-foreground"
-            onClick={clearSelection}>
-            <X className="h-3.5 w-3.5" />
-            Цуцлах
-          </Button>
-          <div className="flex-1" />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-            disabled={pending}
-            onClick={() => onBulkSetConfirmed(true)}>
-            <CheckCircle2 className="h-4 w-4" />
-            QR уншсан болгох
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            disabled={pending}
-            onClick={() => onBulkSetConfirmed(false)}>
-            <X className="h-4 w-4" />
-            Уншаагүй болгох
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            disabled={pending || selected.size < 2}
-            onClick={() => setLinkOpen(true)}>
-            <Users className="h-4 w-4" />
-            Хамт холбох
-          </Button>
-          {anyLinkedSelected && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              disabled={pending}
-              onClick={onUnlink}>
-              <X className="h-4 w-4" />
-              Холбоо салгах
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            disabled={pending}
-            onClick={() => setBulkUnassignOpen(true)}>
-            <CornerUpLeft className="h-4 w-4" />
-            Хуваарилаагүй руу буцаах
-          </Button>
-          {otherBuses.length > 0 && (
-            <Button
-              size="sm"
-              className="h-8"
-              disabled={pending}
-              onClick={() => setBulkTransferOpen(true)}>
-              <ArrowLeftRight className="h-4 w-4" />
-              Шилжүүлэх
-            </Button>
-          )}
-        </div>
-      )}
 
       {/* list */}
       <Card className="overflow-hidden p-0">
@@ -628,7 +634,28 @@ export function AssignmentBoard({
                 <TableCell className="text-sm text-muted-foreground">
                   {leader.directionName ?? "—"}
                 </TableCell>
-                {canAdmin && <TableCell />}
+                {canAdmin && (
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      {otherBuses.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          title="Өөр автобусанд зорчигчоор шилжүүлэх (ахлахаас чөлөөлнө)"
+                          onClick={() => setLeaderTransferOpen(true)}>
+                          <ArrowLeftRight className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Ахлахаас чөлөөлөх"
+                        onClick={() => onSetLeader(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                )}
               </TableRow>
             )}
             {filtered.length === 0
@@ -657,7 +684,11 @@ export function AssignmentBoard({
                     <TableCell className="text-muted-foreground tabular-nums">
                       {i + 1 + (leader ? 1 : 0)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell
+                      className={canAdmin ? "cursor-pointer" : undefined}
+                      onClick={
+                        canAdmin ? () => toggleOne(a.id) : undefined
+                      }>
                       <div className="flex items-center gap-2">
                         <span className="text-foreground">{a.displayName}</span>
                         {a.isConfirmed && (
@@ -734,6 +765,97 @@ export function AssignmentBoard({
         </Table>
       </Card>
 
+      {/* bulk action footbar — эцэг scroll container (page эсвэл Dialog)-ийн
+          хамгийн сүүлийн элемент тул sticky bottom-0-оор түүний доод ирмэгт
+          байнга наалдана; scroll хийхэд ч дэлгэцнээс алга болохгүй, мөн
+          Dialog-ийн `translate`-тэй transform нөлөөлдөг `fixed`-ийн зэрэг
+          containing-block эмзэглэл байхгүй тул хоёр контекстэд адилхан ажиллана. */}
+      {canAdmin && selected.size > 0 && (
+        <div className="sticky bottom-0 z-30 rounded-lg border bg-background/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex flex-row flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="tabular-nums">
+              {selected.size} сонгосон
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-muted-foreground"
+              onClick={clearSelection}>
+              <X className="h-3.5 w-3.5" />
+              Цуцлах
+            </Button>
+            {noLeader && singleSelected && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 border-amber-300 text-amber-700 hover:bg-amber-50"
+                disabled={pending}
+                onClick={() => onSetLeader(singleSelected.internalUserId)}>
+                <UserCog className="h-4 w-4" />
+                Аялалын ахлах болгох
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              disabled={pending}
+              onClick={() => onBulkSetConfirmed(true)}>
+              <CheckCircle2 className="h-4 w-4" />
+              QR уншсан болгох
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={pending}
+              onClick={() => onBulkSetConfirmed(false)}>
+              <X className="h-4 w-4" />
+              Уншаагүй болгох
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={pending || selected.size < 2}
+              onClick={() => setLinkOpen(true)}>
+              <Users className="h-4 w-4" />
+              Хамт холбох
+            </Button>
+            {anyLinkedSelected && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={pending}
+                onClick={onUnlink}>
+                <X className="h-4 w-4" />
+                Холбоо салгах
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={pending}
+              onClick={() => setBulkUnassignOpen(true)}>
+              <CornerUpLeft className="h-4 w-4" />
+              Хуваарилаагүй руу буцаах
+            </Button>
+            {otherBuses.length > 0 && (
+              <Button
+                size="sm"
+                className="h-8"
+                disabled={pending}
+                onClick={() => setBulkTransferOpen(true)}>
+                <ArrowLeftRight className="h-4 w-4" />
+                Шилжүүлэх
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* remove confirm */}
       <AlertDialog
         open={!!toRemove}
@@ -798,6 +920,82 @@ export function AssignmentBoard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* leader-ийг өөр автобус руу зорчигчоор шилжүүлэх */}
+      <Dialog
+        open={leaderTransferOpen}
+        onOpenChange={(o) => {
+          setLeaderTransferOpen(o);
+          if (!o) setLeaderTransferTarget("");
+        }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ахлахыг зорчигчоор шилжүүлэх</DialogTitle>
+            <DialogDescription>
+              {bus.tripLeaderName} — ахлах статусаас чөлөөлөгдөж, сонгосон
+              автобусанд энгийн зорчигчоор орно.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Зорилтот автобус</Label>
+            <Select
+              value={leaderTransferTarget}
+              onValueChange={setLeaderTransferTarget}>
+              <SelectTrigger>
+                <SelectValue placeholder="Сонгох..." />
+              </SelectTrigger>
+              <SelectContent>
+                {otherBuses.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name} ({b.passengerCount}/{passengerCapacity(b.capacity)}
+                    )
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLeaderTransferOpen(false)}>
+              Болих
+            </Button>
+            <Button
+              onClick={onTransferLeader}
+              disabled={!leaderTransferTarget || pending}>
+              Шилжүүлэх
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* хүн нэмэхэд тэр хүн өөр автобусны ахлах бол сануулга */}
+      <AlertDialog
+        open={!!leaderConfirm}
+        onOpenChange={(o) => !o && setLeaderConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Энэ хүн &quot;{leaderConfirm?.leaderBusName}&quot; автобусны
+              ахлах байна
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Үргэлжлүүлбэл тэр хүн &quot;{leaderConfirm?.leaderBusName}&quot;
+              автобусны ахлахаас чөлөөлөгдөж, энэ автобусанд энгийн зорчигчоор
+              нэмэгдэнэ.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Болих</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                leaderConfirm && onAddInternal(leaderConfirm.userId, true)
+              }>
+              Чөлөөлөөд нэмэх
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* bulk unassign confirm */}
       <AlertDialog open={bulkUnassignOpen} onOpenChange={setBulkUnassignOpen}>
@@ -901,6 +1099,8 @@ export function AssignmentBoard({
           </DialogHeader>
           <BusForm
             exchangeId={exchangeId}
+            exchangeDirection={bus.direction}
+            exchangeDate={exchangeDate ?? ""}
             directions={directions}
             initial={bus}
             onDone={() => {
@@ -920,8 +1120,33 @@ export function AssignmentBoard({
               Одоогийн ахлах: {bus.tripLeaderName ?? "—"}
             </DialogDescription>
           </DialogHeader>
+          {assignments.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Энэ автобусны зорчигчдоос сонгох
+              </Label>
+              <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-md border p-1">
+                {assignments.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onSetLeader(a.internalUserId)}
+                    className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted disabled:opacity-50">
+                    <span className="text-foreground">
+                      {a.displayName || "Нэргүй"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {a.albaName ?? a.heltesName ?? ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">эсвэл шинээр хайх:</p>
+            </div>
+          )}
           <UserSearchPicker
-            autoFocus
+            autoFocus={assignments.length === 0}
             placeholder="Шинэ ахлах хайх..."
             disabled={pending}
             onSelect={(u) => onSetLeader(u.id)}
@@ -1209,7 +1434,7 @@ function PoolDialog({
           members: [p],
         });
     }
-    return [...m.values()].sort((a, b) => a.orgName.localeCompare(b.orgName));
+    return [...m.values()].sort((a, b) => mnCompare(a.orgName, b.orgName));
   }, [filtered]);
 
   const toggleOne = (id: number) =>
