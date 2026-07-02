@@ -61,6 +61,7 @@ export interface PassengerAssignment {
   id: number;
   shiftExchangeId: number;
   busId: number | null; // null = pool (хуваарилаагүй)
+  busName: string | null;
   internalUserId: string;
   isConfirmed: boolean;
   confirmedAt: string | null;
