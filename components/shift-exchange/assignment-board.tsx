@@ -137,21 +137,35 @@ export function AssignmentBoard({
     [assignments],
   );
 
-  // энэ автобусанд байгаа зорчигчдын алба/хэлтэсийнset — filter-т ашиглана.
+  // энэ автобусанд байгаа зорчигчдын алба/хэлтэсийн жагсаалт — filter-т
+  // ашиглана. Өөр өөр байгууллага ижил нэртэй алба/хэлтэстэй байж болох тул
+  // (жишээ: "Санхүүгийн алба" хоёр компанид) зөвхөн НЭРЭЭР давхардал шалгавал
+  // хольж холихдоо тэдгээрийг ялгах боломжгүй болдог — байгууллагатай хослуулсан
+  // key ашиглана.
   const albaOptions = useMemo(() => {
-    const s = new Set<string>();
+    const m = new Map<string, { key: string; label: string }>();
     for (const a of assignments) {
-      const v = a.albaName ?? a.heltesName;
-      if (v) s.add(v);
+      const name = a.albaName ?? a.heltesName;
+      if (!name) continue;
+      const key = `${a.organizationId ?? ""}::${name}`;
+      if (!m.has(key)) {
+        m.set(key, {
+          key,
+          label: a.organizationName ? `${name} — ${a.organizationName}` : name,
+        });
+      }
     }
-    return [...s].sort(mnCompare);
+    return [...m.values()].sort((x, y) => mnCompare(x.label, y.label));
   }, [assignments]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return assignments.filter((a) => {
-      if (albaFilter && (a.albaName ?? a.heltesName) !== albaFilter)
-        return false;
+      if (albaFilter) {
+        const name = a.albaName ?? a.heltesName;
+        const key = `${a.organizationId ?? ""}::${name ?? ""}`;
+        if (key !== albaFilter) return false;
+      }
       if (!q) return true;
       return [
         a.displayName,
@@ -566,8 +580,8 @@ export function AssignmentBoard({
             <SelectContent>
               <SelectItem value={ALL}>Алба/Хэлтэс: Бүгд</SelectItem>
               {albaOptions.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {a}
+                <SelectItem key={a.key} value={a.key}>
+                  {a.label}
                 </SelectItem>
               ))}
             </SelectContent>

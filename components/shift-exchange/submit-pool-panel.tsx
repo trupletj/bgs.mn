@@ -66,7 +66,7 @@ function PassengerStatus({ p }: { p: PassengerAssignment }) {
     return (
       <Badge className="gap-1 border-transparent bg-emerald-100 text-emerald-800">
         <CheckCircle2 className="h-3 w-3" />
-        QR уншсан
+        QR уншсан{p.busName ? ` — ${p.busName}` : ""}
       </Badge>
     );
   }
@@ -74,7 +74,7 @@ function PassengerStatus({ p }: { p: PassengerAssignment }) {
     return (
       <Badge className="gap-1 border-transparent bg-sky-100 text-sky-800">
         <Bus className="h-3 w-3" />
-        Автобусанд хуваарилагдсан
+        {p.busName ? `"${p.busName}" автобусанд хуваарилагдсан` : "Автобусанд хуваарилагдсан"}
       </Badge>
     );
   }

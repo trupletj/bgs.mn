@@ -996,10 +996,13 @@ async function mapAssignmentRows(
   const internalIds = [
     ...new Set(rows.map((a) => a.internal_user_id).filter(Boolean)),
   ] as string[];
+  const busIds = [
+    ...new Set(rows.map((a) => a.bus_id).filter((id) => id != null)),
+  ] as number[];
 
   // Бие даасан query-үүдийг зэрэг явуулна (өмнө нь дараалан хүлээдэг байсан).
-  const [directions, orgNames, eeljGroups, users, members] = await Promise.all(
-    [
+  const [directions, orgNames, eeljGroups, users, members, buses] =
+    await Promise.all([
       getDirections(),
       getOrgNameMap(),
       getEeljGroups(),
@@ -1025,7 +1028,16 @@ async function mapAssignmentRows(
             )
             .then((res) => res.data ?? [])
         : Promise.resolve([] as Record<string, unknown>[]),
-    ],
+      busIds.length
+        ? sb()
+            .then((client) =>
+              client.from("buses").select("id, name").in("id", busIds),
+            )
+            .then((res) => res.data ?? [])
+        : Promise.resolve([] as Record<string, unknown>[]),
+    ]);
+  const busNameById = new Map(
+    buses.map((b) => [Number(b.id), String(b.name ?? "")]),
   );
   const dirByBteg = new Map(directions.map((d) => [d.btegId, d.name]));
 
@@ -1089,10 +1101,12 @@ async function mapAssignmentRows(
       (fallbackDirBteg ? dirByBteg.get(fallbackDirBteg) : undefined) ??
       null;
 
+    const busId = a.bus_id != null ? Number(a.bus_id) : null;
     return {
       id: Number(a.id),
       shiftExchangeId: Number(a.shift_exchange_id),
-      busId: a.bus_id != null ? Number(a.bus_id) : null,
+      busId,
+      busName: busId != null ? (busNameById.get(busId) ?? null) : null,
       internalUserId,
       isConfirmed: Boolean(a.is_confirmed),
       confirmedAt: (a.confirmed_at as string) ?? null,
