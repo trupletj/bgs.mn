@@ -31,24 +31,31 @@ Deno.serve(async (req) => {
 
     if (!phone || !otp) {
       console.error("Мэдээлэл дутуу ирлээ:", { phone, otp });
-      return new Response(JSON.stringify({ error: "Missing data" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: { http_code: 400, message: "Missing data" },
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
-    const to8 = phone
-      .replace("+976", "")
-      .replace("976", "")
-      .replace(/\D/g, "")
-      .trim();
+    const digitsOnly = phone.replace(/\D/g, "");
+    const to8 = digitsOnly.length > 8 ? digitsOnly.slice(-8) : digitsOnly;
 
     if (!/^\d{8}$/.test(to8)) {
       console.error("Утасны дугаар буруу байна:", { phone, to8 });
-      return new Response(JSON.stringify({ error: "Invalid phone number" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: { http_code: 400, message: "Invalid phone number" },
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     const smsRes = await sendTextMessage(`Tanii nevtreh code: ${otp}`, to8);
@@ -60,9 +67,10 @@ Deno.serve(async (req) => {
     if (!smsRes.ok) {
       return new Response(
         JSON.stringify({
-          error: "SMS provider error",
-          status: smsRes.status,
-          body: smsText,
+          error: {
+            http_code: 500,
+            message: `SMS provider error (${smsRes.status}): ${smsText}`,
+          },
         }),
         {
           status: 500,
@@ -78,9 +86,14 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Runtime Hook Error:", err.message);
 
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: { http_code: 500, message: err.message },
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 });
