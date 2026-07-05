@@ -537,7 +537,8 @@ export const getShiftExchanges = cache(
       client.from("buses").select("shift_exchange_id"),
       client
         .from("passenger_assignments")
-        .select("shift_exchange_id, is_confirmed"),
+        .select("shift_exchange_id, is_confirmed")
+        .eq("is_trip_leader", false),
     ]);
 
     const busCount = new Map<number, number>();
@@ -737,6 +738,7 @@ async function decorateBuses(rows: unknown[]): Promise<BusWithStats[]> {
           .from("passenger_assignments")
           .select("bus_id, is_confirmed")
           .in("bus_id", busIds)
+          .eq("is_trip_leader", false)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     busDirectionsMap(busIds),
   ]);
@@ -1298,6 +1300,7 @@ export async function getAssignments(
     .from("passenger_assignments")
     .select("*")
     .eq("bus_id", busId)
+    .eq("is_trip_leader", false)
     .order("id");
   if (error) {
     console.error("[shift-exchange] getAssignments:", error.message);
@@ -1316,6 +1319,7 @@ const getExchangeAssignments = cache(
       .from("passenger_assignments")
       .select("*")
       .eq("shift_exchange_id", exchangeId)
+      .eq("is_trip_leader", false)
       .order("id");
     if (error) {
       console.error("[shift-exchange] getExchangeAssignments:", error.message);
@@ -1348,6 +1352,7 @@ export async function getMyExchangeSubmissions(
     .from("passenger_assignments")
     .select("*")
     .eq("shift_exchange_id", exchangeId)
+    .eq("is_trip_leader", false)
     .order("id");
   if (error) {
     console.error("[shift-exchange] getMyExchangeSubmissions:", error.message);
@@ -1771,6 +1776,7 @@ export async function getBusExportData(
     .select("*")
     .eq("shift_exchange_id", exchangeId)
     .not("bus_id", "is", null)
+    .eq("is_trip_leader", false)
     .order("id");
   const enriched = await mapAssignmentRows(allRows ?? []);
   const byBus = new Map<number, PassengerAssignment[]>();
