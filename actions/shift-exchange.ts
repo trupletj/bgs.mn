@@ -724,6 +724,13 @@ function mapBus(row: unknown): Bus {
     isActive: Boolean(b.is_active),
     createdAt: (b.created_at as string) ?? null,
     updatedAt: (b.updated_at as string) ?? null,
+    hAutobusId: b.h_autobus_id != null ? Number(b.h_autobus_id) : null,
+    hAutobusNumber: (b.h_autobus_number as string) ?? null,
+    hAutobusDriverName: (b.h_autobus_driver_name as string) ?? null,
+    hAutobusDriverPhone: (b.h_autobus_driver_phone as string) ?? null,
+    hAutobusExtraDriverName: (b.h_autobus_extra_driver_name as string) ?? null,
+    hAutobusExtraDriverPhone: (b.h_autobus_extra_driver_phone as string) ?? null,
+    hAutobusApartPosition: (b.h_autobus_apart_position as string) ?? null,
   };
 }
 
@@ -847,64 +854,6 @@ export async function getBus(busId: number): Promise<BusWithStats | null> {
   if (error || !data) return null;
   const [bus] = await decorateBuses([data]);
   return bus ?? null;
-}
-
-export interface BusInput {
-  direction: ShiftDirection;
-  name: string;
-  description?: string | null;
-  capacity: number;
-  departureTime?: string | null;
-  tripLeaderId?: string | null;
-  directionIds: string[]; // autobus_direction.id (uuid)
-}
-
-export async function createBus(
-  exchangeId: number,
-  input: BusInput,
-): Promise<ActionResult<{ id: number }>> {
-  const denied = await requireAdmin();
-  if (denied) return { ok: false, error: denied };
-
-  if (input.tripLeaderId)
-    await clearOtherTripLeaderships(exchangeId, input.tripLeaderId, null);
-
-  const client = await sb();
-  const { data, error } = await client
-    .from("buses")
-    .insert({
-      shift_exchange_id: exchangeId,
-      direction: input.direction,
-      name: input.name,
-      description: input.description ?? null,
-      capacity: input.capacity,
-      departure_time: input.departureTime ?? null,
-      trip_leader_id: input.tripLeaderId ?? null,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    if (error.code === "23505")
-      return {
-        ok: false,
-        error: "Энэ хүн энэ ээлжийн өөр автобусанд аялалын ахлах болсон байна",
-      };
-    return { ok: false, error: error.message };
-  }
-
-  const busId = Number(data.id);
-  if (input.directionIds.length) {
-    const { error: rErr } = await client.from("bus_routes").insert(
-      input.directionIds.map((dirId, i) => ({
-        bus_id: busId,
-        direction_id: dirId,
-        stop_order: i + 1,
-      })),
-    );
-    if (rErr) return { ok: false, error: rErr.message };
-  }
-  revalidatePath(`/shift-exchange/${exchangeId}`);
-  return { ok: true, id: busId };
 }
 
 /** Change (or clear) a bus's trip leader inline. The trg_sync_bus_trip_leader
@@ -1059,72 +1008,6 @@ export async function removeTripLeaderToPool(
   revalidatePath(`/shift-exchange/${exchangeId}`);
   revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
   return { ok: true };
-}
-
-export async function updateBus(
-  busId: number,
-  exchangeId: number,
-  input: BusInput,
-): Promise<ActionResult> {
-  const denied = await requireAdmin();
-  if (denied) return { ok: false, error: denied };
-
-  if (input.tripLeaderId)
-    await clearOtherTripLeaderships(exchangeId, input.tripLeaderId, busId);
-
-  const client = await sb();
-  const { error } = await client
-    .from("buses")
-    .update({
-      direction: input.direction,
-      name: input.name,
-      description: input.description ?? null,
-      capacity: input.capacity,
-      departure_time: input.departureTime ?? null,
-      trip_leader_id: input.tripLeaderId ?? null,
-    })
-    .eq("id", busId);
-  if (error) {
-    if (error.code === "23505")
-      return {
-        ok: false,
-        error: "Энэ хүн энэ ээлжийн өөр автобусанд аялалын ахлах болсон байна",
-      };
-    return { ok: false, error: error.message };
-  }
-
-  // replace routes
-  await client.from("bus_routes").delete().eq("bus_id", busId);
-  if (input.directionIds.length) {
-    await client.from("bus_routes").insert(
-      input.directionIds.map((dirId, i) => ({
-        bus_id: busId,
-        direction_id: dirId,
-        stop_order: i + 1,
-      })),
-    );
-  }
-  revalidatePath(`/shift-exchange/${exchangeId}`);
-  revalidatePath(`/shift-exchange/${exchangeId}/buses/${busId}`);
-  return { ok: true };
-}
-
-/** Delete a bus; its passengers are moved back to the pool (not deleted). */
-export async function deleteBus(
-  busId: number,
-  exchangeId: number,
-): Promise<ActionResult<{ movedToPool: number }>> {
-  const denied = await requireAdmin();
-  if (denied) return { ok: false, error: denied };
-  const { data, error } = await (
-    await sb()
-  ).rpc("delete_bus", {
-    p_bus_id: busId,
-  });
-  if (error) return { ok: false, error: error.message };
-  revalidatePath(`/shift-exchange/${exchangeId}`);
-  revalidatePath("/shift-exchange");
-  return { ok: true, movedToPool: Number(data ?? 0) };
 }
 
 // ── Passenger assignments ────────────────────────────────────────────────────

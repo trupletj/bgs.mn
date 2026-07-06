@@ -49,6 +49,15 @@ export interface Bus {
   isActive: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  // Set when this bus is sourced from the external target.h_autobus sync
+  // (see trg_h_autobus_sync); null = internally/manually created.
+  hAutobusId: number | null;
+  hAutobusNumber: string | null;
+  hAutobusDriverName: string | null;
+  hAutobusDriverPhone: string | null;
+  hAutobusExtraDriverName: string | null;
+  hAutobusExtraDriverPhone: string | null;
+  hAutobusApartPosition: string | null;
 }
 
 export interface BusWithStats extends Bus {
@@ -130,6 +139,8 @@ export interface SubmitPoolResult {
 }
 
 export interface AutoDistributeResult {
+  // Always 0 now: auto_distribute_pool no longer creates buses (buses come
+  // from the external target.h_autobus sync). Kept for API/type stability.
   busesCreated: number;
   assigned: number;
   stillPooled: number;

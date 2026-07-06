@@ -91,7 +91,6 @@ import type {
   BusWithStats,
   PassengerAssignment,
 } from "@/types/shift-exchange";
-import { BusForm } from "@/components/shift-exchange/bus-form";
 import { BusyIndicator } from "@/components/ui/page-loader";
 import {
   DirectionBadge,
@@ -215,9 +214,6 @@ export function AssignmentBoard({
         setLeaderConfirm({ userId, leaderBusName: res.leaderBusName ?? "" });
       } else toast.error(res.error);
     });
-
-  // bus edit (inline dialog)
-  const [editOpen, setEditOpen] = useState(false);
 
   // trip leader
   const [leaderOpen, setLeaderOpen] = useState(false);
@@ -503,16 +499,6 @@ export function AssignmentBoard({
               </span>
             </div>
             <Progress value={pct} />
-            {canAdmin && (
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto p-0 text-xs"
-                onClick={() => setEditOpen(true)}>
-                <Pencil className="mr-1 h-3 w-3" />
-                Автобус засах
-              </Button>
-            )}
           </div>
         </div>
 
@@ -1173,29 +1159,6 @@ export function AssignmentBoard({
               Холбох
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* edit bus (inline) */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Автобус засах</DialogTitle>
-            <DialogDescription>
-              Хөдлөх цаг, багтаамж, нэр зэрэг мэдээллийг засна
-            </DialogDescription>
-          </DialogHeader>
-          <BusForm
-            exchangeId={exchangeId}
-            exchangeDirection={bus.direction}
-            exchangeDate={exchangeDate ?? ""}
-            directions={directions}
-            initial={bus}
-            onDone={() => {
-              setEditOpen(false);
-              refresh();
-            }}
-          />
         </DialogContent>
       </Dialog>
 
