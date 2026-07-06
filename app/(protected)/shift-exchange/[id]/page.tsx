@@ -17,7 +17,6 @@ import { LinkedGroups } from "@/components/shift-exchange/linked-groups";
 import { PooledByCompany } from "@/components/shift-exchange/pooled-by-company";
 import { SmartAssignButton } from "@/components/shift-exchange/smart-assign-button";
 import { BusGrid } from "@/components/shift-exchange/bus-grid";
-import { AddBusButton } from "@/components/shift-exchange/add-bus-button";
 import { RegistrationDeadlineControl } from "@/components/shift-exchange/registration-deadline-control";
 import { PassengerLookup } from "@/components/shift-exchange/passenger-lookup";
 import { RealtimeRefresher } from "@/components/shift-exchange/realtime-refresher";
@@ -68,24 +67,14 @@ export default async function ShiftExchangeDetailPage({
             {exchange.notes ? ` · ${exchange.notes}` : ""}
           </p>
         </div>
-        {canView && (
+        {canView && buses.length > 0 && (
           <div className="flex items-center gap-2">
-            {buses.length > 0 && (
-              <Button asChild variant="outline">
-                <a href={`/shift-exchange/${id}/export`}>
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Excel татах
-                </a>
-              </Button>
-            )}
-            {canView && (
-              <AddBusButton
-                exchangeId={id}
-                exchangeDirection={exchange.direction}
-                exchangeDate={exchange.exchangeDate}
-                directions={directions}
-              />
-            )}
+            <Button asChild variant="outline">
+              <a href={`/shift-exchange/${id}/export`}>
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel татах
+              </a>
+            </Button>
           </div>
         )}
       </div>

@@ -20,8 +20,9 @@ import { autoDistributePool } from "@/actions/shift-exchange";
 import { BusyIndicator } from "@/components/ui/page-loader";
 
 /**
- * Ухаалаг хуваарилах: pool дахь зорчигчдыг чиглэлээр нь автобусанд автоматаар
- * хуваарилна (шаардлагатай бол шинэ автобус үүсгэнэ). Хэдийн хуваарилагдсан хүн
+ * Ухаалаг хуваарилах: pool дахь зорчигчдыг чиглэлээр нь байгаа автобусанд
+ * автоматаар хуваарилна (шинэ автобус үүсгэхгүй — автобусууд гадаад системээс
+ * sync орж ирдэг). Багтахгүй бол pool-д үлдэнэ. Хэдийн хуваарилагдсан хүн
  * хэвээр үлдэнэ.
  */
 export function SmartAssignButton({
@@ -39,9 +40,9 @@ export function SmartAssignButton({
       const res = await autoDistributePool(exchangeId);
       if (res.ok) {
         toast.success(
-          `${res.busesCreated} автобус үүсгэж ${res.assigned} зорчигч хуваарилагдлаа` +
+          `${res.assigned} зорчигч байгаа автобусанд хуваарилагдлаа` +
             (res.stillPooled > 0
-              ? ` · ${res.stillPooled} чиглэлгүй хуваарилаагүй үлдлээ`
+              ? ` · ${res.stillPooled} автобус дүүрсэн тул хуваарилаагүй үлдлээ`
               : ""),
         );
         router.refresh();
@@ -67,10 +68,10 @@ export function SmartAssignButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Ухаалаг хуваарилах уу?</AlertDialogTitle>
           <AlertDialogDescription>
-            Хуваарилаагүй {pooledCount} зорчигчийг чиглэлээр нь автобусанд
-            автоматаар хуваарилна. Шаардлагатай бол шинэ автобус (44 зорчигч + 1
-            аялалын ахлах = нийт 45) үүснэ. Хэдийн хуваарилагдсан хүмүүс хэвээр
-            үлдэнэ.
+            Хуваарилаагүй {pooledCount} зорчигчийг чиглэлээр нь байгаа
+            автобусуудад автоматаар хуваарилна (шинэ автобус үүсгэхгүй).
+            Багтахгүй зорчигч хуваарилаагүй хэвээр үлдэнэ. Хэдийн хуваарилагдсан
+            хүмүүс хэвээр үлдэнэ.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
