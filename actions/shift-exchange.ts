@@ -93,7 +93,7 @@ export const getDirections = cache(async (): Promise<AutobusDirection[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("autobus_direction")
-    .select("id, bteg_id, name, zam_tsag")
+    .select("id, h_autobus_direction_id, name, zam_tsag")
     .order("name", { nullsFirst: false });
   if (error) {
     console.error("[shift-exchange] getDirections:", error.message);
@@ -101,7 +101,7 @@ export const getDirections = cache(async (): Promise<AutobusDirection[]> => {
   }
   return (data ?? []).map((d) => ({
     id: String(d.id),
-    btegId: String(d.bteg_id),
+    btegId: String(d.h_autobus_direction_id),
     name: (d.name as string) ?? null,
     zamTsag: d.zam_tsag != null ? Number(d.zam_tsag) : null,
   }));
@@ -111,16 +111,16 @@ export const getEeljGroups = cache(async (): Promise<EeljGroupOption[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("eelj_groups")
-    .select("bteg_id, name")
+    .select("sf_guard_group_id, name")
     .order("name", { nullsFirst: false });
   if (error) {
     console.error("[shift-exchange] getEeljGroups:", error.message);
     return [];
   }
   return (data ?? [])
-    .filter((g) => g.bteg_id)
+    .filter((g) => g.sf_guard_group_id)
     .map((g) => ({
-      btegId: String(g.bteg_id),
+      btegId: String(g.sf_guard_group_id),
       name: (g.name as string) ?? "",
     }));
 });
@@ -133,7 +133,7 @@ export async function getMyOrgEeljGroups(): Promise<EeljGroupOption[]> {
   if (!org) return [];
   const { data, error } = await supabase
     .from("eelj_groups")
-    .select("bteg_id, name")
+    .select("sf_guard_group_id, name")
     .eq("organization_id", org as string)
     .order("name", { nullsFirst: false });
   if (error) {
@@ -141,9 +141,9 @@ export async function getMyOrgEeljGroups(): Promise<EeljGroupOption[]> {
     return [];
   }
   return (data ?? [])
-    .filter((g) => g.bteg_id)
+    .filter((g) => g.sf_guard_group_id)
     .map((g) => ({
-      btegId: String(g.bteg_id),
+      btegId: String(g.sf_guard_group_id),
       name: (g.name as string) ?? "",
     }));
 }
@@ -1824,10 +1824,10 @@ export async function getBusExportData(
     if (groupIds.length) {
       const { data: gs } = await supabase
         .from("eelj_groups")
-        .select("bteg_id, name")
-        .in("bteg_id", groupIds);
+        .select("sf_guard_group_id, name")
+        .in("sf_guard_group_id", groupIds);
       for (const g of gs ?? [])
-        groupName.set(String(g.bteg_id), String(g.name ?? ""));
+        groupName.set(String(g.sf_guard_group_id), String(g.name ?? ""));
     }
     for (const u of us ?? []) {
       const gid = u.sf_guard_group_id ? String(u.sf_guard_group_id) : null;
@@ -1929,10 +1929,10 @@ export async function getLinkedGroups(
   const supabase = await createClient();
   const { data: groups } = await supabase
     .from("eelj_groups")
-    .select("bteg_id, name")
-    .in("bteg_id", ids);
+    .select("sf_guard_group_id, name")
+    .in("sf_guard_group_id", ids);
   const nameMap = new Map(
-    (groups ?? []).map((g) => [String(g.bteg_id), (g.name as string) ?? ""]),
+    (groups ?? []).map((g) => [String(g.sf_guard_group_id), (g.name as string) ?? ""]),
   );
   return ids
     .map((id) => ({ btegId: id, name: nameMap.get(id) ?? id }))
