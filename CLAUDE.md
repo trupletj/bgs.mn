@@ -33,15 +33,17 @@ npm run start      # Serve production build
 npm run lint       # ESLint (run before PRs)
 npm run lint -- --fix  # Auto-fix lint issues
 
-# Supabase local backend
-supabase start           # Boot local Supabase services
-supabase db push         # Apply migrations from supabase/migrations/
-supabase db diff         # Check for schema drift before committing SQL
+# Supabase local backend — see DEVELOPMENT.md for full setup/workflow
+npx supabase start           # Boot local Supabase services (schema from supabase/migrations/)
+npx supabase db diff         # Check for schema drift before committing SQL
+./scripts/refresh-local-data.sh  # Pull latest real data from supa.bgs.mn (production)
 
 # Smoke tests (need env vars exported)
 npx tsx test-auth.ts
 node test-orders.js
 ```
+
+**Production backend**: `supa.bgs.mn` — a self-hosted Supabase stack on the team's Ubuntu server (Supabase Cloud is being phased out). See `DEVELOPMENT.md` for the full local dev setup, how to push schema changes to production, and how to refresh local data.
 
 ## Environment Variables
 
