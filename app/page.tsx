@@ -85,7 +85,8 @@ export default async function Home({
             ].map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 ring-1 ring-white/8 backdrop-blur-sm">
+                className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3 ring-1 ring-white/8 backdrop-blur-sm"
+              >
                 <Icon className="h-4 w-4 shrink-0 text-white/40" />
                 <span className="text-sm text-white/60">{label}</span>
               </div>
@@ -119,7 +120,8 @@ export default async function Home({
             Хэрэв та үзлэгийн хуудас бөглөх бол{" "}
             <a
               href="https://my.bgs.mn"
-              className="font-medium underline underline-offset-2">
+              className="font-medium underline underline-offset-2"
+            >
               my.bgs.mn
             </a>{" "}
             дарж хуучин системээр орно уу.

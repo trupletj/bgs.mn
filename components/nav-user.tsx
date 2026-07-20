@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { IconDotsVertical, IconQrcode, IconLogout } from "@tabler/icons-react";
@@ -58,6 +58,24 @@ export function NavUser({
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const [qrSize, setQrSize] = useState(250);
+
+  useEffect(() => {
+    const updateSize = () => {
+      const width = window.innerWidth;
+
+      if (width < 640) {
+        setQrSize(Math.min(width - 80, 350));
+      } else {
+        setQrSize(Math.min(width * 0.5, 600));
+      }
+    };
+
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     const supabase = createClient();
@@ -73,16 +91,15 @@ export function NavUser({
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="h-auto rounded-xl px-2 py-2 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent">
+                className="h-auto rounded-xl px-2 py-2 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+              >
                 <Avatar className="h-8 w-8 rounded-lg ring-1 ring-white/10">
                   <AvatarImage src={user.avatar} alt={user.name} />
                   <AvatarFallback className="rounded-lg bg-primary/20 text-xs font-semibold text-white">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="truncate text-sm font-medium">
-                  Хэрэглэгч
-                </span>
+                <span className="truncate text-sm font-medium">Хэрэглэгч</span>
                 <IconDotsVertical className="ml-auto h-4 w-4 text-sidebar-foreground/40" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
@@ -91,7 +108,8 @@ export function NavUser({
               className="w-56 rounded-xl"
               side={isMobile ? "bottom" : "right"}
               align="end"
-              sideOffset={8}>
+              sideOffset={8}
+            >
               <div className="flex items-center gap-2.5 px-3 py-2.5">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={user.avatar} alt={user.name} />
@@ -119,7 +137,8 @@ export function NavUser({
                 onSelect={(e) => {
                   e.preventDefault();
                   setLogoutOpen(true);
-                }}>
+                }}
+              >
                 <IconLogout className="h-4 w-4" />
                 Системээс гарах
               </DropdownMenuItem>
@@ -130,13 +149,13 @@ export function NavUser({
 
       {qrPayload && (
         <Dialog open={qrOpen} onOpenChange={setQrOpen}>
-          <DialogContent className="max-w-xs">
+          <DialogContent className="w-[95vw] !max-w-3xl h-auto">
             <DialogHeader>
               <DialogTitle className="text-center">Дижитал үнэмлэх</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col items-center gap-4 py-2">
-              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-border">
-                <QRCodeSVG value={qrPayload} size={200} level="H" />
+              <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-border">
+                <QRCodeSVG value={qrPayload} size={qrSize} level="H" />
               </div>
               <p className="text-sm font-medium">{user.name}</p>
             </div>
