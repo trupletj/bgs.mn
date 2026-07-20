@@ -25,9 +25,6 @@ export async function getNavServices(): Promise<NavService[]> {
     hasPolicyCreate,
     hasJobDescriptionAccess,
     hasJobDescriptionCreate,
-    hasNewsManage,
-    hasNotificationCreate,
-    hasBannerManage,
     hasCreateOrder,
     hasOrderAccess,
     seManage,
@@ -41,9 +38,6 @@ export async function getNavServices(): Promise<NavService[]> {
     hasPermission("policy", "create"),
     hasPermission("job_description", "access"),
     hasPermission("job_description", "create"),
-    hasPermission("news", "create"),
-    hasPermission("notification", "create"),
-    hasPermission("banner", "create"),
     hasPermission("order", "create"),
     hasPermission("order", "access"),
     hasPermission("shift_exchange", "view"),
@@ -225,26 +219,6 @@ export async function getNavServices(): Promise<NavService[]> {
         { title: "Хүсэлтүүд", url: "/devices/requests" },
         { title: "Тайлан", url: "/devices/report" },
       ],
-    });
-  }
-
-  if (hasNewsManage || hasNotificationCreate || hasBannerManage) {
-    const contentItems: NavSubItem[] = [];
-    if (hasNewsManage) {
-      contentItems.push({ title: "Мэдээ", url: "/news" });
-    }
-    if (hasBannerManage) {
-      contentItems.push({ title: "Баннер", url: "/banners" });
-    }
-    if (hasNotificationCreate) {
-      contentItems.push({ title: "Мэдэгдэл", url: "/notifications" });
-    }
-    services.push({
-      key: "content",
-      title: "Контент",
-      url: contentItems[0]?.url ?? "/news",
-      basePaths: ["/news", "/banners", "/notifications"],
-      items: contentItems,
     });
   }
 

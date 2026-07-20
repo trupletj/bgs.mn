@@ -312,8 +312,11 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+MESSAGEPRO_URL = "env(MESSAGEPRO_URL)"
+MESSAGEPRO_FROM = "env(MESSAGEPRO_FROM)"
+MESSAGEPRO_KEY = "env(MESSAGEPRO_KEY)"
+SEND_SMS_HOOK_SECRET = "env(SEND_SMS_HOOK_SECRET)"
 
 [analytics]
 enabled = true
@@ -337,12 +340,12 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [auth.hook.send_sms]
 enabled = true
 uri = "http://host.docker.internal:54321/functions/v1/sms-hook?apikey=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
-secrets = "v1,whsec_ZXhhbXBsZXNlY3JldGtleWZvcmxvY2FsZGV2MTIzNDU="
+secrets = "env(SEND_SMS_HOOK_SECRET)"
 
 [auth.hook.before_user_created]
 enabled = true
 uri = "http://host.docker.internal:54321/functions/v1/create-auth-user?apikey=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
-secrets = "v1,whsec_ZXhhbXBsZXNlY3JldGtleWZvcmxvY2FsZGV2MTIzNDU="
+secrets = "env(SEND_SMS_HOOK_SECRET)"
 
 [functions.sms-hook]
 verify_jwt = false

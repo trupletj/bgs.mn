@@ -7,6 +7,25 @@ const embedParentOrigins = (process.env.NEXT_PUBLIC_EMBED_PARENT_ORIGINS ?? "")
 
 const frameAncestors = ["'self'", ...embedParentOrigins].join(" ");
 
+// NEXT_PUBLIC_SUPABASE_URL-аас тухайн орчны Storage hostname-ийг гаргаж аваад
+// remotePatterns-д нэмнэ, ингэснээр self-host IP/domain солигдох бүрд энэ
+// файлыг дахин засах шаардлагагүй болно.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseRemotePattern = (() => {
+  if (!supabaseUrl) return null;
+  try {
+    const { protocol, hostname, port } = new URL(supabaseUrl);
+    return {
+      protocol: protocol.replace(":", "") as "http" | "https",
+      hostname,
+      port,
+      pathname: "/**" as const,
+    };
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
@@ -20,6 +39,7 @@ const nextConfig: NextConfig = {
         hostname: "ljlywyhpxsutvrdeyyla.supabase.co",
         pathname: "/**",
       },
+      ...(supabaseRemotePattern ? [supabaseRemotePattern] : []),
     ],
   },
   async headers() {

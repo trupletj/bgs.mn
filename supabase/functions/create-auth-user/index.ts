@@ -13,7 +13,7 @@ Deno.serve(async (req)=>{
   });
   const { data: dbUser, error: qErr } = await admin.from("users").select("id, phone, register_number").eq("phone", payload.user.phone).maybeSingle();
   const { user } = payload;
-  if (user.user_metadata.register_number !== dbUser.register_number) {
+  if (!dbUser || user.user_metadata.register_number !== dbUser.register_number) {
     return new Response(JSON.stringify({
       error: {
         message: 'Бүртгэлийн мэдээлэл таарахгүй байна.',
