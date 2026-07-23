@@ -70,8 +70,11 @@ export async function GET(
           lead.lastName ? ". " : ""
         }${lead.firstName ?? ""}`.trim()
       : null;
-    const leaderInfo = leaderLabel
-      ? `Аялалын ахлах: ${leaderLabel}${lead?.phone ? " · " + lead.phone : ""}`
+    // `lead` (not `leaderLabel`) decides whether a leader exists — an empty
+    // last/first name would make leaderLabel "" (falsy) and wrongly show "—"
+    // even though the leader row itself is present.
+    const leaderInfo = lead
+      ? `Аялалын ахлах: ${leaderLabel || "?"}${lead.phone ? " · " + lead.phone : ""}`
       : "Аялалын ахлах: —";
     // Гарчиг, автобусны нэр, ахлах — нэг merge мөрөнд (олон баганад багтаахаар).
     const topLine = `${title} · ${bus.name} · ${leaderInfo}`;
