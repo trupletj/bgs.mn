@@ -29,6 +29,32 @@ import type {
 const SCHEMA = "bgs_attendance";
 const sb = () => createClientForSchema(SCHEMA);
 
+/** PostgREST GET-ийн .in() filter нь URL query string-д ордог тул олон зуун
+ *  UUID нэг дор дамжуулбал self-host gateway (nginx/Kong давхарга) дээр
+ *  "414 Request-URI Too Large" эсвэл "502 Bad Gateway" өгч чимээгүй хоосон
+ *  буцдаг (Cloud дээр анзаарагдаагүй, self-host cutover-оос хойш илэрсэн —
+ *  SHIFT_EXCHANGE_KNOWN_ISSUES.md). Бодитоор хэмжихэд ~94 UUID-аас дээш
+ *  тогтворгүй (502) болж эхэлдэг тул батлагдсан аюулгүй хэмжээнээс (50)
+ *  доогуур байлгана. Том жагсаалтыг багц болгож хуваан query-г найдвартай
+ *  болгоно. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/** `.in()` filter-тэй query-г chunk() ашиглан багцаар явуулж нэгтгэнэ — том
+ *  UUID жагсаалтын URL-length 414 алдаанаас сэргийлнэ. */
+async function fetchInChunks<Row>(
+  ids: string[],
+  size: number,
+  run: (ids: string[]) => PromiseLike<{ data: Row[] | null }>,
+): Promise<Row[]> {
+  if (!ids.length) return [];
+  const batches = await Promise.all(chunk(ids, size).map(run));
+  return batches.flatMap((b) => b.data ?? []);
+}
+
 async function requireAdmin(): Promise<string | null> {
   const ok = await hasPermission("shift_exchange", "view");
   return ok ? null : "Танд энэ үйлдлийг хийх эрх алга";
@@ -717,7 +743,7 @@ function mapBus(row: unknown): Bus {
     direction: b.direction as ShiftDirection,
     name: String(b.name ?? ""),
     description: (b.description as string) ?? null,
-    capacity: Number(b.capacity),
+    capacity: Number(b.capacity) || 45,
     departureTime: (b.departure_time as string) ?? null,
     tripLeaderId: (b.trip_leader_id as string) ?? null,
     tripLeaderName: null,
@@ -1029,28 +1055,24 @@ async function mapAssignmentRows(
       getDirections(),
       getOrgNameMap(),
       getEeljGroups(),
-      internalIds.length
-        ? createClient()
-            .then((supabase) =>
-              supabase
-                .from("users")
-                .select(
-                  "id, first_name, last_name, position_name, department_id, department_name, heltes_name, organization_id, autobus_direction_id, phone, sf_guard_group_id",
-                )
-                .in("id", internalIds),
+      fetchInChunks<Record<string, unknown>>(internalIds, 50, (batch) =>
+        createClient().then((supabase) =>
+          supabase
+            .from("users")
+            .select(
+              "id, first_name, last_name, position_name, department_id, department_name, heltes_name, organization_id, autobus_direction_id, phone, sf_guard_group_id",
             )
-            .then((res) => res.data ?? [])
-        : Promise.resolve([] as Record<string, unknown>[]),
-      internalIds.length
-        ? sb()
-            .then((client) =>
-              client
-                .from("companion_group_members")
-                .select("internal_user_id, group_id")
-                .in("internal_user_id", internalIds),
-            )
-            .then((res) => res.data ?? [])
-        : Promise.resolve([] as Record<string, unknown>[]),
+            .in("id", batch),
+        ),
+      ),
+      fetchInChunks<Record<string, unknown>>(internalIds, 50, (batch) =>
+        sb().then((client) =>
+          client
+            .from("companion_group_members")
+            .select("internal_user_id, group_id")
+            .in("internal_user_id", batch),
+        ),
+      ),
       busIds.length
         ? sb()
             .then((client) =>
@@ -1096,19 +1118,35 @@ async function mapAssignmentRows(
     const internalUserId = String(a.internal_user_id);
     const u = userMap.get(internalUserId);
 
-    const displayName = `${u?.last_name ?? ""} ${u?.first_name ?? ""}`.trim();
-    const positionName = (u?.position_name as string) ?? null;
+    // If the live public.users join misses (stale/broken internal_user_id
+    // link), fall back to the profile snapshot columns stored directly on
+    // the assignment row itself (set once at insert by set_assignment_direction())
+    // instead of rendering a blank name — see SHIFT_EXCHANGE_KNOWN_ISSUES.md.
+    const firstName = u
+      ? ((u.first_name as string) ?? null)
+      : ((a.first_name as string) ?? null);
+    const lastName = u
+      ? ((u.last_name as string) ?? null)
+      : ((a.last_name as string) ?? null);
+    const displayName = `${lastName ?? ""} ${firstName ?? ""}`.trim();
+    const positionName = u
+      ? ((u.position_name as string) ?? null)
+      : ((a.position_name as string) ?? null);
     // department_name/heltes_name can be "" (not null) on rows where that
     // side doesn't apply — decide by the *_id, not by the string value.
-    const albaName = u?.department_id
-      ? (u?.department_name as string) || null
-      : null;
-    const heltesName = (u?.heltes_name as string) || null;
+    const albaName = u
+      ? u.department_id
+        ? (u.department_name as string) || null
+        : null
+      : (a.department_name as string) || null;
+    const heltesName = u
+      ? (u.heltes_name as string) || null
+      : (a.heltes_name as string) || null;
     const organizationId = (u?.organization_id as string) ?? null;
     const organizationName = organizationId
       ? (orgNames.get(organizationId) ?? null)
       : null;
-    const phone = (u?.phone as string) ?? null;
+    const phone = u ? ((u.phone as string) ?? null) : ((a.phone as string) ?? null);
     const eeljGroupId = (u?.sf_guard_group_id as string) ?? null;
     const eeljGroupName = eeljGroupId
       ? (eeljNameByBteg.get(eeljGroupId) ?? null)
@@ -1135,8 +1173,8 @@ async function mapAssignmentRows(
       confirmedAt: (a.confirmed_at as string) ?? null,
       notes: (a.notes as string) ?? null,
       displayName,
-      firstName: (u?.first_name as string) ?? null,
-      lastName: (u?.last_name as string) ?? null,
+      firstName,
+      lastName,
       positionName,
       albaName,
       heltesName,
@@ -1671,6 +1709,22 @@ export async function getBusExportData(
   }
   const assignsPerBus = buses.map((b) => byBus.get(b.id) ?? []);
 
+  // Аялалын ахлахын мөр (is_trip_leader=true) — доор нь public.users live
+  // join амжилтгүй болвол ашиглах баялаг fallback: mapAssignmentRows нь
+  // regular зорчигчдод хэрэглэдэгтэй ижил snapshot багана (position/heltes/
+  // department/phone)-аар автоматаар нөхдөг.
+  const { data: leaderRows } = await client
+    .from("passenger_assignments")
+    .select("*")
+    .eq("shift_exchange_id", exchangeId)
+    .not("bus_id", "is", null)
+    .eq("is_trip_leader", true)
+    .order("id");
+  const enrichedLeaders = await mapAssignmentRows(leaderRows ?? []);
+  const leaderAssignmentByBusId = new Map<number, PassengerAssignment>();
+  for (const a of enrichedLeaders)
+    if (a.busId != null) leaderAssignmentByBusId.set(a.busId, a);
+
   // eelj_groups.name + аялалын ахлахын дэлгэрэнгүй (нэр/утас)
   const userIds = new Set<string>();
   for (const list of assignsPerBus)
@@ -1693,26 +1747,39 @@ export async function getBusExportData(
     }
   >();
   if (userIds.size) {
-    const supabase = await createClient();
-    const { data: us } = await supabase
-      .from("users")
-      .select(
-        "id, sf_guard_group_id, phone, first_name, last_name, department_id, department_name, heltes_name, position_name, autobus_direction_id",
-      )
-      .in("id", [...userIds]);
+    const us = await fetchInChunks<Record<string, unknown>>(
+      [...userIds],
+      50,
+      (batch) =>
+        createClient().then((supabase) =>
+          supabase
+            .from("users")
+            .select(
+              "id, sf_guard_group_id, phone, first_name, last_name, department_id, department_name, heltes_name, position_name, autobus_direction_id",
+            )
+            .in("id", batch),
+        ),
+    );
     const groupIds = [
-      ...new Set((us ?? []).map((u) => u.sf_guard_group_id).filter(Boolean)),
+      ...new Set(us.map((u) => u.sf_guard_group_id).filter(Boolean)),
     ] as string[];
     const groupName = new Map<string, string>();
     if (groupIds.length) {
-      const { data: gs } = await supabase
-        .from("eelj_groups")
-        .select("sf_guard_group_id, name")
-        .in("sf_guard_group_id", groupIds);
-      for (const g of gs ?? [])
+      const gs = await fetchInChunks<Record<string, unknown>>(
+        groupIds,
+        50,
+        (batch) =>
+          createClient().then((supabase) =>
+            supabase
+              .from("eelj_groups")
+              .select("sf_guard_group_id, name")
+              .in("sf_guard_group_id", batch),
+          ),
+      );
+      for (const g of gs)
         groupName.set(String(g.sf_guard_group_id), String(g.name ?? ""));
     }
-    for (const u of us ?? []) {
+    for (const u of us) {
       const gid = u.sf_guard_group_id ? String(u.sf_guard_group_id) : null;
       if (gid && groupName.has(gid)) eeljByUser.set(String(u.id), groupName.get(gid)!);
       // Алба (department_id) байвал албаны нэр, эс бөгөөс хэлтсийн нэр.
@@ -1737,26 +1804,87 @@ export async function getBusExportData(
 
   const directionLabel = exchange.direction === "arriving" ? "Ирэх" : "Буух";
 
+  // Fallback source when the live public.users join misses for a trip leader
+  // (stale/broken trip_leader_id -> users mapping): bgs_attendance.trip_leaders
+  // holds a name/phone snapshot written by sync_bus_trip_leader() at the moment
+  // trip_leader_id was last set, keyed by bus_id — see SHIFT_EXCHANGE_KNOWN_ISSUES.md.
+  const busIdsWithLeader = buses.filter((b) => b.tripLeaderId).map((b) => b.id);
+  const tripLeaderSnapshotByBusId = new Map<
+    number,
+    { name: string | null; phone: string | null }
+  >();
+  if (busIdsWithLeader.length) {
+    const { data: tls } = await client
+      .from("trip_leaders")
+      .select("bus_id, name, phone")
+      .in("bus_id", busIdsWithLeader);
+    for (const tl of tls ?? [])
+      tripLeaderSnapshotByBusId.set(tl.bus_id as number, {
+        name: (tl.name as string) ?? null,
+        phone: (tl.phone as string) ?? null,
+      });
+  }
+
   const sheets: BusExportSheet[] = buses.map((b, i) => {
     const passengers: BusExportPassenger[] = [];
     // Аялалын ахлах = 1 дэх зорчигч (тусдаа хүн, жагсаалтын эхэнд).
     const leader = b.tripLeaderId ? userDetail.get(b.tripLeaderId) : null;
+    // Fetched regardless of `leader` — also used to backfill eelj-group/alba
+    // when the live users join found the leader but the separate eelj_groups
+    // lookup used for eeljByUser/albaByUser didn't.
+    const leaderAssignment = leaderAssignmentByBusId.get(b.id) ?? null;
+    const leaderSnapshot =
+      !leader && !leaderAssignment ? tripLeaderSnapshotByBusId.get(b.id) : null;
     if (leader) {
       passengers.push({
         isLeader: true,
-        eeljGroupName: eeljByUser.get(b.tripLeaderId!) ?? null,
-        albaOrHeltes: albaByUser.get(b.tripLeaderId!) ?? null,
+        eeljGroupName:
+          eeljByUser.get(b.tripLeaderId!) ?? leaderAssignment?.eeljGroupName ?? null,
+        albaOrHeltes:
+          albaByUser.get(b.tripLeaderId!) ??
+          leaderAssignment?.albaName ??
+          leaderAssignment?.heltesName ??
+          null,
         position: leader.position,
         lastName: leader.last,
         firstName: leader.first,
         phone: leader.phone,
         directionName: leader.directionName,
       });
+    } else if (leaderAssignment) {
+      // users join missed — the is_trip_leader=true passenger_assignments row
+      // carries its own full snapshot (position/heltes/department/phone), same
+      // fallback columns already used for regular passengers.
+      passengers.push({
+        isLeader: true,
+        eeljGroupName: leaderAssignment.eeljGroupName,
+        albaOrHeltes: leaderAssignment.albaName ?? leaderAssignment.heltesName,
+        position: leaderAssignment.positionName,
+        lastName: leaderAssignment.lastName,
+        firstName: leaderAssignment.firstName,
+        phone: leaderAssignment.phone,
+        directionName: leaderAssignment.directionName,
+      });
+    } else if (leaderSnapshot) {
+      // last resort — bgs_attendance.trip_leaders only has name+phone (no
+      // position/alba/eelj-group), for trip leaders set purely via the legacy
+      // sync trigger without ever getting an is_trip_leader assignment row.
+      const [lastName, ...rest] = (leaderSnapshot.name ?? "").split(" ");
+      passengers.push({
+        isLeader: true,
+        eeljGroupName: null,
+        albaOrHeltes: null,
+        position: null,
+        lastName: lastName || null,
+        firstName: rest.join(" ") || null,
+        phone: leaderSnapshot.phone,
+        directionName: null,
+      });
     }
     for (const a of assignsPerBus[i]) {
       passengers.push({
         isLeader: false,
-        eeljGroupName: eeljByUser.get(a.internalUserId) ?? null,
+        eeljGroupName: eeljByUser.get(a.internalUserId) ?? a.eeljGroupName ?? null,
         albaOrHeltes:
           albaByUser.get(a.internalUserId) ?? a.albaName ?? a.heltesName ?? null,
         position: a.positionName,
