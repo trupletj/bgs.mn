@@ -355,8 +355,7 @@ export function PurchaseQuoteManager({
               <h2 className="font-semibold">Үнийн санал</h2>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Авсан үнийн саналуудыг харьцуулж, худалдан авалтын баримт
-              бүртгэхдээ modal дотроос сонгоно.
+              Авсан үнийн саналуудыг харьцуулж, худалдан авалтын баримт бүртгэх
             </p>
           </div>
           <DialogTrigger asChild>
@@ -389,7 +388,8 @@ export function PurchaseQuoteManager({
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="justify-between">
+                    className="justify-between"
+                  >
                     <span className="truncate">
                       {selectedSupplier
                         ? `${selectedSupplier.name}${selectedSupplier.registration_number ? ` · ${selectedSupplier.registration_number}` : ""}`
@@ -400,7 +400,8 @@ export function PurchaseQuoteManager({
                 </PopoverTrigger>
                 <PopoverContent
                   className="w-[min(92vw,420px)] p-0"
-                  align="start">
+                  align="start"
+                >
                   <Command shouldFilter={false}>
                     <CommandInput
                       value={supplierQuery}
@@ -422,7 +423,8 @@ export function PurchaseQuoteManager({
                               setShowNewSupplier(true);
                               setNewSupplierName(supplierQuery);
                               setSupplierOpen(false);
-                            }}>
+                            }}
+                          >
                             <Plus className="h-4 w-4" />
                             Шинээр нэмэх
                           </Button>
@@ -440,7 +442,8 @@ export function PurchaseQuoteManager({
                               setNewSupplierName("");
                               setNewSupplierRegistration("");
                               setSupplierOpen(false);
-                            }}>
+                            }}
+                          >
                             <Building2 className="h-4 w-4" />
                             <div className="min-w-0">
                               <p className="truncate font-medium">
@@ -482,7 +485,8 @@ export function PurchaseQuoteManager({
                     type="button"
                     size="sm"
                     className="mt-2"
-                    onClick={handleCreateSupplier}>
+                    onClick={handleCreateSupplier}
+                  >
                     <Plus className="h-4 w-4" />
                     Компани хадгалах
                   </Button>
@@ -529,10 +533,7 @@ export function PurchaseQuoteManager({
                 accept="application/pdf,image/jpeg,image/png,image/webp"
                 onChange={(event) => {
                   const files = filterAllowedSizeFiles(event.target.files);
-                  setQuoteFiles((prev) => [
-                    ...prev,
-                    ...files,
-                  ]);
+                  setQuoteFiles((prev) => [...prev, ...files]);
                   event.currentTarget.value = "";
                 }}
               />
@@ -593,7 +594,8 @@ export function PurchaseQuoteManager({
                           className={cn(
                             isUnavailable && "bg-muted/20",
                             isSelected && !isUnavailable && "bg-primary/5",
-                          )}>
+                          )}
+                        >
                           <td className="px-3 py-2">
                             <Checkbox
                               checked={isSelected}
@@ -659,7 +661,8 @@ export function PurchaseQuoteManager({
                               disabled={!isSelected}
                               onValueChange={(value) =>
                                 setLineValue(item.id, "currency", value)
-                              }>
+                              }
+                            >
                               <SelectTrigger className="h-8 w-36">
                                 <SelectValue />
                               </SelectTrigger>
@@ -667,7 +670,8 @@ export function PurchaseQuoteManager({
                                 {CURRENCY_OPTIONS.map((option) => (
                                   <SelectItem
                                     key={option.value}
-                                    value={option.value}>
+                                    value={option.value}
+                                  >
                                     {option.label}
                                   </SelectItem>
                                 ))}
@@ -686,7 +690,8 @@ export function PurchaseQuoteManager({
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="mt-4 ml-auto">
+            className="mt-4 ml-auto"
+          >
             <Plus className="h-4 w-4" />
             {saving ? "Хадгалж байна..." : "Үнийн санал хадгалах"}
           </Button>
@@ -732,7 +737,8 @@ function PurchaseQuoteList({ quotes }: { quotes: PurchaseQuoteRow[] }) {
           return (
             <div
               key={quote.id}
-              className="rounded-lg border border-border/60 p-3">
+              className="rounded-lg border border-border/60 p-3"
+            >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -801,7 +807,8 @@ function PurchaseQuoteList({ quotes }: { quotes: PurchaseQuoteRow[] }) {
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => openDocument(document.id)}>
+                    onClick={() => openDocument(document.id)}
+                  >
                     <ExternalLink className="h-4 w-4" />
                     <span className="max-w-40 truncate">
                       {document.file_name}

@@ -106,6 +106,9 @@ export function PurchaseFulfillmentBoard({
   const [moveNote, setMoveNote] = useState("");
   const [draggingCard, setDraggingCard] = useState<BoardCard | null>(null);
 
+  const isMultiDragActive =
+    !!draggingCard && selected.size > 1 && selected.has(draggingCard.chunkId);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -282,20 +285,46 @@ export function PurchaseFulfillmentBoard({
     const card = cards.find((c) => c.chunkId === Number(active.id));
     const toStatus = String(over.id);
 
-    if (!card || card.status === toStatus) return;
+    if (!card) return;
+
+    // Dragging a card that's part of a multi-selection moves the whole selection.
+    const cardsToMove =
+      selected.size > 1 && selected.has(card.chunkId)
+        ? cards.filter(
+            (c) => selected.has(c.chunkId) && c.status !== toStatus,
+          )
+        : card.status !== toStatus
+          ? [card]
+          : [];
+
+    if (cardsToMove.length === 0) return;
 
     setBusy(true);
+    let moved = 0;
     try {
-      await runTransition(
-        card.chunkId,
-        toStatus,
-        card.quantity,
-        `${PURCHASE_MOVEMENT_LABELS[toStatus] ?? toStatus} рүү шилжүүлэв`,
+      for (const moveCard of cardsToMove) {
+        await runTransition(
+          moveCard.chunkId,
+          toStatus,
+          moveCard.quantity,
+          `${PURCHASE_MOVEMENT_LABELS[toStatus] ?? toStatus} рүү шилжүүлэв`,
+        );
+        moved += 1;
+      }
+      toast.success(
+        cardsToMove.length > 1
+          ? `${moved} мөр ${PURCHASE_MOVEMENT_LABELS[toStatus] ?? toStatus} рүү шилжлээ`
+          : `${cardsToMove[0].partName} → ${PURCHASE_MOVEMENT_LABELS[toStatus] ?? toStatus}`,
       );
-      toast.success(`${card.partName} → ${PURCHASE_MOVEMENT_LABELS[toStatus] ?? toStatus}`);
+      setSelected(new Set());
       onRefresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Алдаа гарлаа");
+      toast.error(
+        error instanceof Error
+          ? `${moved} мөр шилжсэн. Алдаа: ${error.message}`
+          : "Алдаа гарлаа",
+      );
+      onRefresh();
     } finally {
       setBusy(false);
     }
@@ -416,7 +445,13 @@ export function PurchaseFulfillmentBoard({
                     </p>
                   ) : (
                     columnCards.map((card) => (
-                      <DraggableCard key={card.chunkId} card={card} disabled={busy}>
+                      <DraggableCard
+                        key={card.chunkId}
+                        card={card}
+                        disabled={busy}
+                        forceGhost={
+                          isMultiDragActive && selected.has(card.chunkId)
+                        }>
                         <BoardCardItem
                           card={card}
                           selected={selected.has(card.chunkId)}
@@ -531,8 +566,21 @@ export function PurchaseFulfillmentBoard({
       {/* Drag overlay — renders outside the scroll container */}
       <DragOverlay dropAnimation={{ duration: 120 }}>
         {draggingCard && (
-          <div className="w-[244px] rotate-1 scale-105 opacity-95 shadow-xl">
-            <CardGhost card={draggingCard} />
+          <div className="relative w-[244px]">
+            {isMultiDragActive && (
+              <>
+                <div className="absolute inset-0 translate-x-2 translate-y-2 rotate-2 rounded-lg border border-primary/20 bg-card shadow-sm" />
+                <div className="absolute inset-0 translate-x-1 translate-y-1 rotate-1 rounded-lg border border-primary/30 bg-card shadow-sm" />
+              </>
+            )}
+            <div className="relative rotate-1 scale-105 opacity-95 shadow-xl">
+              <CardGhost card={draggingCard} />
+              {isMultiDragActive && (
+                <Badge className="absolute -right-2 -top-2 h-5 min-w-5 justify-center rounded-full px-1.5 text-[11px] font-bold">
+                  {selected.size}
+                </Badge>
+              )}
+            </div>
           </div>
         )}
       </DragOverlay>
@@ -571,21 +619,24 @@ function DroppableZone({
 function DraggableCard({
   card,
   disabled,
+  forceGhost,
   children,
 }: {
   card: BoardCard;
   disabled: boolean;
+  forceGhost?: boolean;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.chunkId, disabled });
+  const ghosted = isDragging || forceGhost;
 
   return (
     <div
       ref={setNodeRef}
       style={{
         transform: CSS.Translate.toString(transform),
-        opacity: isDragging ? 0.35 : 1,
+        opacity: ghosted ? 0.35 : 1,
         zIndex: isDragging ? 10 : undefined,
       }}>
       {/* Drag handle — passes listeners to children via slot */}

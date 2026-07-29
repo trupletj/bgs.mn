@@ -354,6 +354,7 @@ export interface VisibleOrderListRow {
   status: string;
   created_at: string;
   profile?: { name?: string; department_name?: string } | null;
+  hasPurchaseStarted: boolean;
 }
 
 export interface VisibleOrderStatusCount {
@@ -438,10 +439,28 @@ export async function getVisibleOrdersForCurrentUser({
     }
   }
 
+  const pageOrderIds = (data ?? []).map((row) => Number(row.id));
+  const purchaseStartedOrderIds = new Set<number>();
+
+  if (pageOrderIds.length > 0) {
+    const { data: purchaseRows, error: purchaseError } = await supabase
+      .from("order_purchase_batches")
+      .select("order_id")
+      .in("order_id", pageOrderIds);
+
+    if (purchaseError) {
+      throw new Error("Худалдан авалтын мэдээлэл унших үед алдаа гарлаа.");
+    }
+
+    for (const row of purchaseRows ?? []) {
+      purchaseStartedOrderIds.add(Number(row.order_id));
+    }
+  }
+
   return {
     orders: (
       (data ?? []) as Array<
-        Omit<VisibleOrderListRow, "profile"> & {
+        Omit<VisibleOrderListRow, "profile" | "hasPurchaseStarted"> & {
           profile?:
             | VisibleOrderListRow["profile"]
             | VisibleOrderListRow["profile"][];
@@ -450,6 +469,7 @@ export async function getVisibleOrdersForCurrentUser({
     ).map((row) => ({
       ...row,
       profile: Array.isArray(row.profile) ? row.profile[0] : row.profile,
+      hasPurchaseStarted: purchaseStartedOrderIds.has(Number(row.id)),
     })),
     totalCount: count ?? 0,
     statusCounts: Object.entries(statusMap).map(([rowStatus, total]) => ({
