@@ -42,6 +42,7 @@ import {
   Building2,
   Filter,
   Plus,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -90,6 +91,17 @@ function StatusBadge({ status }: { status: string }) {
       variant="outline"
       className={cn("h-5 px-2 text-[11px] font-medium", className)}>
       {label}
+    </Badge>
+  );
+}
+
+function PurchaseStartedBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="h-5 gap-1 border-violet-200 bg-violet-50 px-2 text-[11px] font-medium text-violet-700">
+      <ShoppingCart className="h-3 w-3" />
+      Худалдан авалт
     </Badge>
   );
 }
@@ -388,7 +400,10 @@ export default function AllOrderList({
                     )}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={order.status} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusBadge status={order.status} />
+                      {order.hasPurchaseStarted && <PurchaseStartedBadge />}
+                    </div>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(order.created_at)}
@@ -443,6 +458,7 @@ export default function AllOrderList({
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <StatusBadge status={order.status} />
+                  {order.hasPurchaseStarted && <PurchaseStartedBadge />}
                   <span className="text-[11px] text-muted-foreground">
                     {formatDate(order.created_at)}
                   </span>
