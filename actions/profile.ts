@@ -52,13 +52,18 @@ export const getQrPayload = cache(async (): Promise<string | null> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user?.phone) return null;
 
+  // public.users.auth_user_id хэвшмэл бөглөгддөггүй (~19% хэрэглэгчид л
+  // байдаг — create-auth-user edge function-ийн бөглөх код comment
+  // хийгдсэн хэвээр), тиймээс auth_user_id-аар БИШ, profile-ийн адилаар
+  // auth.users.phone-оор шууд холбоно (public.users.phone нь
+  // create_profile_from_auth_user()-тэй ижил эх сурвалж).
   const { data } = await supabase
     .from("users")
     .select("bteg_id, idcard_number")
-    .eq("auth_user_id", user.id)
-    .single();
+    .eq("phone", user.phone)
+    .maybeSingle();
 
   if (!data?.bteg_id || !data?.idcard_number) return null;
 
