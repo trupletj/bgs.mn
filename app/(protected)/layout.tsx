@@ -20,12 +20,15 @@ export default async function AuditLayout({
   let userName = "Хэрэглэгч";
   let userEmail = authUser.user?.email ?? "";
 
-  if (authUser.user) {
+  if (authUser.user?.phone) {
+    // public.users.auth_user_id ихэнх хэрэглэгчид бөглөгддөггүй тул
+    // auth.users.phone-оор шууд холбоно (public.users.phone-той адил
+    // эх сурвалж — getQrPayload()-тэй ижил шалтгаанаар).
     const { data: userRecord } = await supabase
       .from("users")
       .select("first_name, last_name, email")
-      .eq("auth_user_id", authUser.user.id)
-      .single();
+      .eq("phone", authUser.user.phone)
+      .maybeSingle();
 
     if (userRecord) {
       const firstName = userRecord.first_name ?? "";
