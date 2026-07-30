@@ -12,15 +12,15 @@ export async function getProfileInfo() {
   if (!user) {
     throw new Error("Хэрэглэгч олдсонгүй");
   }
-  const { data: profile, error } = await supabase
+  // HR профайл хараахан үүсээгүй шинэ ажилтан (зөвхөн утасны OTP-оор
+  // нэвтэрсэн) энд мөр байхгүй байж болно — throw хийвэл SiteHeader
+  // бүх protected хуудсан дээр л уналт үзүүлнэ, тул null буцаана.
+  const { data: profile } = await supabase
     .from("profile")
     .select("*")
     .eq("auth_user_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    throw new Error("Профайл олдсонгүй");
-  }
   return profile;
 }
 
