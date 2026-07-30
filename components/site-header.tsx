@@ -20,7 +20,7 @@ export async function SiteHeader() {
         <div className="flex-1 min-w-0">
           <p className="truncate text-sm font-medium text-foreground">
             Сайн байна уу,{" "}
-            <span className="text-primary">{profile.name}</span>
+            <span className="text-primary">{profile?.name ?? "Хэрэглэгч"}</span>
           </p>
         </div>
 
