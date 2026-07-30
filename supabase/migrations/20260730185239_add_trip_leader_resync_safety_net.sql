@@ -49,6 +49,14 @@ END;
 $$;
 
 ALTER FUNCTION bgs_attendance.resync_stuck_trip_leaders() OWNER TO postgres;
+
+-- SECURITY DEFINER functions get an implicit EXECUTE grant to PUBLIC on
+-- creation, which under PostgREST means anon/authenticated could call this
+-- over /rest/v1/rpc/... — explicitly close that before opening it to
+-- service_role only (caught by the Supabase security linter).
+REVOKE ALL ON FUNCTION bgs_attendance.resync_stuck_trip_leaders() FROM PUBLIC;
+REVOKE ALL ON FUNCTION bgs_attendance.resync_stuck_trip_leaders() FROM anon;
+REVOKE ALL ON FUNCTION bgs_attendance.resync_stuck_trip_leaders() FROM authenticated;
 GRANT EXECUTE ON FUNCTION bgs_attendance.resync_stuck_trip_leaders() TO service_role;
 
 COMMENT ON FUNCTION bgs_attendance.resync_stuck_trip_leaders() IS
